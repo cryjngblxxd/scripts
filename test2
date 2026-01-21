@@ -1,5 +1,5 @@
 -- ══════════════════════════════════════════════════════════════════════
--- AZRIX CS:GO STYLED UI LIBRARY
+-- AZRIX CS:GO STYLED UI LIBRARY - FIXED
 -- ══════════════════════════════════════════════════════════════════════
 
 local AzrixLibrary = {}
@@ -31,47 +31,30 @@ local Config = {
 -- ══════════════════════════════════════════════════════════════════════
 
 local Colors = {
-    -- Main Colors
     Background = Color3.fromRGB(17, 17, 17),
     BackgroundDark = Color3.fromRGB(12, 12, 12),
     BackgroundLight = Color3.fromRGB(25, 25, 25),
-    
-    -- Panel Colors
     Panel = Color3.fromRGB(22, 22, 22),
     PanelBorder = Color3.fromRGB(35, 35, 35),
     PanelHeader = Color3.fromRGB(28, 28, 28),
-    
-    -- Accent Colors
     Accent = Color3.fromRGB(170, 120, 50),
     AccentDark = Color3.fromRGB(140, 95, 35),
     AccentLight = Color3.fromRGB(200, 150, 70),
-    
-    -- Text Colors
     TextPrimary = Color3.fromRGB(220, 220, 220),
     TextSecondary = Color3.fromRGB(150, 150, 150),
     TextDisabled = Color3.fromRGB(80, 80, 80),
-    
-    -- Interactive Colors
     Toggle = Color3.fromRGB(45, 45, 45),
     ToggleEnabled = Color3.fromRGB(170, 120, 50),
     Slider = Color3.fromRGB(35, 35, 35),
     SliderFill = Color3.fromRGB(170, 120, 50),
-    
-    -- Input Colors
     Input = Color3.fromRGB(30, 30, 30),
     InputBorder = Color3.fromRGB(50, 50, 50),
     InputFocused = Color3.fromRGB(170, 120, 50),
-    
-    -- Dropdown Colors
     Dropdown = Color3.fromRGB(28, 28, 28),
     DropdownHover = Color3.fromRGB(35, 35, 35),
-    
-    -- Tab Colors
     TabInactive = Color3.fromRGB(25, 25, 25),
     TabActive = Color3.fromRGB(35, 35, 35),
     TabHover = Color3.fromRGB(30, 30, 30),
-    
-    -- Misc
     Divider = Color3.fromRGB(40, 40, 40),
     Shadow = Color3.fromRGB(0, 0, 0),
     Success = Color3.fromRGB(75, 175, 100),
@@ -151,6 +134,30 @@ local function AddListLayout(parent, padding, direction, alignment)
     return layout
 end
 
+-- Safe KeyCode lookup
+local function GetKeyCode(keyName)
+    if keyName == nil or keyName == "Unknown" or keyName == "None" or keyName == "" then
+        return Enum.KeyCode.Unknown
+    end
+    
+    local success, result = pcall(function()
+        return Enum.KeyCode[keyName]
+    end)
+    
+    if success and result then
+        return result
+    end
+    
+    return Enum.KeyCode.Unknown
+end
+
+local function GetKeyName(keyCode)
+    if keyCode == nil or keyCode == Enum.KeyCode.Unknown then
+        return "..."
+    end
+    return keyCode.Name
+end
+
 -- ══════════════════════════════════════════════════════════════════════
 -- LIBRARY CORE
 -- ══════════════════════════════════════════════════════════════════════
@@ -170,7 +177,7 @@ function AzrixLibrary.Notifications:Create(options)
     options = options or {}
     local name = options.Name or "Notification"
     local lifetime = options.Lifetime or 3
-    local type = options.Type or "Info"
+    local notifType = options.Type or "Info"
     
     local notifContainer = AzrixLibrary._NotificationContainer
     if not notifContainer then return end
@@ -186,9 +193,18 @@ function AzrixLibrary.Notifications:Create(options)
     AddCorner(notif, 4)
     AddStroke(notif, Colors.PanelBorder)
     
+    local accentColor = Colors.Accent
+    if notifType == "Success" then
+        accentColor = Colors.Success
+    elseif notifType == "Error" then
+        accentColor = Colors.Error
+    elseif notifType == "Warning" then
+        accentColor = Colors.Warning
+    end
+    
     local accentBar = Instance.new("Frame")
     accentBar.Name = "AccentBar"
-    accentBar.BackgroundColor3 = type == "Success" and Colors.Success or type == "Error" and Colors.Error or Colors.Accent
+    accentBar.BackgroundColor3 = accentColor
     accentBar.BorderSizePixel = 0
     accentBar.Size = UDim2.new(0, 3, 1, 0)
     accentBar.Parent = notif
@@ -209,10 +225,8 @@ function AzrixLibrary.Notifications:Create(options)
     text.TextXAlignment = Enum.TextXAlignment.Left
     text.Parent = notif
     
-    -- Animate in
     CreateTween(notif, 0.3, {Position = UDim2.new(0, 0, 0, 0)}):Play()
     
-    -- Animate out and destroy
     task.delay(lifetime, function()
         local tweenOut = CreateTween(notif, 0.3, {Position = UDim2.new(1, 50, 0, 0)})
         tweenOut:Play()
@@ -250,7 +264,7 @@ function AzrixLibrary:SaveConfig(name)
             elseif value.Key then
                 data[flag] = {
                     Type = "Keybind",
-                    Key = value.Key.Name,
+                    Key = GetKeyName(value.Key),
                     Mode = value.Mode
                 }
             else
@@ -304,7 +318,7 @@ function AzrixLibrary:LoadConfig(name)
                 }
             elseif info.Type == "Keybind" then
                 self.Flags[flag] = {
-                    Key = Enum.KeyCode[info.Key] or Enum.KeyCode.None,
+                    Key = GetKeyCode(info.Key),
                     Mode = info.Mode
                 }
             elseif info.Type == "Color3" then
@@ -376,7 +390,12 @@ function AzrixLibrary:Window(options)
     elseif gethui then
         screenGui.Parent = gethui()
     else
-        screenGui.Parent = CoreGui
+        pcall(function()
+            screenGui.Parent = CoreGui
+        end)
+        if not screenGui.Parent then
+            screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+        end
     end
     
     -- Notification Container
@@ -400,8 +419,7 @@ function AzrixLibrary:Window(options)
     mainFrame.Parent = screenGui
     
     AddCorner(mainFrame, 6)
-    
-    local mainStroke = AddStroke(mainFrame, Colors.PanelBorder, 1)
+    AddStroke(mainFrame, Colors.PanelBorder, 1)
     
     -- Shadow
     local shadow = Instance.new("ImageLabel")
@@ -429,7 +447,6 @@ function AzrixLibrary:Window(options)
     topCorner.CornerRadius = UDim.new(0, 6)
     topCorner.Parent = topBar
     
-    -- Fix bottom corners of top bar
     local topBarFix = Instance.new("Frame")
     topBarFix.Name = "CornerFix"
     topBarFix.BackgroundColor3 = Colors.BackgroundDark
@@ -578,7 +595,6 @@ function AzrixLibrary:Window(options)
     function Window:Tab(options)
         options = options or {}
         local name = options.Name or "Tab"
-        local icon = options.Icon or nil
         
         local Tab = {}
         Tab.Sections = {Left = {}, Right = {}}
@@ -710,7 +726,6 @@ function AzrixLibrary:Window(options)
             headerCorner.CornerRadius = UDim.new(0, 4)
             headerCorner.Parent = sectionHeader
             
-            -- Fix bottom corners
             local headerFix = Instance.new("Frame")
             headerFix.Name = "CornerFix"
             headerFix.BackgroundColor3 = Colors.PanelHeader
@@ -740,7 +755,7 @@ function AzrixLibrary:Window(options)
             sectionContent.AutomaticSize = Enum.AutomaticSize.Y
             sectionContent.Parent = sectionFrame
             
-            local contentLayout = AddListLayout(sectionContent, 2)
+            AddListLayout(sectionContent, 2)
             local contentPadding = Instance.new("UIPadding")
             contentPadding.PaddingTop = UDim.new(0, 6)
             contentPadding.PaddingBottom = UDim.new(0, 8)
@@ -840,7 +855,7 @@ function AzrixLibrary:Window(options)
                 function Toggle:Keybind(kbOptions)
                     kbOptions = kbOptions or {}
                     local kbFlag = kbOptions.Flag or flag .. "_Keybind"
-                    local defaultKey = kbOptions.Key or Enum.KeyCode.None
+                    local defaultKey = kbOptions.Key or Enum.KeyCode.Unknown
                     local mode = kbOptions.Mode or "Toggle"
                     local kbCallback = kbOptions.Callback or function() end
                     
@@ -853,7 +868,7 @@ function AzrixLibrary:Window(options)
                     keybindBtn.Position = UDim2.new(1, -85, 0.5, -9)
                     keybindBtn.Size = UDim2.new(0, 40, 0, 18)
                     keybindBtn.Font = Enum.Font.Gotham
-                    keybindBtn.Text = defaultKey == Enum.KeyCode.None and "..." or defaultKey.Name
+                    keybindBtn.Text = GetKeyName(defaultKey)
                     keybindBtn.TextColor3 = Colors.TextSecondary
                     keybindBtn.TextSize = 10
                     keybindBtn.Parent = toggleFrame
@@ -872,12 +887,18 @@ function AzrixLibrary:Window(options)
                     inputConn = UserInputService.InputBegan:Connect(function(input, processed)
                         if listening then
                             if input.UserInputType == Enum.UserInputType.Keyboard then
-                                AzrixLibrary.Flags[kbFlag].Key = input.KeyCode
-                                keybindBtn.Text = input.KeyCode.Name
+                                if input.KeyCode == Enum.KeyCode.Escape then
+                                    AzrixLibrary.Flags[kbFlag].Key = Enum.KeyCode.Unknown
+                                    keybindBtn.Text = "..."
+                                else
+                                    AzrixLibrary.Flags[kbFlag].Key = input.KeyCode
+                                    keybindBtn.Text = input.KeyCode.Name
+                                end
                                 listening = false
                             end
                         elseif not processed then
-                            if input.KeyCode == AzrixLibrary.Flags[kbFlag].Key then
+                            local currentKey = AzrixLibrary.Flags[kbFlag].Key
+                            if currentKey and currentKey ~= Enum.KeyCode.Unknown and input.KeyCode == currentKey then
                                 if mode == "Toggle" then
                                     SetValue(not AzrixLibrary.Flags[flag])
                                     kbCallback(AzrixLibrary.Flags[flag])
@@ -890,12 +911,14 @@ function AzrixLibrary:Window(options)
                     end)
                     
                     if mode == "Hold" then
-                        UserInputService.InputEnded:Connect(function(input)
-                            if input.KeyCode == AzrixLibrary.Flags[kbFlag].Key then
+                        local inputEndConn = UserInputService.InputEnded:Connect(function(input)
+                            local currentKey = AzrixLibrary.Flags[kbFlag].Key
+                            if currentKey and currentKey ~= Enum.KeyCode.Unknown and input.KeyCode == currentKey then
                                 SetValue(false)
                                 kbCallback(false)
                             end
                         end)
+                        table.insert(AzrixLibrary.Connections, inputEndConn)
                     end
                     
                     table.insert(AzrixLibrary.Connections, inputConn)
@@ -1001,11 +1024,11 @@ function AzrixLibrary:Window(options)
                     callback(value)
                 end
                 
-                local dragging = false
+                local sliderDragging = false
                 
                 sliderBg.InputBegan:Connect(function(input)
                     if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                        dragging = true
+                        sliderDragging = true
                         local percent = math.clamp((input.Position.X - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X, 0, 1)
                         SetValue(min + (max - min) * percent)
                     end
@@ -1013,16 +1036,18 @@ function AzrixLibrary:Window(options)
                 
                 sliderBg.InputEnded:Connect(function(input)
                     if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                        dragging = false
+                        sliderDragging = false
                     end
                 end)
                 
-                UserInputService.InputChanged:Connect(function(input)
-                    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                local sliderMoveConn = UserInputService.InputChanged:Connect(function(input)
+                    if sliderDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
                         local percent = math.clamp((input.Position.X - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X, 0, 1)
                         SetValue(min + (max - min) * percent)
                     end
                 end)
+                
+                table.insert(AzrixLibrary.Connections, sliderMoveConn)
                 
                 function Slider:Set(value)
                     SetValue(value)
@@ -1041,7 +1066,7 @@ function AzrixLibrary:Window(options)
                 local dropdownName = options.Name or "Dropdown"
                 local flag = options.Flag or dropdownName
                 local dropdownOptions = options.Options or {}
-                local default = options.Default or (options.Multi and {} or dropdownOptions[1])
+                local default = options.Default or (options.Multi and {} or (dropdownOptions[1] or ""))
                 local multi = options.Multi or false
                 local callback = options.Callback or function() end
                 
@@ -1111,11 +1136,12 @@ function AzrixLibrary:Window(options)
                 AddCorner(optionContainer, 4)
                 AddStroke(optionContainer, Colors.InputBorder)
                 
-                local optionLayout = AddListLayout(optionContainer, 0)
+                AddListLayout(optionContainer, 0)
                 
                 local function GetDisplayText()
                     if multi then
                         local selected = AzrixLibrary.Flags[flag]
+                        if type(selected) ~= "table" then selected = {} end
                         if #selected == 0 then
                             return "None Selected"
                         elseif #selected <= 2 then
@@ -1137,7 +1163,7 @@ function AzrixLibrary:Window(options)
                         end
                     end
                     
-                    dropdownOptions = newOptions
+                    dropdownOptions = newOptions or dropdownOptions
                     
                     for i, option in ipairs(dropdownOptions) do
                         local optionBtn = Instance.new("TextButton")
@@ -1165,6 +1191,7 @@ function AzrixLibrary:Window(options)
                         optionBtn.MouseButton1Click:Connect(function()
                             if multi then
                                 local selected = AzrixLibrary.Flags[flag]
+                                if type(selected) ~= "table" then selected = {} end
                                 local index = table.find(selected, option)
                                 if index then
                                     table.remove(selected, index)
@@ -1363,7 +1390,7 @@ function AzrixLibrary:Window(options)
                 return Label
             end
             
-            -- Colorpicker (standalone and attachment)
+            -- Colorpicker
             function Section:Colorpicker(options)
                 options = options or {}
                 local colorName = options.Name or "Color"
@@ -1403,20 +1430,22 @@ function AzrixLibrary:Window(options)
                 AddCorner(colorBtn, 4)
                 AddStroke(colorBtn, Colors.PanelBorder)
                 
-                -- Simple color picker popup (simplified for this example)
+                local colors = {
+                    Color3.fromRGB(255, 0, 0),
+                    Color3.fromRGB(255, 128, 0),
+                    Color3.fromRGB(255, 255, 0),
+                    Color3.fromRGB(0, 255, 0),
+                    Color3.fromRGB(0, 255, 255),
+                    Color3.fromRGB(0, 128, 255),
+                    Color3.fromRGB(0, 0, 255),
+                    Color3.fromRGB(128, 0, 255),
+                    Color3.fromRGB(255, 0, 255),
+                    Color3.fromRGB(255, 255, 255),
+                    Color3.fromRGB(170, 120, 50),
+                    Color3.fromRGB(115, 225, 175)
+                }
+                
                 colorBtn.MouseButton1Click:Connect(function()
-                    -- For now, just cycle through some preset colors
-                    local colors = {
-                        Color3.fromRGB(255, 0, 0),
-                        Color3.fromRGB(0, 255, 0),
-                        Color3.fromRGB(0, 0, 255),
-                        Color3.fromRGB(255, 255, 0),
-                        Color3.fromRGB(255, 0, 255),
-                        Color3.fromRGB(0, 255, 255),
-                        Color3.fromRGB(255, 255, 255),
-                        Color3.fromRGB(170, 120, 50)
-                    }
-                    
                     local currentIndex = 1
                     for i, c in ipairs(colors) do
                         if c == colorBtn.BackgroundColor3 then
@@ -1469,10 +1498,9 @@ function AzrixLibrary:Window(options)
             Side = "Left"
         })
         
-        local configNameBox
         local configDropdown
         
-        configNameBox = ConfigSection:Textbox({
+        ConfigSection:Textbox({
             Name = "Config Name",
             Flag = "ConfigName",
             PlaceHolder = "Enter config name...",
@@ -1502,20 +1530,23 @@ function AzrixLibrary:Window(options)
             end
         })
         
+        local configs = AzrixLibrary:GetConfigs()
+        if #configs == 0 then
+            configs = {"No configs"}
+        end
+        
         configDropdown = ConfigSection:Dropdown({
             Name = "Load Config",
             Flag = "SelectedConfig",
-            Options = AzrixLibrary:GetConfigs(),
-            Callback = function(option)
-                -- Just select, don't load yet
-            end
+            Options = configs,
+            Callback = function(option) end
         })
         
         ConfigSection:Button({
             Name = "Load Selected Config",
             Callback = function()
                 local name = AzrixLibrary.Flags.SelectedConfig
-                if name and AzrixLibrary:LoadConfig(name) then
+                if name and name ~= "No configs" and AzrixLibrary:LoadConfig(name) then
                     AzrixLibrary.Notifications:Create({
                         Name = "Config loaded: " .. name,
                         Type = "Success",
@@ -1534,7 +1565,11 @@ function AzrixLibrary:Window(options)
         ConfigSection:Button({
             Name = "Refresh Configs",
             Callback = function()
-                configDropdown.RefreshOptions(AzrixLibrary:GetConfigs())
+                local configs = AzrixLibrary:GetConfigs()
+                if #configs == 0 then
+                    configs = {"No configs"}
+                end
+                configDropdown.RefreshOptions(configs)
                 AzrixLibrary.Notifications:Create({
                     Name = "Configs refreshed",
                     Lifetime = 2
@@ -1546,13 +1581,17 @@ function AzrixLibrary:Window(options)
             Name = "Delete Selected Config",
             Callback = function()
                 local name = AzrixLibrary.Flags.SelectedConfig
-                if name and AzrixLibrary:DeleteConfig(name) then
+                if name and name ~= "No configs" and AzrixLibrary:DeleteConfig(name) then
                     AzrixLibrary.Notifications:Create({
                         Name = "Config deleted: " .. name,
                         Type = "Success",
                         Lifetime = 2
                     })
-                    configDropdown.RefreshOptions(AzrixLibrary:GetConfigs())
+                    local configs = AzrixLibrary:GetConfigs()
+                    if #configs == 0 then
+                        configs = {"No configs"}
+                    end
+                    configDropdown.RefreshOptions(configs)
                 else
                     AzrixLibrary.Notifications:Create({
                         Name = "Failed to delete config",
@@ -1565,7 +1604,7 @@ function AzrixLibrary:Window(options)
     end
     
     -- Toggle Key Handler
-    UserInputService.InputBegan:Connect(function(input, processed)
+    local toggleConn = UserInputService.InputBegan:Connect(function(input, processed)
         if processed then return end
         if input.KeyCode == AzrixLibrary.ToggleKey then
             AzrixLibrary.Visible = not AzrixLibrary.Visible
@@ -1573,10 +1612,14 @@ function AzrixLibrary:Window(options)
         end
     end)
     
+    table.insert(AzrixLibrary.Connections, toggleConn)
+    
     -- Unload function
     function AzrixLibrary:Unload()
         for _, conn in pairs(self.Connections) do
-            conn:Disconnect()
+            if conn and conn.Disconnect then
+                conn:Disconnect()
+            end
         end
         screenGui:Destroy()
     end
@@ -1587,24 +1630,6 @@ function AzrixLibrary:Window(options)
     table.insert(AzrixLibrary.Windows, Window)
     
     return Window
-end
-
--- ══════════════════════════════════════════════════════════════════════
--- AUTO LOAD CONFIG
--- ══════════════════════════════════════════════════════════════════════
-
-function AzrixLibrary:AutoLoadConfig()
-    if self.AutoLoad and self.AutoLoad ~= "" then
-        task.delay(0.5, function()
-            if self:LoadConfig(self.AutoLoad) then
-                self.Notifications:Create({
-                    Name = "Auto-loaded config: " .. self.AutoLoad,
-                    Type = "Success",
-                    Lifetime = 3
-                })
-            end
-        end)
-    end
 end
 
 return AzrixLibrary
