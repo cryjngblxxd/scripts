@@ -1,9 +1,11 @@
 -- ══════════════════════════════════════════════════════════════════════
--- AZRIX UI LIBRARY V2 - COMPACT DESIGN
+-- AZRIX UI LIBRARY - NEW DESIGN (SAME API)
 -- ══════════════════════════════════════════════════════════════════════
 
-local AzrixLibrary = {}
-AzrixLibrary.__index = AzrixLibrary
+local Library = {}
+Library.Flags = {}
+Library.ToggleKey = Enum.KeyCode.Insert
+Library.Unloaded = false
 
 -- Services
 local Players = game:GetService("Players")
@@ -15,1160 +17,1468 @@ local CoreGui = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
+local Connections = {}
 
--- Configuration
-local Config = {
-    ToggleKey = Enum.KeyCode.Insert,
-    ConfigFolder = "AzrixConfigs"
+-- Theme
+local Theme = {
+    Background = Color3.fromRGB(18, 18, 18),
+    Secondary = Color3.fromRGB(22, 22, 22),
+    Tertiary = Color3.fromRGB(28, 28, 28),
+    Accent = Color3.fromRGB(88, 101, 242),
+    AccentDark = Color3.fromRGB(71, 82, 196),
+    Text = Color3.fromRGB(255, 255, 255),
+    TextDark = Color3.fromRGB(175, 175, 175),
+    TextDarker = Color3.fromRGB(100, 100, 100),
+    Divider = Color3.fromRGB(40, 40, 40),
+    Toggle = Color3.fromRGB(50, 50, 50),
+    ToggleOn = Color3.fromRGB(88, 101, 242),
+    SliderBg = Color3.fromRGB(40, 40, 40),
+    SliderFill = Color3.fromRGB(88, 101, 242),
+    Input = Color3.fromRGB(35, 35, 35),
+    InputBorder = Color3.fromRGB(50, 50, 50)
 }
 
--- Color Scheme
-local Colors = {
-    Background = Color3.fromRGB(20, 20, 20),
-    TopBar = Color3.fromRGB(15, 15, 15),
-    TabBar = Color3.fromRGB(18, 18, 18),
-    Section = Color3.fromRGB(25, 25, 25),
-    SectionHeader = Color3.fromRGB(30, 30, 30),
-    Element = Color3.fromRGB(32, 32, 32),
-    ElementHover = Color3.fromRGB(38, 38, 38),
-    Border = Color3.fromRGB(45, 45, 45),
-    Accent = Color3.fromRGB(90, 120, 190),
-    AccentHover = Color3.fromRGB(110, 140, 210),
-    Text = Color3.fromRGB(210, 210, 210),
-    TextDark = Color3.fromRGB(140, 140, 140),
-    TextDisabled = Color3.fromRGB(80, 80, 80),
-    Toggle = Color3.fromRGB(40, 40, 40),
-    ToggleEnabled = Color3.fromRGB(90, 120, 190),
-    Slider = Color3.fromRGB(35, 35, 35),
-    SliderFill = Color3.fromRGB(90, 120, 190),
-    Input = Color3.fromRGB(28, 28, 28),
-    Success = Color3.fromRGB(70, 160, 90),
-    Error = Color3.fromRGB(180, 70, 70),
-    Warning = Color3.fromRGB(180, 150, 70)
-}
-
--- Utility Functions
-local function Tween(obj, time, props)
-    local tween = TweenService:Create(obj, TweenInfo.new(time, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props)
+-- Utility
+local function Tween(obj, time, props, style, dir)
+    local tween = TweenService:Create(obj, TweenInfo.new(time, style or Enum.EasingStyle.Quart, dir or Enum.EasingDirection.Out), props)
     tween:Play()
     return tween
 end
 
-local function Create(class, props)
-    local obj = Instance.new(class)
-    for k, v in pairs(props) do
-        if k ~= "Parent" then
-            obj[k] = v
+local function MakeDraggable(frame, handle)
+    local dragging, dragInput, dragStart, startPos
+    
+    handle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+            
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    
+    handle.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+local function CreateInstance(className, properties)
+    local inst = Instance.new(className)
+    for prop, value in pairs(properties) do
+        if prop ~= "Parent" then
+            inst[prop] = value
         end
     end
-    if props.Parent then
-        obj.Parent = props.Parent
+    if properties.Parent then
+        inst.Parent = properties.Parent
     end
-    return obj
+    return inst
 end
 
-local function Corner(parent, radius)
-    return Create("UICorner", {CornerRadius = UDim.new(0, radius or 4), Parent = parent})
+local function AddCorner(parent, radius)
+    return CreateInstance("UICorner", {
+        CornerRadius = UDim.new(0, radius or 6),
+        Parent = parent
+    })
 end
 
-local function Stroke(parent, color, thickness)
-    return Create("UIStroke", {Color = color or Colors.Border, Thickness = thickness or 1, Parent = parent})
+local function AddStroke(parent, color, thickness, transparency)
+    return CreateInstance("UIStroke", {
+        Color = color or Theme.Divider,
+        Thickness = thickness or 1,
+        Transparency = transparency or 0,
+        Parent = parent
+    })
 end
-
-local function GetKeyName(key)
-    if key == nil or key == Enum.KeyCode.Unknown then return "..." end
-    return key.Name
-end
-
-local function GetKeyCode(name)
-    if not name or name == "..." or name == "Unknown" then return Enum.KeyCode.Unknown end
-    local s, r = pcall(function() return Enum.KeyCode[name] end)
-    return s and r or Enum.KeyCode.Unknown
-end
-
--- Library Core
-AzrixLibrary.Windows = {}
-AzrixLibrary.Flags = {}
-AzrixLibrary.Connections = {}
-AzrixLibrary.ToggleKey = Config.ToggleKey
-AzrixLibrary.Visible = true
-AzrixLibrary.ConfigFolder = Config.ConfigFolder
 
 -- Notifications
-AzrixLibrary.Notifications = {}
+Library.Notifications = {}
+local NotificationHolder
 
-function AzrixLibrary.Notifications:Create(opts)
-    opts = opts or {}
-    local text = opts.Name or "Notification"
-    local duration = opts.Lifetime or 3
-    local nType = opts.Type or "Info"
+function Library.Notifications:Create(options)
+    if not NotificationHolder then return end
     
-    local container = AzrixLibrary._NotifContainer
-    if not container then return end
+    options = options or {}
+    local text = options.Name or "Notification"
+    local duration = options.Lifetime or 3
     
-    local notif = Create("Frame", {
-        Size = UDim2.new(1, 0, 0, 32),
-        BackgroundColor3 = Colors.Section,
+    local Notification = CreateInstance("Frame", {
+        Size = UDim2.new(1, 0, 0, 36),
+        BackgroundColor3 = Theme.Secondary,
         BorderSizePixel = 0,
-        Position = UDim2.new(1, 20, 0, 0),
-        Parent = container
+        Parent = NotificationHolder
     })
-    Corner(notif, 4)
-    Stroke(notif, Colors.Border)
+    AddCorner(Notification, 6)
+    AddStroke(Notification, Theme.Divider)
     
-    local accent = Create("Frame", {
-        Size = UDim2.new(0, 3, 1, 0),
-        BackgroundColor3 = nType == "Success" and Colors.Success or nType == "Error" and Colors.Error or Colors.Accent,
+    local AccentBar = CreateInstance("Frame", {
+        Size = UDim2.new(0, 3, 1, -8),
+        Position = UDim2.new(0, 4, 0, 4),
+        BackgroundColor3 = Theme.Accent,
         BorderSizePixel = 0,
-        Parent = notif
+        Parent = Notification
     })
-    Corner(accent, 4)
+    AddCorner(AccentBar, 2)
     
-    Create("TextLabel", {
-        Size = UDim2.new(1, -15, 1, 0),
-        Position = UDim2.new(0, 12, 0, 0),
+    local NotifText = CreateInstance("TextLabel", {
+        Size = UDim2.new(1, -20, 1, 0),
+        Position = UDim2.new(0, 14, 0, 0),
         BackgroundTransparency = 1,
         Text = text,
-        TextColor3 = Colors.Text,
-        TextSize = 12,
+        TextColor3 = Theme.Text,
+        TextSize = 13,
         Font = Enum.Font.Gotham,
         TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = notif
+        TextTruncate = Enum.TextTruncate.AtEnd,
+        Parent = Notification
     })
     
-    Tween(notif, 0.25, {Position = UDim2.new(0, 0, 0, 0)})
+    Notification.Position = UDim2.new(1, 20, 0, 0)
+    Notification.BackgroundTransparency = 1
+    NotifText.TextTransparency = 1
+    AccentBar.BackgroundTransparency = 1
+    
+    Tween(Notification, 0.3, {Position = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 0})
+    Tween(NotifText, 0.3, {TextTransparency = 0})
+    Tween(AccentBar, 0.3, {BackgroundTransparency = 0})
     
     task.delay(duration, function()
-        Tween(notif, 0.25, {Position = UDim2.new(1, 20, 0, 0)}).Completed:Wait()
-        notif:Destroy()
+        Tween(Notification, 0.3, {Position = UDim2.new(1, 20, 0, 0), BackgroundTransparency = 1})
+        Tween(NotifText, 0.3, {TextTransparency = 1})
+        Tween(AccentBar, 0.3, {BackgroundTransparency = 1})
+        task.wait(0.3)
+        Notification:Destroy()
     end)
 end
 
 -- Config System
-function AzrixLibrary:SaveConfig(name)
-    if not isfolder then return false end
-    name = name or "default"
-    if not isfolder(self.ConfigFolder) then makefolder(self.ConfigFolder) end
+local ConfigFolder = "AzrixConfigs"
+
+local function EnsureConfigFolder()
+    if isfolder and not isfolder(ConfigFolder) then
+        makefolder(ConfigFolder)
+    end
+end
+
+function Library:SaveConfig(name)
+    EnsureConfigFolder()
+    if not writefile then return end
     
     local data = {}
     for flag, value in pairs(self.Flags) do
-        if type(value) == "table" then
+        if typeof(value) == "table" then
             if value.Color then
-                data[flag] = {T = "Color", R = value.Color.R, G = value.Color.G, B = value.Color.B, A = value.Alpha}
+                data[flag] = {Type = "Color", R = value.Color.R, G = value.Color.G, B = value.Color.B, A = value.Alpha}
             elseif value.Key then
-                data[flag] = {T = "Key", K = GetKeyName(value.Key), M = value.Mode}
+                local keyName = value.Key == Enum.KeyCode.Unknown and "Unknown" or value.Key.Name
+                data[flag] = {Type = "Keybind", Key = keyName, Mode = value.Mode}
             else
-                data[flag] = {T = "Tbl", V = value}
+                data[flag] = {Type = "Table", Value = value}
             end
         elseif typeof(value) == "Color3" then
-            data[flag] = {T = "C3", R = value.R, G = value.G, B = value.B}
+            data[flag] = {Type = "Color3", R = value.R, G = value.G, B = value.B}
+        elseif typeof(value) == "EnumItem" then
+            data[flag] = {Type = "Enum", Value = tostring(value)}
         else
-            data[flag] = {T = "Val", V = value}
+            data[flag] = {Type = "Value", Value = value}
         end
     end
     
-    local s = pcall(function() writefile(self.ConfigFolder .. "/" .. name .. ".json", HttpService:JSONEncode(data)) end)
-    return s
+    writefile(ConfigFolder .. "/" .. name .. ".json", HttpService:JSONEncode(data))
 end
 
-function AzrixLibrary:LoadConfig(name)
-    if not isfile then return false end
-    name = name or "default"
-    local path = self.ConfigFolder .. "/" .. name .. ".json"
-    if not isfile(path) then return false end
+function Library:LoadConfig(name)
+    EnsureConfigFolder()
+    if not isfile or not isfile(ConfigFolder .. "/" .. name .. ".json") then return end
     
-    local s, data = pcall(function() return HttpService:JSONDecode(readfile(path)) end)
-    if not s then return false end
+    local success, data = pcall(function()
+        return HttpService:JSONDecode(readfile(ConfigFolder .. "/" .. name .. ".json"))
+    end)
+    
+    if not success then return end
     
     for flag, info in pairs(data) do
-        if self.Flags[flag] ~= nil then
-            if info.T == "Color" then
-                self.Flags[flag] = {Color = Color3.new(info.R, info.G, info.B), Alpha = info.A}
-            elseif info.T == "Key" then
-                self.Flags[flag] = {Key = GetKeyCode(info.K), Mode = info.M}
-            elseif info.T == "C3" then
-                self.Flags[flag] = Color3.new(info.R, info.G, info.B)
-            elseif info.T == "Tbl" then
-                self.Flags[flag] = info.V
-            else
-                self.Flags[flag] = info.V
+        if info.Type == "Color" then
+            Library.Flags[flag] = {Color = Color3.new(info.R, info.G, info.B), Alpha = info.A}
+        elseif info.Type == "Keybind" then
+            local key = Enum.KeyCode.Unknown
+            if info.Key and info.Key ~= "Unknown" then
+                pcall(function() key = Enum.KeyCode[info.Key] end)
             end
+            Library.Flags[flag] = {Key = key, Mode = info.Mode}
+        elseif info.Type == "Color3" then
+            Library.Flags[flag] = Color3.new(info.R, info.G, info.B)
+        elseif info.Type == "Table" then
+            Library.Flags[flag] = info.Value
+        else
+            Library.Flags[flag] = info.Value
         end
     end
-    return true
 end
 
-function AzrixLibrary:GetConfigs()
-    if not isfolder or not listfiles then return {} end
-    if not isfolder(self.ConfigFolder) then makefolder(self.ConfigFolder) return {} end
+function Library:GetConfigs()
+    EnsureConfigFolder()
+    if not listfiles then return {} end
+    
     local configs = {}
-    for _, f in pairs(listfiles(self.ConfigFolder)) do
-        local n = f:match("([^/\\]+)%.json$")
-        if n then table.insert(configs, n) end
+    for _, path in pairs(listfiles(ConfigFolder)) do
+        local name = path:match("([^/\\]+)%.json$")
+        if name then
+            table.insert(configs, name)
+        end
     end
     return configs
 end
 
-function AzrixLibrary:DeleteConfig(name)
-    if not isfile or not delfile then return false end
-    local path = self.ConfigFolder .. "/" .. name .. ".json"
-    if isfile(path) then delfile(path) return true end
-    return false
+function Library:DeleteConfig(name)
+    EnsureConfigFolder()
+    if delfile and isfile(ConfigFolder .. "/" .. name .. ".json") then
+        delfile(ConfigFolder .. "/" .. name .. ".json")
+    end
+end
+
+-- Unload
+function Library:Unload()
+    self.Unloaded = true
+    for _, conn in pairs(Connections) do
+        if conn.Disconnect then conn:Disconnect() end
+    end
+    if self.ScreenGui then
+        self.ScreenGui:Destroy()
+    end
 end
 
 -- Window
-function AzrixLibrary:Window(opts)
-    opts = opts or {}
-    local title = opts.Title or "AZRIX"
-    local subtitle = opts.Subtitle or "CLIENT"
-    local size = opts.Size or UDim2.new(0, 650, 0, 450)
-    
-    local Window = {Tabs = {}, ActiveTab = nil}
+function Library:Window(options)
+    options = options or {}
+    local prefix = options.Prefix or "AZRIX"
+    local suffix = options.Suffix or "CLIENT"
+    local size = options.Size or UDim2.new(0, 620, 0, 471)
     
     -- ScreenGui
-    local gui = Create("ScreenGui", {
-        Name = "AzrixUI",
+    local ScreenGui = CreateInstance("ScreenGui", {
+        Name = "AzrixUI_" .. HttpService:GenerateGUID(false),
         ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
         ResetOnSpawn = false
     })
     
     if syn and syn.protect_gui then
-        syn.protect_gui(gui)
-        gui.Parent = CoreGui
+        syn.protect_gui(ScreenGui)
+        ScreenGui.Parent = CoreGui
     elseif gethui then
-        gui.Parent = gethui()
+        ScreenGui.Parent = gethui()
     else
-        pcall(function() gui.Parent = CoreGui end)
-        if not gui.Parent then gui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+        ScreenGui.Parent = CoreGui
     end
     
-    -- Notifications
-    local notifContainer = Create("Frame", {
-        Size = UDim2.new(0, 220, 1, -20),
-        Position = UDim2.new(1, -230, 0, 10),
+    Library.ScreenGui = ScreenGui
+    
+    -- Notification Container
+    NotificationHolder = CreateInstance("Frame", {
+        Size = UDim2.new(0, 250, 1, -20),
+        Position = UDim2.new(1, -260, 0, 10),
         BackgroundTransparency = 1,
-        Parent = gui
+        Parent = ScreenGui
     })
-    Create("UIListLayout", {Padding = UDim.new(0, 5), Parent = notifContainer})
-    AzrixLibrary._NotifContainer = notifContainer
+    
+    CreateInstance("UIListLayout", {
+        Padding = UDim.new(0, 6),
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Parent = NotificationHolder
+    })
     
     -- Main Frame
-    local main = Create("Frame", {
+    local Main = CreateInstance("Frame", {
+        Name = "Main",
         Size = size,
         Position = UDim2.new(0.5, -size.X.Offset/2, 0.5, -size.Y.Offset/2),
-        BackgroundColor3 = Colors.Background,
+        BackgroundColor3 = Theme.Background,
         BorderSizePixel = 0,
-        Parent = gui
+        Parent = ScreenGui
     })
-    Corner(main, 6)
-    Stroke(main, Colors.Border)
+    AddCorner(Main, 8)
+    
+    local MainShadow = CreateInstance("ImageLabel", {
+        Size = UDim2.new(1, 30, 1, 30),
+        Position = UDim2.new(0, -15, 0, -15),
+        BackgroundTransparency = 1,
+        Image = "rbxassetid://5554236805",
+        ImageColor3 = Color3.fromRGB(0, 0, 0),
+        ImageTransparency = 0.5,
+        ScaleType = Enum.ScaleType.Slice,
+        SliceCenter = Rect.new(23, 23, 277, 277),
+        ZIndex = -1,
+        Parent = Main
+    })
     
     -- Top Bar
-    local topBar = Create("Frame", {
-        Size = UDim2.new(1, 0, 0, 32),
-        BackgroundColor3 = Colors.TopBar,
+    local TopBar = CreateInstance("Frame", {
+        Size = UDim2.new(1, 0, 0, 40),
+        BackgroundColor3 = Theme.Secondary,
         BorderSizePixel = 0,
-        Parent = main
+        Parent = Main
     })
-    Corner(topBar, 6)
-    Create("Frame", {Size = UDim2.new(1, 0, 0, 6), Position = UDim2.new(0, 0, 1, -6), BackgroundColor3 = Colors.TopBar, BorderSizePixel = 0, Parent = topBar})
+    AddCorner(TopBar, 8)
+    
+    -- Fix corners
+    local TopBarFix = CreateInstance("Frame", {
+        Size = UDim2.new(1, 0, 0, 10),
+        Position = UDim2.new(0, 0, 1, -10),
+        BackgroundColor3 = Theme.Secondary,
+        BorderSizePixel = 0,
+        Parent = TopBar
+    })
+    
+    MakeDraggable(Main, TopBar)
     
     -- Title
-    Create("TextLabel", {
+    local TitleLabel = CreateInstance("TextLabel", {
         Size = UDim2.new(0, 100, 1, 0),
-        Position = UDim2.new(0, 12, 0, 0),
+        Position = UDim2.new(0, 15, 0, 0),
         BackgroundTransparency = 1,
-        Text = title,
-        TextColor3 = Colors.Accent,
-        TextSize = 14,
+        Text = prefix,
+        TextColor3 = Theme.Accent,
+        TextSize = 15,
         Font = Enum.Font.GothamBold,
         TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = topBar
+        Parent = TopBar
     })
     
-    Create("TextLabel", {
+    local SubtitleLabel = CreateInstance("TextLabel", {
         Size = UDim2.new(0, 100, 1, 0),
-        Position = UDim2.new(0, 12 + #title * 9, 0, 0),
+        Position = UDim2.new(0, 15 + TitleLabel.TextBounds.X + 6, 0, 0),
         BackgroundTransparency = 1,
-        Text = subtitle,
-        TextColor3 = Colors.TextDark,
-        TextSize = 14,
+        Text = suffix,
+        TextColor3 = Theme.TextDark,
+        TextSize = 15,
         Font = Enum.Font.Gotham,
         TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = topBar
+        Parent = TopBar
     })
     
     -- Close Button
-    local closeBtn = Create("TextButton", {
-        Size = UDim2.new(0, 32, 0, 32),
-        Position = UDim2.new(1, -32, 0, 0),
+    local CloseButton = CreateInstance("TextButton", {
+        Size = UDim2.new(0, 30, 0, 30),
+        Position = UDim2.new(1, -35, 0.5, -15),
         BackgroundTransparency = 1,
-        Text = "×",
-        TextColor3 = Colors.TextDark,
+        Text = "✕",
+        TextColor3 = Theme.TextDark,
+        TextSize = 16,
+        Font = Enum.Font.GothamBold,
+        Parent = TopBar
+    })
+    
+    CloseButton.MouseEnter:Connect(function()
+        Tween(CloseButton, 0.2, {TextColor3 = Color3.fromRGB(255, 80, 80)})
+    end)
+    CloseButton.MouseLeave:Connect(function()
+        Tween(CloseButton, 0.2, {TextColor3 = Theme.TextDark})
+    end)
+    CloseButton.MouseButton1Click:Connect(function()
+        ScreenGui.Enabled = false
+        Library.Visible = false
+    end)
+    
+    -- Minimize Button
+    local MinButton = CreateInstance("TextButton", {
+        Size = UDim2.new(0, 30, 0, 30),
+        Position = UDim2.new(1, -65, 0.5, -15),
+        BackgroundTransparency = 1,
+        Text = "−",
+        TextColor3 = Theme.TextDark,
         TextSize = 20,
         Font = Enum.Font.GothamBold,
-        Parent = topBar
+        Parent = TopBar
     })
     
-    closeBtn.MouseEnter:Connect(function() Tween(closeBtn, 0.1, {TextColor3 = Colors.Error}) end)
-    closeBtn.MouseLeave:Connect(function() Tween(closeBtn, 0.1, {TextColor3 = Colors.TextDark}) end)
-    closeBtn.MouseButton1Click:Connect(function()
-        AzrixLibrary.Visible = false
-        main.Visible = false
+    MinButton.MouseEnter:Connect(function()
+        Tween(MinButton, 0.2, {TextColor3 = Theme.Accent})
+    end)
+    MinButton.MouseLeave:Connect(function()
+        Tween(MinButton, 0.2, {TextColor3 = Theme.TextDark})
     end)
     
-    -- Tab Bar (Left Side)
-    local tabBar = Create("Frame", {
-        Size = UDim2.new(0, 120, 1, -42),
-        Position = UDim2.new(0, 5, 0, 37),
-        BackgroundColor3 = Colors.TabBar,
+    -- Tab Container
+    local TabContainer = CreateInstance("Frame", {
+        Size = UDim2.new(1, -30, 0, 32),
+        Position = UDim2.new(0, 15, 0, 45),
+        BackgroundColor3 = Theme.Secondary,
         BorderSizePixel = 0,
-        Parent = main
+        Parent = Main
     })
-    Corner(tabBar, 4)
+    AddCorner(TabContainer, 6)
     
-    local tabList = Create("Frame", {
-        Size = UDim2.new(1, -10, 1, -10),
-        Position = UDim2.new(0, 5, 0, 5),
+    local TabHolder = CreateInstance("Frame", {
+        Size = UDim2.new(1, -10, 1, -6),
+        Position = UDim2.new(0, 5, 0, 3),
         BackgroundTransparency = 1,
-        Parent = tabBar
+        Parent = TabContainer
     })
-    Create("UIListLayout", {Padding = UDim.new(0, 3), Parent = tabList})
     
-    -- Content Area
-    local content = Create("Frame", {
-        Size = UDim2.new(1, -135, 1, -42),
-        Position = UDim2.new(0, 130, 0, 37),
-        BackgroundColor3 = Colors.TabBar,
-        BorderSizePixel = 0,
-        Parent = main
+    CreateInstance("UIListLayout", {
+        FillDirection = Enum.FillDirection.Horizontal,
+        Padding = UDim.new(0, 4),
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Parent = TabHolder
     })
-    Corner(content, 4)
     
-    -- Dragging
-    local dragging, dragStart, startPos = false, nil, nil
+    -- Content Container
+    local ContentContainer = CreateInstance("Frame", {
+        Size = UDim2.new(1, -30, 1, -92),
+        Position = UDim2.new(0, 15, 0, 82),
+        BackgroundTransparency = 1,
+        ClipsDescendants = true,
+        Parent = Main
+    })
     
-    topBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            dragStart = input.Position
-            startPos = main.Position
+    local Window = {}
+    Window.Tabs = {}
+    Window.ActiveTab = nil
+    Library.Visible = true
+    
+    -- Toggle Key
+    local toggleConn = UserInputService.InputBegan:Connect(function(input, processed)
+        if processed then return end
+        if input.KeyCode == Library.ToggleKey then
+            Library.Visible = not Library.Visible
+            ScreenGui.Enabled = Library.Visible
         end
     end)
-    
-    topBar.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
-        end
-    end)
-    
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = input.Position - dragStart
-            main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end)
+    table.insert(Connections, toggleConn)
     
     -- Tab Function
-    function Window:Tab(opts)
-        opts = opts or {}
-        local name = opts.Name or "Tab"
+    function Window:Tab(options)
+        options = options or {}
+        local name = options.Name or "Tab"
+        local icon = options.Icon
         
         local Tab = {}
         
         -- Tab Button
-        local tabBtn = Create("TextButton", {
-            Size = UDim2.new(1, 0, 0, 28),
-            BackgroundColor3 = Colors.Element,
+        local TabButton = CreateInstance("TextButton", {
+            Size = UDim2.new(0, 0, 1, -4),
+            AutomaticSize = Enum.AutomaticSize.X,
+            BackgroundColor3 = Theme.Tertiary,
             BackgroundTransparency = 1,
             BorderSizePixel = 0,
-            Text = name,
-            TextColor3 = Colors.TextDark,
-            TextSize = 12,
-            Font = Enum.Font.Gotham,
-            Parent = tabList
+            Text = "",
+            Parent = TabHolder
         })
-        Corner(tabBtn, 4)
+        AddCorner(TabButton, 5)
+        
+        CreateInstance("UIPadding", {
+            PaddingLeft = UDim.new(0, 12),
+            PaddingRight = UDim.new(0, 12),
+            Parent = TabButton
+        })
+        
+        local TabText = CreateInstance("TextLabel", {
+            Size = UDim2.new(0, 0, 1, 0),
+            AutomaticSize = Enum.AutomaticSize.X,
+            BackgroundTransparency = 1,
+            Text = name,
+            TextColor3 = Theme.TextDark,
+            TextSize = 12,
+            Font = Enum.Font.GothamMedium,
+            Parent = TabButton
+        })
         
         -- Tab Content
-        local tabContent = Create("Frame", {
+        local TabContent = CreateInstance("Frame", {
             Size = UDim2.new(1, 0, 1, 0),
             BackgroundTransparency = 1,
             Visible = false,
-            Parent = content
+            Parent = ContentContainer
         })
         
-        -- Two Columns
-        local leftCol = Create("ScrollingFrame", {
-            Size = UDim2.new(0.5, -5, 1, -10),
-            Position = UDim2.new(0, 5, 0, 5),
+        -- Left Column
+        local LeftColumn = CreateInstance("ScrollingFrame", {
+            Size = UDim2.new(0.5, -5, 1, 0),
+            Position = UDim2.new(0, 0, 0, 0),
             BackgroundTransparency = 1,
             BorderSizePixel = 0,
             ScrollBarThickness = 2,
-            ScrollBarImageColor3 = Colors.Accent,
+            ScrollBarImageColor3 = Theme.Accent,
             CanvasSize = UDim2.new(0, 0, 0, 0),
             AutomaticCanvasSize = Enum.AutomaticSize.Y,
-            Parent = tabContent
+            Parent = TabContent
         })
-        Create("UIListLayout", {Padding = UDim.new(0, 5), Parent = leftCol})
-        Create("UIPadding", {PaddingRight = UDim.new(0, 5), Parent = leftCol})
         
-        local rightCol = Create("ScrollingFrame", {
-            Size = UDim2.new(0.5, -5, 1, -10),
-            Position = UDim2.new(0.5, 0, 0, 5),
+        CreateInstance("UIListLayout", {
+            Padding = UDim.new(0, 8),
+            SortOrder = Enum.SortOrder.LayoutOrder,
+            Parent = LeftColumn
+        })
+        
+        -- Right Column
+        local RightColumn = CreateInstance("ScrollingFrame", {
+            Size = UDim2.new(0.5, -5, 1, 0),
+            Position = UDim2.new(0.5, 5, 0, 0),
             BackgroundTransparency = 1,
             BorderSizePixel = 0,
             ScrollBarThickness = 2,
-            ScrollBarImageColor3 = Colors.Accent,
+            ScrollBarImageColor3 = Theme.Accent,
             CanvasSize = UDim2.new(0, 0, 0, 0),
             AutomaticCanvasSize = Enum.AutomaticSize.Y,
-            Parent = tabContent
+            Parent = TabContent
         })
-        Create("UIListLayout", {Padding = UDim.new(0, 5), Parent = rightCol})
-        Create("UIPadding", {PaddingRight = UDim.new(0, 5), Parent = rightCol})
+        
+        CreateInstance("UIListLayout", {
+            Padding = UDim.new(0, 8),
+            SortOrder = Enum.SortOrder.LayoutOrder,
+            Parent = RightColumn
+        })
         
         local function SelectTab()
+            -- Deselect all
             for _, t in pairs(Window.Tabs) do
-                t.Btn.BackgroundTransparency = 1
-                t.Btn.TextColor3 = Colors.TextDark
+                Tween(t.Button, 0.2, {BackgroundTransparency = 1})
+                Tween(t.Text, 0.2, {TextColor3 = Theme.TextDark})
                 t.Content.Visible = false
             end
-            tabBtn.BackgroundTransparency = 0
-            tabBtn.BackgroundColor3 = Colors.Element
-            tabBtn.TextColor3 = Colors.Text
-            tabContent.Visible = true
+            
+            -- Select this
+            Tween(TabButton, 0.2, {BackgroundTransparency = 0})
+            Tween(TabText, 0.2, {TextColor3 = Theme.Text})
+            TabContent.Visible = true
             Window.ActiveTab = Tab
         end
         
-        tabBtn.MouseButton1Click:Connect(SelectTab)
-        tabBtn.MouseEnter:Connect(function()
+        TabButton.MouseButton1Click:Connect(SelectTab)
+        
+        TabButton.MouseEnter:Connect(function()
             if Window.ActiveTab ~= Tab then
-                Tween(tabBtn, 0.1, {BackgroundTransparency = 0.5})
+                Tween(TabButton, 0.2, {BackgroundTransparency = 0.5})
             end
         end)
-        tabBtn.MouseLeave:Connect(function()
+        
+        TabButton.MouseLeave:Connect(function()
             if Window.ActiveTab ~= Tab then
-                Tween(tabBtn, 0.1, {BackgroundTransparency = 1})
+                Tween(TabButton, 0.2, {BackgroundTransparency = 1})
             end
         end)
         
         -- Section Function
-        function Tab:Section(opts)
-            opts = opts or {}
-            local sName = opts.Name or "Section"
-            local side = opts.Side or "Left"
-            local col = side == "Left" and leftCol or rightCol
+        function Tab:Section(options)
+            options = options or {}
+            local sectionName = options.Name or "Section"
+            local side = options.Side or "Left"
+            local column = side == "Left" and LeftColumn or RightColumn
             
             local Section = {}
             
-            local sFrame = Create("Frame", {
+            local SectionFrame = CreateInstance("Frame", {
                 Size = UDim2.new(1, 0, 0, 0),
                 AutomaticSize = Enum.AutomaticSize.Y,
-                BackgroundColor3 = Colors.Section,
+                BackgroundColor3 = Theme.Secondary,
                 BorderSizePixel = 0,
-                Parent = col
+                Parent = column
             })
-            Corner(sFrame, 4)
-            Stroke(sFrame, Colors.Border)
+            AddCorner(SectionFrame, 6)
             
-            local sHeader = Create("Frame", {
-                Size = UDim2.new(1, 0, 0, 24),
-                BackgroundColor3 = Colors.SectionHeader,
+            -- Section Header
+            local SectionHeader = CreateInstance("Frame", {
+                Size = UDim2.new(1, 0, 0, 28),
+                BackgroundColor3 = Theme.Tertiary,
                 BorderSizePixel = 0,
-                Parent = sFrame
+                Parent = SectionFrame
             })
-            Corner(sHeader, 4)
-            Create("Frame", {Size = UDim2.new(1, 0, 0, 4), Position = UDim2.new(0, 0, 1, -4), BackgroundColor3 = Colors.SectionHeader, BorderSizePixel = 0, Parent = sHeader})
+            AddCorner(SectionHeader, 6)
             
-            Create("TextLabel", {
-                Size = UDim2.new(1, -10, 1, 0),
-                Position = UDim2.new(0, 8, 0, 0),
+            local HeaderFix = CreateInstance("Frame", {
+                Size = UDim2.new(1, 0, 0, 8),
+                Position = UDim2.new(0, 0, 1, -8),
+                BackgroundColor3 = Theme.Tertiary,
+                BorderSizePixel = 0,
+                Parent = SectionHeader
+            })
+            
+            local SectionTitle = CreateInstance("TextLabel", {
+                Size = UDim2.new(1, -16, 1, 0),
+                Position = UDim2.new(0, 10, 0, 0),
                 BackgroundTransparency = 1,
-                Text = sName:upper(),
-                TextColor3 = Colors.Text,
-                TextSize = 10,
-                Font = Enum.Font.GothamMedium,
+                Text = sectionName,
+                TextColor3 = Theme.Text,
+                TextSize = 12,
+                Font = Enum.Font.GothamBold,
                 TextXAlignment = Enum.TextXAlignment.Left,
-                Parent = sHeader
+                Parent = SectionHeader
             })
             
-            local sContent = Create("Frame", {
+            -- Section Content
+            local SectionContent = CreateInstance("Frame", {
                 Size = UDim2.new(1, 0, 0, 0),
-                Position = UDim2.new(0, 0, 0, 24),
+                Position = UDim2.new(0, 0, 0, 28),
                 AutomaticSize = Enum.AutomaticSize.Y,
                 BackgroundTransparency = 1,
-                Parent = sFrame
+                Parent = SectionFrame
             })
-            Create("UIListLayout", {Padding = UDim.new(0, 2), Parent = sContent})
-            Create("UIPadding", {PaddingTop = UDim.new(0, 4), PaddingBottom = UDim.new(0, 6), PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6), Parent = sContent})
+            
+            CreateInstance("UIListLayout", {
+                Padding = UDim.new(0, 4),
+                SortOrder = Enum.SortOrder.LayoutOrder,
+                Parent = SectionContent
+            })
+            
+            CreateInstance("UIPadding", {
+                PaddingTop = UDim.new(0, 6),
+                PaddingBottom = UDim.new(0, 8),
+                PaddingLeft = UDim.new(0, 8),
+                PaddingRight = UDim.new(0, 8),
+                Parent = SectionContent
+            })
             
             -- Toggle
-            function Section:Toggle(opts)
-                opts = opts or {}
-                local tName = opts.Name or "Toggle"
-                local flag = opts.Flag or tName
-                local default = opts.Default or false
-                local callback = opts.Callback or function() end
+            function Section:Toggle(options)
+                options = options or {}
+                local toggleName = options.Name or "Toggle"
+                local flag = options.Flag or toggleName
+                local default = options.Default or false
+                local callback = options.Callback or function() end
                 
-                AzrixLibrary.Flags[flag] = default
+                Library.Flags[flag] = default
+                
                 local Toggle = {}
                 
-                local tFrame = Create("Frame", {
-                    Size = UDim2.new(1, 0, 0, 24),
+                local ToggleFrame = CreateInstance("Frame", {
+                    Size = UDim2.new(1, 0, 0, 28),
                     BackgroundTransparency = 1,
-                    Parent = sContent
+                    Parent = SectionContent
                 })
                 
-                Create("TextLabel", {
-                    Size = UDim2.new(1, -45, 1, 0),
+                local ToggleLabel = CreateInstance("TextLabel", {
+                    Size = UDim2.new(1, -50, 1, 0),
+                    Position = UDim2.new(0, 0, 0, 0),
                     BackgroundTransparency = 1,
-                    Text = tName,
-                    TextColor3 = Colors.Text,
-                    TextSize = 11,
+                    Text = toggleName,
+                    TextColor3 = Theme.Text,
+                    TextSize = 12,
                     Font = Enum.Font.Gotham,
                     TextXAlignment = Enum.TextXAlignment.Left,
-                    Parent = tFrame
+                    Parent = ToggleFrame
                 })
                 
-                local tBg = Create("Frame", {
-                    Size = UDim2.new(0, 32, 0, 16),
-                    Position = UDim2.new(1, -32, 0.5, -8),
-                    BackgroundColor3 = default and Colors.ToggleEnabled or Colors.Toggle,
+                local ToggleBg = CreateInstance("Frame", {
+                    Size = UDim2.new(0, 38, 0, 20),
+                    Position = UDim2.new(1, -38, 0.5, -10),
+                    BackgroundColor3 = default and Theme.ToggleOn or Theme.Toggle,
                     BorderSizePixel = 0,
-                    Parent = tFrame
+                    Parent = ToggleFrame
                 })
-                Corner(tBg, 8)
+                AddCorner(ToggleBg, 10)
                 
-                local tCircle = Create("Frame", {
-                    Size = UDim2.new(0, 12, 0, 12),
-                    Position = default and UDim2.new(1, -14, 0.5, -6) or UDim2.new(0, 2, 0.5, -6),
-                    BackgroundColor3 = Colors.Text,
+                local ToggleCircle = CreateInstance("Frame", {
+                    Size = UDim2.new(0, 16, 0, 16),
+                    Position = default and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8),
+                    BackgroundColor3 = Color3.fromRGB(255, 255, 255),
                     BorderSizePixel = 0,
-                    Parent = tBg
+                    Parent = ToggleBg
                 })
-                Corner(tCircle, 6)
+                AddCorner(ToggleCircle, 8)
                 
-                local function SetValue(v)
-                    AzrixLibrary.Flags[flag] = v
-                    Tween(tBg, 0.15, {BackgroundColor3 = v and Colors.ToggleEnabled or Colors.Toggle})
-                    Tween(tCircle, 0.15, {Position = v and UDim2.new(1, -14, 0.5, -6) or UDim2.new(0, 2, 0.5, -6)})
-                    callback(v)
+                local function SetValue(value)
+                    Library.Flags[flag] = value
+                    Tween(ToggleBg, 0.2, {BackgroundColor3 = value and Theme.ToggleOn or Theme.Toggle})
+                    Tween(ToggleCircle, 0.2, {Position = value and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)})
+                    callback(value)
                 end
                 
-                local tBtn = Create("TextButton", {
+                local ToggleButton = CreateInstance("TextButton", {
                     Size = UDim2.new(1, 0, 1, 0),
                     BackgroundTransparency = 1,
                     Text = "",
-                    Parent = tFrame
+                    Parent = ToggleFrame
                 })
-                tBtn.MouseButton1Click:Connect(function() SetValue(not AzrixLibrary.Flags[flag]) end)
                 
-                function Toggle:Set(v) SetValue(v) end
-                function Toggle:Get() return AzrixLibrary.Flags[flag] end
+                ToggleButton.MouseButton1Click:Connect(function()
+                    SetValue(not Library.Flags[flag])
+                end)
                 
-                function Toggle:Keybind(kOpts)
-                    kOpts = kOpts or {}
-                    local kFlag = kOpts.Flag or flag .. "_Key"
-                    local kDefault = kOpts.Key or Enum.KeyCode.Unknown
-                    local kMode = kOpts.Mode or "Toggle"
-                    local kCallback = kOpts.Callback or function() end
+                function Toggle:Set(value)
+                    SetValue(value)
+                end
+                
+                function Toggle:Get()
+                    return Library.Flags[flag]
+                end
+                
+                -- Keybind
+                function Toggle:Keybind(kbOptions)
+                    kbOptions = kbOptions or {}
+                    local kbFlag = kbOptions.Flag or flag .. "_Keybind"
+                    local kbDefault = kbOptions.Key or Enum.KeyCode.Unknown
+                    local kbMode = kbOptions.Mode or "Toggle"
+                    local kbCallback = kbOptions.Callback or function() end
                     
-                    AzrixLibrary.Flags[kFlag] = {Key = kDefault, Mode = kMode}
+                    Library.Flags[kbFlag] = {Key = kbDefault, Mode = kbMode}
                     
-                    local kBtn = Create("TextButton", {
-                        Size = UDim2.new(0, 36, 0, 16),
-                        Position = UDim2.new(1, -72, 0.5, -8),
-                        BackgroundColor3 = Colors.Input,
+                    local KeybindButton = CreateInstance("TextButton", {
+                        Size = UDim2.new(0, 45, 0, 20),
+                        Position = UDim2.new(1, -88, 0.5, -10),
+                        BackgroundColor3 = Theme.Input,
                         BorderSizePixel = 0,
-                        Text = GetKeyName(kDefault),
-                        TextColor3 = Colors.TextDark,
-                        TextSize = 9,
+                        Text = kbDefault == Enum.KeyCode.Unknown and "..." or kbDefault.Name,
+                        TextColor3 = Theme.TextDark,
+                        TextSize = 10,
                         Font = Enum.Font.Gotham,
-                        Parent = tFrame
+                        Parent = ToggleFrame
                     })
-                    Corner(kBtn, 4)
+                    AddCorner(KeybindButton, 4)
                     
                     local listening = false
-                    kBtn.MouseButton1Click:Connect(function()
+                    
+                    KeybindButton.MouseButton1Click:Connect(function()
                         listening = true
-                        kBtn.Text = "..."
+                        KeybindButton.Text = "..."
                     end)
                     
-                    local conn = UserInputService.InputBegan:Connect(function(input, gpe)
+                    local kbConn = UserInputService.InputBegan:Connect(function(input, processed)
                         if listening then
                             if input.UserInputType == Enum.UserInputType.Keyboard then
                                 if input.KeyCode == Enum.KeyCode.Escape then
-                                    AzrixLibrary.Flags[kFlag].Key = Enum.KeyCode.Unknown
-                                    kBtn.Text = "..."
+                                    Library.Flags[kbFlag].Key = Enum.KeyCode.Unknown
+                                    KeybindButton.Text = "..."
                                 else
-                                    AzrixLibrary.Flags[kFlag].Key = input.KeyCode
-                                    kBtn.Text = input.KeyCode.Name
+                                    Library.Flags[kbFlag].Key = input.KeyCode
+                                    KeybindButton.Text = input.KeyCode.Name
                                 end
                                 listening = false
                             end
-                        elseif not gpe then
-                            local k = AzrixLibrary.Flags[kFlag].Key
-                            if k and k ~= Enum.KeyCode.Unknown and input.KeyCode == k then
-                                if kMode == "Toggle" then
-                                    SetValue(not AzrixLibrary.Flags[flag])
-                                    kCallback(AzrixLibrary.Flags[flag])
-                                elseif kMode == "Hold" then
+                        elseif not processed then
+                            local key = Library.Flags[kbFlag].Key
+                            if key and key ~= Enum.KeyCode.Unknown and input.KeyCode == key then
+                                if kbMode == "Toggle" then
+                                    SetValue(not Library.Flags[flag])
+                                    kbCallback(Library.Flags[flag])
+                                elseif kbMode == "Hold" then
                                     SetValue(true)
-                                    kCallback(true)
+                                    kbCallback(true)
                                 end
                             end
                         end
                     end)
-                    table.insert(AzrixLibrary.Connections, conn)
+                    table.insert(Connections, kbConn)
                     
-                    if kMode == "Hold" then
-                        local conn2 = UserInputService.InputEnded:Connect(function(input)
-                            local k = AzrixLibrary.Flags[kFlag].Key
-                            if k and k ~= Enum.KeyCode.Unknown and input.KeyCode == k then
+                    if kbMode == "Hold" then
+                        local kbConn2 = UserInputService.InputEnded:Connect(function(input)
+                            local key = Library.Flags[kbFlag].Key
+                            if key and key ~= Enum.KeyCode.Unknown and input.KeyCode == key then
                                 SetValue(false)
-                                kCallback(false)
+                                kbCallback(false)
                             end
                         end)
-                        table.insert(AzrixLibrary.Connections, conn2)
+                        table.insert(Connections, kbConn2)
                     end
                     
                     return Toggle
                 end
                 
-                if default then callback(default) end
+                -- Colorpicker attached to toggle
+                function Toggle:Colorpicker(cpOptions)
+                    cpOptions = cpOptions or {}
+                    local cpFlag = cpOptions.Flag or flag .. "_Color"
+                    local cpDefault = cpOptions.Color or Color3.fromRGB(255, 255, 255)
+                    local cpAlpha = cpOptions.Alpha or 1
+                    local cpCallback = cpOptions.Callback or function() end
+                    
+                    Library.Flags[cpFlag] = {Color = cpDefault, Alpha = cpAlpha}
+                    
+                    local ColorButton = CreateInstance("TextButton", {
+                        Size = UDim2.new(0, 28, 0, 20),
+                        Position = UDim2.new(1, -88, 0.5, -10),
+                        BackgroundColor3 = cpDefault,
+                        BorderSizePixel = 0,
+                        Text = "",
+                        Parent = ToggleFrame
+                    })
+                    AddCorner(ColorButton, 4)
+                    AddStroke(ColorButton, Theme.Divider)
+                    
+                    -- Move toggle button
+                    ToggleBg.Position = UDim2.new(1, -38, 0.5, -10)
+                    
+                    local colors = {
+                        Color3.fromRGB(255, 50, 50),
+                        Color3.fromRGB(255, 150, 50),
+                        Color3.fromRGB(255, 255, 50),
+                        Color3.fromRGB(50, 255, 50),
+                        Color3.fromRGB(50, 255, 255),
+                        Color3.fromRGB(50, 150, 255),
+                        Color3.fromRGB(50, 50, 255),
+                        Color3.fromRGB(150, 50, 255),
+                        Color3.fromRGB(255, 50, 255),
+                        Color3.fromRGB(255, 255, 255),
+                        Color3.fromRGB(115, 225, 175)
+                    }
+                    
+                    ColorButton.MouseButton1Click:Connect(function()
+                        local currentIndex = 1
+                        for i, c in ipairs(colors) do
+                            if c == ColorButton.BackgroundColor3 then
+                                currentIndex = i
+                                break
+                            end
+                        end
+                        local nextColor = colors[(currentIndex % #colors) + 1]
+                        ColorButton.BackgroundColor3 = nextColor
+                        Library.Flags[cpFlag] = {Color = nextColor, Alpha = cpAlpha}
+                        cpCallback(nextColor, cpAlpha)
+                    end)
+                    
+                    return Toggle
+                end
+                
+                if default then
+                    callback(default)
+                end
+                
                 return Toggle
             end
             
             -- Slider
-            function Section:Slider(opts)
-                opts = opts or {}
-                local sName = opts.Name or "Slider"
-                local flag = opts.Flag or sName
-                local min = opts.Min or 0
-                local max = opts.Max or 100
-                local default = opts.Default or min
-                local suffix = opts.Suffix or ""
-                local decimal = opts.Decimal or 1
-                local callback = opts.Callback or function() end
+            function Section:Slider(options)
+                options = options or {}
+                local sliderName = options.Name or "Slider"
+                local flag = options.Flag or sliderName
+                local min = options.Min or 0
+                local max = options.Max or 100
+                local default = options.Default or min
+                local suffix = options.Suffix or ""
+                local decimal = options.Decimal or 1
+                local callback = options.Callback or function() end
                 
-                AzrixLibrary.Flags[flag] = default
+                Library.Flags[flag] = default
+                
                 local Slider = {}
                 
-                local sFrame = Create("Frame", {
-                    Size = UDim2.new(1, 0, 0, 32),
+                local SliderFrame = CreateInstance("Frame", {
+                    Size = UDim2.new(1, 0, 0, 38),
                     BackgroundTransparency = 1,
-                    Parent = sContent
+                    Parent = SectionContent
                 })
                 
-                Create("TextLabel", {
-                    Size = UDim2.new(1, -50, 0, 16),
+                local SliderLabel = CreateInstance("TextLabel", {
+                    Size = UDim2.new(1, -60, 0, 18),
+                    Position = UDim2.new(0, 0, 0, 0),
                     BackgroundTransparency = 1,
-                    Text = sName,
-                    TextColor3 = Colors.Text,
-                    TextSize = 11,
+                    Text = sliderName,
+                    TextColor3 = Theme.Text,
+                    TextSize = 12,
                     Font = Enum.Font.Gotham,
                     TextXAlignment = Enum.TextXAlignment.Left,
-                    Parent = sFrame
+                    Parent = SliderFrame
                 })
                 
-                local valLabel = Create("TextLabel", {
-                    Size = UDim2.new(0, 45, 0, 16),
-                    Position = UDim2.new(1, -45, 0, 0),
+                local SliderValue = CreateInstance("TextLabel", {
+                    Size = UDim2.new(0, 55, 0, 18),
+                    Position = UDim2.new(1, -55, 0, 0),
                     BackgroundTransparency = 1,
-                    Text = default .. suffix,
-                    TextColor3 = Colors.Accent,
-                    TextSize = 11,
+                    Text = tostring(default) .. suffix,
+                    TextColor3 = Theme.Accent,
+                    TextSize = 12,
                     Font = Enum.Font.Gotham,
                     TextXAlignment = Enum.TextXAlignment.Right,
-                    Parent = sFrame
+                    Parent = SliderFrame
                 })
                 
-                local sBg = Create("Frame", {
-                    Size = UDim2.new(1, 0, 0, 10),
-                    Position = UDim2.new(0, 0, 0, 20),
-                    BackgroundColor3 = Colors.Slider,
+                local SliderBg = CreateInstance("Frame", {
+                    Size = UDim2.new(1, 0, 0, 14),
+                    Position = UDim2.new(0, 0, 0, 22),
+                    BackgroundColor3 = Theme.SliderBg,
                     BorderSizePixel = 0,
-                    Parent = sFrame
+                    Parent = SliderFrame
                 })
-                Corner(sBg, 5)
+                AddCorner(SliderBg, 7)
                 
-                local sFill = Create("Frame", {
+                local SliderFill = CreateInstance("Frame", {
                     Size = UDim2.new((default - min) / (max - min), 0, 1, 0),
-                    BackgroundColor3 = Colors.SliderFill,
+                    BackgroundColor3 = Theme.SliderFill,
                     BorderSizePixel = 0,
-                    Parent = sBg
+                    Parent = SliderBg
                 })
-                Corner(sFill, 5)
+                AddCorner(SliderFill, 7)
                 
-                local function SetValue(v)
-                    v = math.clamp(v, min, max)
-                    v = math.floor(v / decimal + 0.5) * decimal
-                    AzrixLibrary.Flags[flag] = v
-                    valLabel.Text = v .. suffix
-                    local pct = (v - min) / (max - min)
-                    Tween(sFill, 0.05, {Size = UDim2.new(pct, 0, 1, 0)})
-                    callback(v)
+                local SliderKnob = CreateInstance("Frame", {
+                    Size = UDim2.new(0, 18, 0, 18),
+                    Position = UDim2.new((default - min) / (max - min), -9, 0.5, -9),
+                    BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                    BorderSizePixel = 0,
+                    ZIndex = 2,
+                    Parent = SliderBg
+                })
+                AddCorner(SliderKnob, 9)
+                
+                local function SetValue(value)
+                    value = math.clamp(value, min, max)
+                    value = math.floor(value / decimal + 0.5) * decimal
+                    Library.Flags[flag] = value
+                    SliderValue.Text = tostring(value) .. suffix
+                    local percent = (value - min) / (max - min)
+                    Tween(SliderFill, 0.1, {Size = UDim2.new(percent, 0, 1, 0)})
+                    Tween(SliderKnob, 0.1, {Position = UDim2.new(percent, -9, 0.5, -9)})
+                    callback(value)
                 end
                 
-                local sDragging = false
-                sBg.InputBegan:Connect(function(input)
+                local dragging = false
+                
+                SliderBg.InputBegan:Connect(function(input)
                     if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                        sDragging = true
-                        local pct = math.clamp((input.Position.X - sBg.AbsolutePosition.X) / sBg.AbsoluteSize.X, 0, 1)
-                        SetValue(min + (max - min) * pct)
+                        dragging = true
+                        local percent = math.clamp((input.Position.X - SliderBg.AbsolutePosition.X) / SliderBg.AbsoluteSize.X, 0, 1)
+                        SetValue(min + (max - min) * percent)
                     end
                 end)
-                sBg.InputEnded:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1 then sDragging = false end
-                end)
                 
-                local sConn = UserInputService.InputChanged:Connect(function(input)
-                    if sDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-                        local pct = math.clamp((input.Position.X - sBg.AbsolutePosition.X) / sBg.AbsoluteSize.X, 0, 1)
-                        SetValue(min + (max - min) * pct)
+                SliderBg.InputEnded:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                        dragging = false
                     end
                 end)
-                table.insert(AzrixLibrary.Connections, sConn)
                 
-                function Slider:Set(v) SetValue(v) end
-                function Slider:Get() return AzrixLibrary.Flags[flag] end
+                local sliderConn = UserInputService.InputChanged:Connect(function(input)
+                    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                        local percent = math.clamp((input.Position.X - SliderBg.AbsolutePosition.X) / SliderBg.AbsoluteSize.X, 0, 1)
+                        SetValue(min + (max - min) * percent)
+                    end
+                end)
+                table.insert(Connections, sliderConn)
+                
+                function Slider:Set(value)
+                    SetValue(value)
+                end
+                
+                function Slider:Get()
+                    return Library.Flags[flag]
+                end
                 
                 return Slider
             end
             
             -- Dropdown
-            function Section:Dropdown(opts)
-                opts = opts or {}
-                local dName = opts.Name or "Dropdown"
-                local flag = opts.Flag or dName
-                local dOpts = opts.Options or {}
-                local default = opts.Default or (opts.Multi and {} or (dOpts[1] or ""))
-                local multi = opts.Multi or false
-                local callback = opts.Callback or function() end
+            function Section:Dropdown(options)
+                options = options or {}
+                local dropdownName = options.Name or "Dropdown"
+                local flag = options.Flag or dropdownName
+                local dropdownOptions = options.Options or {}
+                local default = options.Default or (options.Multi and {} or (dropdownOptions[1] or ""))
+                local multi = options.Multi or false
+                local callback = options.Callback or function() end
                 
-                AzrixLibrary.Flags[flag] = default
+                Library.Flags[flag] = default
+                
                 local Dropdown = {}
                 local isOpen = false
                 
-                local dFrame = Create("Frame", {
-                    Size = UDim2.new(1, 0, 0, 38),
+                local DropdownFrame = CreateInstance("Frame", {
+                    Size = UDim2.new(1, 0, 0, 44),
                     BackgroundTransparency = 1,
                     ClipsDescendants = true,
-                    Parent = sContent
+                    Parent = SectionContent
                 })
                 
-                Create("TextLabel", {
-                    Size = UDim2.new(1, 0, 0, 16),
+                local DropdownLabel = CreateInstance("TextLabel", {
+                    Size = UDim2.new(1, 0, 0, 18),
+                    Position = UDim2.new(0, 0, 0, 0),
                     BackgroundTransparency = 1,
-                    Text = dName,
-                    TextColor3 = Colors.Text,
+                    Text = dropdownName,
+                    TextColor3 = Theme.Text,
+                    TextSize = 12,
+                    Font = Enum.Font.Gotham,
+                    TextXAlignment = Enum.TextXAlignment.Left,
+                    Parent = DropdownFrame
+                })
+                
+                local function GetDisplayText()
+                    if multi then
+                        local selected = Library.Flags[flag]
+                        if type(selected) ~= "table" then selected = {} end
+                        if #selected == 0 then return "None" end
+                        if #selected <= 2 then return table.concat(selected, ", ") end
+                        return selected[1] .. ", " .. selected[2] .. " +" .. (#selected - 2)
+                    end
+                    return Library.Flags[flag] or "None"
+                end
+                
+                local DropdownButton = CreateInstance("TextButton", {
+                    Size = UDim2.new(1, 0, 0, 24),
+                    Position = UDim2.new(0, 0, 0, 20),
+                    BackgroundColor3 = Theme.Input,
+                    BorderSizePixel = 0,
+                    Text = "",
+                    Parent = DropdownFrame
+                })
+                AddCorner(DropdownButton, 5)
+                AddStroke(DropdownButton, Theme.InputBorder)
+                
+                local DropdownText = CreateInstance("TextLabel", {
+                    Size = UDim2.new(1, -30, 1, 0),
+                    Position = UDim2.new(0, 10, 0, 0),
+                    BackgroundTransparency = 1,
+                    Text = GetDisplayText(),
+                    TextColor3 = Theme.TextDark,
                     TextSize = 11,
                     Font = Enum.Font.Gotham,
                     TextXAlignment = Enum.TextXAlignment.Left,
-                    Parent = dFrame
+                    TextTruncate = Enum.TextTruncate.AtEnd,
+                    Parent = DropdownButton
                 })
                 
-                local function GetText()
-                    if multi then
-                        local sel = AzrixLibrary.Flags[flag]
-                        if type(sel) ~= "table" then sel = {} end
-                        if #sel == 0 then return "None" end
-                        if #sel <= 2 then return table.concat(sel, ", ") end
-                        return sel[1] .. " +" .. (#sel - 1)
-                    end
-                    return AzrixLibrary.Flags[flag] or "None"
-                end
-                
-                local dBtn = Create("TextButton", {
-                    Size = UDim2.new(1, 0, 0, 20),
-                    Position = UDim2.new(0, 0, 0, 18),
-                    BackgroundColor3 = Colors.Input,
-                    BorderSizePixel = 0,
-                    Text = "  " .. GetText(),
-                    TextColor3 = Colors.TextDark,
-                    TextSize = 10,
-                    Font = Enum.Font.Gotham,
-                    TextXAlignment = Enum.TextXAlignment.Left,
-                    Parent = dFrame
-                })
-                Corner(dBtn, 4)
-                Stroke(dBtn, Colors.Border)
-                
-                local arrow = Create("TextLabel", {
-                    Size = UDim2.new(0, 16, 1, 0),
-                    Position = UDim2.new(1, -16, 0, 0),
+                local DropdownArrow = CreateInstance("TextLabel", {
+                    Size = UDim2.new(0, 20, 1, 0),
+                    Position = UDim2.new(1, -22, 0, 0),
                     BackgroundTransparency = 1,
                     Text = "▼",
-                    TextColor3 = Colors.TextDark,
-                    TextSize = 8,
+                    TextColor3 = Theme.TextDark,
+                    TextSize = 10,
                     Font = Enum.Font.Gotham,
-                    Parent = dBtn
+                    Parent = DropdownButton
                 })
                 
-                local optContainer = Create("Frame", {
+                local OptionContainer = CreateInstance("Frame", {
                     Size = UDim2.new(1, 0, 0, 0),
-                    Position = UDim2.new(0, 0, 0, 40),
-                    BackgroundColor3 = Colors.Input,
+                    Position = UDim2.new(0, 0, 0, 46),
+                    BackgroundColor3 = Theme.Input,
                     BorderSizePixel = 0,
                     ClipsDescendants = true,
                     Visible = false,
-                    Parent = dFrame
+                    Parent = DropdownFrame
                 })
-                Corner(optContainer, 4)
-                Stroke(optContainer, Colors.Border)
-                Create("UIListLayout", {Parent = optContainer})
+                AddCorner(OptionContainer, 5)
+                AddStroke(OptionContainer, Theme.InputBorder)
                 
-                local function RefreshOptions(newOpts)
-                    for _, c in pairs(optContainer:GetChildren()) do
-                        if c:IsA("TextButton") then c:Destroy() end
+                CreateInstance("UIListLayout", {
+                    Padding = UDim.new(0, 0),
+                    SortOrder = Enum.SortOrder.LayoutOrder,
+                    Parent = OptionContainer
+                })
+                
+                local function RefreshOptions(newOptions)
+                    for _, child in pairs(OptionContainer:GetChildren()) do
+                        if child:IsA("TextButton") then child:Destroy() end
                     end
-                    dOpts = newOpts or dOpts
                     
-                    for i, opt in ipairs(dOpts) do
-                        local oBtn = Create("TextButton", {
-                            Size = UDim2.new(1, 0, 0, 20),
+                    dropdownOptions = newOptions or dropdownOptions
+                    
+                    for i, option in ipairs(dropdownOptions) do
+                        local OptionButton = CreateInstance("TextButton", {
+                            Size = UDim2.new(1, 0, 0, 24),
+                            BackgroundColor3 = Theme.Input,
                             BackgroundTransparency = 1,
-                            Text = "  " .. opt,
-                            TextColor3 = Colors.TextDark,
-                            TextSize = 10,
+                            BorderSizePixel = 0,
+                            Text = option,
+                            TextColor3 = Theme.TextDark,
+                            TextSize = 11,
                             Font = Enum.Font.Gotham,
-                            TextXAlignment = Enum.TextXAlignment.Left,
                             LayoutOrder = i,
-                            Parent = optContainer
+                            Parent = OptionContainer
                         })
                         
-                        oBtn.MouseEnter:Connect(function() Tween(oBtn, 0.1, {BackgroundTransparency = 0, BackgroundColor3 = Colors.ElementHover}) end)
-                        oBtn.MouseLeave:Connect(function() Tween(oBtn, 0.1, {BackgroundTransparency = 1}) end)
+                        OptionButton.MouseEnter:Connect(function()
+                            Tween(OptionButton, 0.15, {BackgroundTransparency = 0, BackgroundColor3 = Theme.Tertiary})
+                        end)
+                        OptionButton.MouseLeave:Connect(function()
+                            Tween(OptionButton, 0.15, {BackgroundTransparency = 1})
+                        end)
                         
-                        oBtn.MouseButton1Click:Connect(function()
+                        OptionButton.MouseButton1Click:Connect(function()
                             if multi then
-                                local sel = AzrixLibrary.Flags[flag]
-                                if type(sel) ~= "table" then sel = {} end
-                                local idx = table.find(sel, opt)
-                                if idx then table.remove(sel, idx) else table.insert(sel, opt) end
-                                AzrixLibrary.Flags[flag] = sel
+                                local selected = Library.Flags[flag]
+                                if type(selected) ~= "table" then selected = {} end
+                                local index = table.find(selected, option)
+                                if index then
+                                    table.remove(selected, index)
+                                else
+                                    table.insert(selected, option)
+                                end
+                                Library.Flags[flag] = selected
                             else
-                                AzrixLibrary.Flags[flag] = opt
+                                Library.Flags[flag] = option
                                 isOpen = false
-                                optContainer.Visible = false
-                                Tween(dFrame, 0.15, {Size = UDim2.new(1, 0, 0, 38)})
-                                Tween(arrow, 0.15, {Rotation = 0})
+                                OptionContainer.Visible = false
+                                Tween(DropdownFrame, 0.2, {Size = UDim2.new(1, 0, 0, 44)})
+                                Tween(DropdownArrow, 0.2, {Rotation = 0})
                             end
-                            dBtn.Text = "  " .. GetText()
-                            callback(AzrixLibrary.Flags[flag])
+                            DropdownText.Text = GetDisplayText()
+                            callback(Library.Flags[flag])
                         end)
                     end
                 end
-                RefreshOptions(dOpts)
                 
-                dBtn.MouseButton1Click:Connect(function()
+                RefreshOptions(dropdownOptions)
+                
+                DropdownButton.MouseButton1Click:Connect(function()
                     isOpen = not isOpen
                     if isOpen then
-                        optContainer.Visible = true
-                        local h = math.min(#dOpts * 20, 80)
-                        Tween(dFrame, 0.15, {Size = UDim2.new(1, 0, 0, 40 + h)})
-                        Tween(optContainer, 0.15, {Size = UDim2.new(1, 0, 0, h)})
-                        Tween(arrow, 0.15, {Rotation = 180})
+                        OptionContainer.Visible = true
+                        local targetHeight = math.min(#dropdownOptions * 24, 120)
+                        Tween(DropdownFrame, 0.2, {Size = UDim2.new(1, 0, 0, 48 + targetHeight)})
+                        Tween(OptionContainer, 0.2, {Size = UDim2.new(1, 0, 0, targetHeight)})
+                        Tween(DropdownArrow, 0.2, {Rotation = 180})
                     else
-                        Tween(dFrame, 0.15, {Size = UDim2.new(1, 0, 0, 38)})
-                        Tween(optContainer, 0.15, {Size = UDim2.new(1, 0, 0, 0)})
-                        Tween(arrow, 0.15, {Rotation = 0})
-                        task.delay(0.15, function() optContainer.Visible = false end)
+                        Tween(DropdownFrame, 0.2, {Size = UDim2.new(1, 0, 0, 44)})
+                        Tween(OptionContainer, 0.2, {Size = UDim2.new(1, 0, 0, 0)})
+                        Tween(DropdownArrow, 0.2, {Rotation = 0})
+                        task.delay(0.2, function() OptionContainer.Visible = false end)
                     end
                 end)
                 
-                function Dropdown:Set(v)
-                    AzrixLibrary.Flags[flag] = v
-                    dBtn.Text = "  " .. GetText()
-                    callback(v)
+                function Dropdown:Set(value)
+                    Library.Flags[flag] = value
+                    DropdownText.Text = GetDisplayText()
+                    callback(value)
                 end
-                function Dropdown:Get() return AzrixLibrary.Flags[flag] end
+                
+                function Dropdown:Get()
+                    return Library.Flags[flag]
+                end
+                
                 Dropdown.RefreshOptions = RefreshOptions
                 
                 return Dropdown
             end
             
             -- Textbox
-            function Section:Textbox(opts)
-                opts = opts or {}
-                local tName = opts.Name or "Textbox"
-                local flag = opts.Flag or tName
-                local placeholder = opts.PlaceHolder or ""
-                local default = opts.Default or ""
-                local callback = opts.Callback or function() end
+            function Section:Textbox(options)
+                options = options or {}
+                local textboxName = options.Name or "Textbox"
+                local flag = options.Flag or textboxName
+                local placeholder = options.PlaceHolder or ""
+                local default = options.Default or ""
+                local callback = options.Callback or function() end
                 
-                AzrixLibrary.Flags[flag] = default
+                Library.Flags[flag] = default
+                
                 local Textbox = {}
                 
-                local tFrame = Create("Frame", {
-                    Size = UDim2.new(1, 0, 0, 38),
+                local TextboxFrame = CreateInstance("Frame", {
+                    Size = UDim2.new(1, 0, 0, 44),
                     BackgroundTransparency = 1,
-                    Parent = sContent
+                    Parent = SectionContent
                 })
                 
-                Create("TextLabel", {
-                    Size = UDim2.new(1, 0, 0, 16),
+                local TextboxLabel = CreateInstance("TextLabel", {
+                    Size = UDim2.new(1, 0, 0, 18),
+                    Position = UDim2.new(0, 0, 0, 0),
                     BackgroundTransparency = 1,
-                    Text = tName,
-                    TextColor3 = Colors.Text,
-                    TextSize = 11,
+                    Text = textboxName,
+                    TextColor3 = Theme.Text,
+                    TextSize = 12,
                     Font = Enum.Font.Gotham,
                     TextXAlignment = Enum.TextXAlignment.Left,
-                    Parent = tFrame
+                    Parent = TextboxFrame
                 })
                 
-                local tBox = Create("TextBox", {
-                    Size = UDim2.new(1, 0, 0, 20),
-                    Position = UDim2.new(0, 0, 0, 18),
-                    BackgroundColor3 = Colors.Input,
+                local TextboxInput = CreateInstance("TextBox", {
+                    Size = UDim2.new(1, 0, 0, 24),
+                    Position = UDim2.new(0, 0, 0, 20),
+                    BackgroundColor3 = Theme.Input,
                     BorderSizePixel = 0,
                     Text = default,
                     PlaceholderText = placeholder,
-                    PlaceholderColor3 = Colors.TextDisabled,
-                    TextColor3 = Colors.Text,
-                    TextSize = 10,
+                    PlaceholderColor3 = Theme.TextDarker,
+                    TextColor3 = Theme.Text,
+                    TextSize = 11,
                     Font = Enum.Font.Gotham,
                     ClearTextOnFocus = false,
-                    Parent = tFrame
+                    Parent = TextboxFrame
                 })
-                Corner(tBox, 4)
-                local tStroke = Stroke(tBox, Colors.Border)
-                Create("UIPadding", {PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6), Parent = tBox})
+                AddCorner(TextboxInput, 5)
+                local textboxStroke = AddStroke(TextboxInput, Theme.InputBorder)
                 
-                tBox.Focused:Connect(function() Tween(tStroke, 0.1, {Color = Colors.Accent}) end)
-                tBox.FocusLost:Connect(function()
-                    Tween(tStroke, 0.1, {Color = Colors.Border})
-                    AzrixLibrary.Flags[flag] = tBox.Text
-                    callback(tBox.Text)
+                CreateInstance("UIPadding", {
+                    PaddingLeft = UDim.new(0, 8),
+                    PaddingRight = UDim.new(0, 8),
+                    Parent = TextboxInput
+                })
+                
+                TextboxInput.Focused:Connect(function()
+                    Tween(textboxStroke, 0.15, {Color = Theme.Accent})
                 end)
                 
-                function Textbox:Set(v)
-                    tBox.Text = v
-                    AzrixLibrary.Flags[flag] = v
-                    callback(v)
+                TextboxInput.FocusLost:Connect(function()
+                    Tween(textboxStroke, 0.15, {Color = Theme.InputBorder})
+                    Library.Flags[flag] = TextboxInput.Text
+                    callback(TextboxInput.Text)
+                end)
+                
+                function Textbox:Set(value)
+                    TextboxInput.Text = value
+                    Library.Flags[flag] = value
+                    callback(value)
                 end
-                function Textbox:Get() return AzrixLibrary.Flags[flag] end
+                
+                function Textbox:Get()
+                    return Library.Flags[flag]
+                end
                 
                 return Textbox
             end
             
             -- Button
-            function Section:Button(opts)
-                opts = opts or {}
-                local bName = opts.Name or "Button"
-                local callback = opts.Callback or function() end
+            function Section:Button(options)
+                options = options or {}
+                local buttonName = options.Name or "Button"
+                local callback = options.Callback or function() end
                 
-                local bBtn = Create("TextButton", {
-                    Size = UDim2.new(1, 0, 0, 24),
-                    BackgroundColor3 = Colors.Accent,
+                local Button = {}
+                
+                local ButtonFrame = CreateInstance("TextButton", {
+                    Size = UDim2.new(1, 0, 0, 28),
+                    BackgroundColor3 = Theme.Accent,
                     BorderSizePixel = 0,
-                    Text = bName,
-                    TextColor3 = Colors.Text,
-                    TextSize = 11,
+                    Text = buttonName,
+                    TextColor3 = Theme.Text,
+                    TextSize = 12,
                     Font = Enum.Font.GothamMedium,
-                    Parent = sContent
+                    Parent = SectionContent
                 })
-                Corner(bBtn, 4)
+                AddCorner(ButtonFrame, 5)
                 
-                bBtn.MouseEnter:Connect(function() Tween(bBtn, 0.1, {BackgroundColor3 = Colors.AccentHover}) end)
-                bBtn.MouseLeave:Connect(function() Tween(bBtn, 0.1, {BackgroundColor3 = Colors.Accent}) end)
-                bBtn.MouseButton1Click:Connect(callback)
+                ButtonFrame.MouseEnter:Connect(function()
+                    Tween(ButtonFrame, 0.15, {BackgroundColor3 = Theme.AccentDark})
+                end)
+                ButtonFrame.MouseLeave:Connect(function()
+                    Tween(ButtonFrame, 0.15, {BackgroundColor3 = Theme.Accent})
+                end)
+                ButtonFrame.MouseButton1Click:Connect(function()
+                    callback()
+                end)
                 
-                return {}
+                return Button
             end
             
             -- Label
-            function Section:Label(opts)
-                opts = opts or {}
-                local text = opts.Name or ""
+            function Section:Label(options)
+                options = options or {}
+                local text = options.Name or ""
                 
-                local lbl = Create("TextLabel", {
-                    Size = UDim2.new(1, 0, 0, 16),
+                local Label = {}
+                
+                local LabelFrame = CreateInstance("TextLabel", {
+                    Size = UDim2.new(1, 0, 0, 18),
                     BackgroundTransparency = 1,
                     Text = text,
-                    TextColor3 = Colors.TextDark,
-                    TextSize = 10,
+                    TextColor3 = Theme.TextDark,
+                    TextSize = 11,
                     Font = Enum.Font.Gotham,
                     TextXAlignment = Enum.TextXAlignment.Left,
                     TextWrapped = true,
                     AutomaticSize = Enum.AutomaticSize.Y,
-                    Parent = sContent
+                    Parent = SectionContent
                 })
                 
-                return {Set = function(_, t) lbl.Text = t end}
+                function Label:Set(newText)
+                    LabelFrame.Text = newText
+                end
+                
+                return Label
             end
             
-            -- Colorpicker
-            function Section:Colorpicker(opts)
-                opts = opts or {}
-                local cName = opts.Name or "Color"
-                local flag = opts.Flag or cName
-                local defaultColor = opts.Color or Color3.fromRGB(255, 255, 255)
-                local defaultAlpha = opts.Alpha or 1
-                local callback = opts.Callback or function() end
+            -- Colorpicker (standalone)
+            function Section:Colorpicker(options)
+                options = options or {}
+                local colorName = options.Name or "Color"
+                local flag = options.Flag or colorName
+                local defaultColor = options.Color or Color3.fromRGB(255, 255, 255)
+                local defaultAlpha = options.Alpha or 1
+                local callback = options.Callback or function() end
                 
-                AzrixLibrary.Flags[flag] = {Color = defaultColor, Alpha = defaultAlpha}
+                Library.Flags[flag] = {Color = defaultColor, Alpha = defaultAlpha}
                 
-                local cFrame = Create("Frame", {
-                    Size = UDim2.new(1, 0, 0, 24),
+                local ColorFrame = CreateInstance("Frame", {
+                    Size = UDim2.new(1, 0, 0, 28),
                     BackgroundTransparency = 1,
-                    Parent = sContent
+                    Parent = SectionContent
                 })
                 
-                Create("TextLabel", {
-                    Size = UDim2.new(1, -30, 1, 0),
+                local ColorLabel = CreateInstance("TextLabel", {
+                    Size = UDim2.new(1, -40, 1, 0),
+                    Position = UDim2.new(0, 0, 0, 0),
                     BackgroundTransparency = 1,
-                    Text = cName,
-                    TextColor3 = Colors.Text,
-                    TextSize = 11,
+                    Text = colorName,
+                    TextColor3 = Theme.Text,
+                    TextSize = 12,
                     Font = Enum.Font.Gotham,
                     TextXAlignment = Enum.TextXAlignment.Left,
-                    Parent = cFrame
+                    Parent = ColorFrame
                 })
                 
-                local cBtn = Create("TextButton", {
-                    Size = UDim2.new(0, 24, 0, 16),
-                    Position = UDim2.new(1, -24, 0.5, -8),
+                local ColorButton = CreateInstance("TextButton", {
+                    Size = UDim2.new(0, 32, 0, 20),
+                    Position = UDim2.new(1, -32, 0.5, -10),
                     BackgroundColor3 = defaultColor,
                     BorderSizePixel = 0,
                     Text = "",
-                    Parent = cFrame
+                    Parent = ColorFrame
                 })
-                Corner(cBtn, 4)
-                Stroke(cBtn, Colors.Border)
+                AddCorner(ColorButton, 5)
+                AddStroke(ColorButton, Theme.Divider)
                 
                 local colors = {
-                    Color3.fromRGB(255, 50, 50), Color3.fromRGB(255, 150, 50), Color3.fromRGB(255, 255, 50),
-                    Color3.fromRGB(50, 255, 50), Color3.fromRGB(50, 255, 255), Color3.fromRGB(50, 150, 255),
-                    Color3.fromRGB(50, 50, 255), Color3.fromRGB(150, 50, 255), Color3.fromRGB(255, 50, 255),
-                    Color3.fromRGB(255, 255, 255), Color3.fromRGB(90, 120, 190)
+                    Color3.fromRGB(255, 50, 50),
+                    Color3.fromRGB(255, 150, 50),
+                    Color3.fromRGB(255, 255, 50),
+                    Color3.fromRGB(50, 255, 50),
+                    Color3.fromRGB(50, 255, 255),
+                    Color3.fromRGB(50, 150, 255),
+                    Color3.fromRGB(50, 50, 255),
+                    Color3.fromRGB(150, 50, 255),
+                    Color3.fromRGB(255, 50, 255),
+                    Color3.fromRGB(255, 255, 255),
+                    Color3.fromRGB(115, 225, 175)
                 }
                 
-                cBtn.MouseButton1Click:Connect(function()
-                    local idx = 1
+                ColorButton.MouseButton1Click:Connect(function()
+                    local currentIndex = 1
                     for i, c in ipairs(colors) do
-                        if c == cBtn.BackgroundColor3 then idx = i break end
+                        if c == ColorButton.BackgroundColor3 then
+                            currentIndex = i
+                            break
+                        end
                     end
-                    local next = colors[(idx % #colors) + 1]
-                    cBtn.BackgroundColor3 = next
-                    AzrixLibrary.Flags[flag] = {Color = next, Alpha = defaultAlpha}
-                    callback(next, defaultAlpha)
+                    local nextColor = colors[(currentIndex % #colors) + 1]
+                    ColorButton.BackgroundColor3 = nextColor
+                    Library.Flags[flag] = {Color = nextColor, Alpha = defaultAlpha}
+                    callback(nextColor, defaultAlpha)
                 end)
                 
                 return {
-                    Set = function(_, c, a)
-                        cBtn.BackgroundColor3 = c
-                        AzrixLibrary.Flags[flag] = {Color = c, Alpha = a or defaultAlpha}
-                        callback(c, a or defaultAlpha)
+                    Set = function(_, color, alpha)
+                        ColorButton.BackgroundColor3 = color
+                        Library.Flags[flag] = {Color = color, Alpha = alpha or defaultAlpha}
+                        callback(color, alpha or defaultAlpha)
                     end,
-                    Get = function() return AzrixLibrary.Flags[flag] end
+                    Get = function()
+                        return Library.Flags[flag]
+                    end
                 }
             end
             
             return Section
         end
         
-        table.insert(Window.Tabs, {Btn = tabBtn, Content = tabContent, Tab = Tab})
-        if #Window.Tabs == 1 then SelectTab() end
+        table.insert(Window.Tabs, {Button = TabButton, Text = TabText, Content = TabContent, Tab = Tab})
+        
+        if #Window.Tabs == 1 then
+            SelectTab()
+        end
         
         return Tab
     end
     
-    -- Config Section
-    function Window:ConfigSection(tab)
-        local cfgSec = tab:Section({Name = "Configuration", Side = "Left"})
-        local cfgDropdown
-        
-        cfgSec:Textbox({
-            Name = "Config Name",
-            Flag = "ConfigName",
-            PlaceHolder = "config name...",
-            Default = "default"
-        })
-        
-        cfgSec:Button({
-            Name = "Save Config",
-            Callback = function()
-                local n = AzrixLibrary.Flags.ConfigName or "default"
-                if AzrixLibrary:SaveConfig(n) then
-                    AzrixLibrary.Notifications:Create({Name = "Saved: " .. n, Type = "Success", Lifetime = 2})
-                    local cfgs = AzrixLibrary:GetConfigs()
-                    if #cfgs == 0 then cfgs = {"No configs"} end
-                    if cfgDropdown then cfgDropdown.RefreshOptions(cfgs) end
-                else
-                    AzrixLibrary.Notifications:Create({Name = "Failed to save", Type = "Error", Lifetime = 2})
-                end
-            end
-        })
-        
-        local cfgs = AzrixLibrary:GetConfigs()
-        if #cfgs == 0 then cfgs = {"No configs"} end
-        
-        cfgDropdown = cfgSec:Dropdown({
-            Name = "Select Config",
-            Flag = "SelectedConfig",
-            Options = cfgs
-        })
-        
-        cfgSec:Button({
-            Name = "Load Config",
-            Callback = function()
-                local n = AzrixLibrary.Flags.SelectedConfig
-                if n and n ~= "No configs" and AzrixLibrary:LoadConfig(n) then
-                    AzrixLibrary.Notifications:Create({Name = "Loaded: " .. n, Type = "Success", Lifetime = 2})
-                else
-                    AzrixLibrary.Notifications:Create({Name = "Failed to load", Type = "Error", Lifetime = 2})
-                end
-            end
-        })
-        
-        cfgSec:Button({
-            Name = "Refresh Configs",
-            Callback = function()
-                local cfgs = AzrixLibrary:GetConfigs()
-                if #cfgs == 0 then cfgs = {"No configs"} end
-                cfgDropdown.RefreshOptions(cfgs)
-                AzrixLibrary.Notifications:Create({Name = "Refreshed", Lifetime = 2})
-            end
-        })
-        
-        cfgSec:Button({
-            Name = "Delete Config",
-            Callback = function()
-                local n = AzrixLibrary.Flags.SelectedConfig
-                if n and n ~= "No configs" and AzrixLibrary:DeleteConfig(n) then
-                    AzrixLibrary.Notifications:Create({Name = "Deleted: " .. n, Type = "Success", Lifetime = 2})
-                    local cfgs = AzrixLibrary:GetConfigs()
-                    if #cfgs == 0 then cfgs = {"No configs"} end
-                    cfgDropdown.RefreshOptions(cfgs)
-                end
-            end
-        })
-    end
-    
-    -- Toggle Key
-    local toggleConn = UserInputService.InputBegan:Connect(function(input, gpe)
-        if gpe then return end
-        if input.KeyCode == AzrixLibrary.ToggleKey then
-            AzrixLibrary.Visible = not AzrixLibrary.Visible
-            main.Visible = AzrixLibrary.Visible
-        end
-    end)
-    table.insert(AzrixLibrary.Connections, toggleConn)
-    
-    -- Unload
-    function AzrixLibrary:Unload()
-        for _, c in pairs(self.Connections) do
-            if c and c.Disconnect then c:Disconnect() end
-        end
-        gui:Destroy()
-    end
-    
-    Window.Gui = gui
-    Window.Main = main
-    table.insert(AzrixLibrary.Windows, Window)
-    
     return Window
 end
 
-return AzrixLibrary
+-- Configs
+function Library:Configs(window)
+    local SettingsTab = window:Tab({Name = "Configs"})
+    
+    local ConfigSection = SettingsTab:Section({Name = "Configuration", Side = "Left"})
+    
+    local configDropdown
+    
+    ConfigSection:Textbox({
+        Name = "Config Name",
+        Flag = "ConfigName",
+        PlaceHolder = "Enter name...",
+        Default = "default"
+    })
+    
+    ConfigSection:Button({
+        Name = "Save Config",
+        Callback = function()
+            local name = Library.Flags.ConfigName or "default"
+            Library:SaveConfig(name)
+            Library.Notifications:Create({Name = "Saved config: " .. name, Lifetime = 2})
+            if configDropdown then
+                local configs = Library:GetConfigs()
+                if #configs == 0 then configs = {"No configs"} end
+                configDropdown.RefreshOptions(configs)
+            end
+        end
+    })
+    
+    local configs = Library:GetConfigs()
+    if #configs == 0 then configs = {"No configs"} end
+    
+    configDropdown = ConfigSection:Dropdown({
+        Name = "Select Config",
+        Flag = "SelectedConfig",
+        Options = configs,
+        Default = configs[1]
+    })
+    
+    ConfigSection:Button({
+        Name = "Load Config",
+        Callback = function()
+            local name = Library.Flags.SelectedConfig
+            if name and name ~= "No configs" then
+                Library:LoadConfig(name)
+                Library.Notifications:Create({Name = "Loaded config: " .. name, Lifetime = 2})
+            end
+        end
+    })
+    
+    ConfigSection:Button({
+        Name = "Refresh Configs",
+        Callback = function()
+            local configs = Library:GetConfigs()
+            if #configs == 0 then configs = {"No configs"} end
+            configDropdown.RefreshOptions(configs)
+            Library.Notifications:Create({Name = "Refreshed configs", Lifetime = 2})
+        end
+    })
+    
+    ConfigSection:Button({
+        Name = "Delete Config",
+        Callback = function()
+            local name = Library.Flags.SelectedConfig
+            if name and name ~= "No configs" then
+                Library:DeleteConfig(name)
+                Library.Notifications:Create({Name = "Deleted config: " .. name, Lifetime = 2})
+                local configs = Library:GetConfigs()
+                if #configs == 0 then configs = {"No configs"} end
+                configDropdown.RefreshOptions(configs)
+            end
+        end
+    })
+    
+    local InfoSection = SettingsTab:Section({Name = "Information", Side = "Right"})
+    
+    InfoSection:Label({Name = "Azrix Client"})
+    InfoSection:Label({Name = "Toggle Key: INSERT"})
+    InfoSection:Label({Name = ""})
+    InfoSection:Button({
+        Name = "Unload",
+        Callback = function()
+            Library.Notifications:Create({Name = "Unloading...", Lifetime = 2})
+            task.wait(1)
+            Library:Unload()
+        end
+    })
+end
+
+-- Auto-load default config
+task.spawn(function()
+    task.wait(1)
+    if Library:GetConfigs() and table.find(Library:GetConfigs(), "default") then
+        Library:LoadConfig("default")
+        Library.Notifications:Create({Name = "Auto-loaded default config", Lifetime = 3})
+    end
+end)
+
+return Library
