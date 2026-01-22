@@ -60,26 +60,22 @@
     local concat = table.concat
 -- 
 
--- Library init
-    getgenv().library = {
-        directory = "avenir",
-        folders = {
-            "/fonts",
-            "/configs",
-        },
-        flags = {},
-        config_flags = {},
-        connections = {},   
-        notifications = {
-            notifs = {},
-            enabled = false, -- Notifications disabled on startup by default
-        },
-        settings = {
-            auto_load_config = nil, -- Stores the name of config to auto-load
-            notifications_enabled = false, -- Controls if notifications show
-        },
-        current_open; 
-    }
+getgenv().library = {
+    directory = "avenir",
+    folders = {
+        "/fonts",
+        "/configs",
+    },
+    flags = {},
+    config_flags = {},
+    connections = {},   
+    notifications = {
+        notifs = {},
+        enabled = false,
+    },
+    auto_load_config_name = nil,
+    current_open; 
+}
 
     local themes = {
         preset = {
@@ -555,6 +551,65 @@
             library = nil 
         end 
     --
+
+    function library:get_settings_path()
+    return library.directory .. "/settings.json"
+end
+
+function library:save_library_settings()
+    local settings_data = {
+        auto_load_config = library.auto_load_config_name,
+        notifications_enabled = notifications.enabled,
+    }
+    writefile(library:get_settings_path(), http_service:JSONEncode(settings_data))
+end
+
+function library:load_library_settings()
+    local path = library:get_settings_path()
+    if isfile(path) then
+        local success, data = pcall(function()
+            return http_service:JSONDecode(readfile(path))
+        end)
+        if success and data then
+            library.auto_load_config_name = data.auto_load_config
+            notifications.enabled = data.notifications_enabled or false
+        end
+    end
+end
+
+function library:set_auto_load_config(config_name)
+    library.auto_load_config_name = config_name
+    library:save_library_settings()
+end
+
+function library:remove_auto_load_config()
+    library.auto_load_config_name = nil
+    library:save_library_settings()
+end
+
+function library:set_notifications_enabled(enabled)
+    notifications.enabled = enabled
+    library:save_library_settings()
+end
+
+function library:perform_auto_load()
+    library:load_library_settings()
+    if library.auto_load_config_name then
+        local config_path = library.directory .. "/configs/" .. library.auto_load_config_name .. ".cfg"
+        if isfile(config_path) then
+            task.spawn(function()
+                task.wait(0.5)
+                library:load_config(readfile(config_path))
+                if notifications.enabled then
+                    notifications:create_notification({
+                        name = "Auto Load",
+                        info = "Loaded config: " .. library.auto_load_config_name
+                    })
+                end
+            end)
+        end
+    end
+end
     
     -- Library element functions
         function library:window(properties)
