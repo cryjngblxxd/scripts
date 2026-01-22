@@ -38,7 +38,7 @@ getgenv().Loaded = true
             visible_backgrounds = rgb(20, 23, 22),
             text_color = rgb(221, 223, 222),
             glow = rgb(126, 72, 163),
-            deselected = rgb(45, 0, 194),
+            deselected = rgb(255, 255, 255),
         },
         utility = {},
         gradients = {
