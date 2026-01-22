@@ -1729,7 +1729,7 @@
                 cfg.set(cfg.enabled)
             end)
             
-            if cfg.seperator then
+                       if cfg.seperator then
                 library:create( "Frame" , {
                     AnchorPoint = vec2(0, 1);
                     Parent = self.items[ "elements" ];
@@ -3712,7 +3712,7 @@
                 ui_section:keybind({
                     name = "Menu Toggle", 
                     flag = "menu_keybind",
-                    key = Enum.KeyCode.end,
+                    key = Enum.KeyCode.RightShift,
                     mode = "Toggle",
                     default = true,
                     callback = function(bool) 
