@@ -27,6 +27,8 @@ getgenv().Loaded = true
         Notifications = {Notifs = {}},
         OpenElement = {},
         AutoLoadFile = "xezios/autoload.txt",
+        SettingsFile = "xezios/settings.txt",
+        NotificationsEnabled = true,
     }
 
     local themes = {
@@ -37,8 +39,8 @@ getgenv().Loaded = true
             background = rgb(17, 19, 19),
             visible_backgrounds = rgb(20, 23, 22),
             text_color = rgb(221, 223, 222),
-            glow = rgb(126, 72, 163),
-            deselected = rgb(255, 255, 255),
+            glow = rgb(0, 0, 0),
+            deselected = rgb(89, 91, 91),
         },
         utility = {},
         gradients = {
@@ -123,6 +125,31 @@ getgenv().Loaded = true
     local Flags = Library.Flags 
     local ConfigFlags = Library.ConfigFlags
     local Notifications = Library.Notifications 
+
+    -- Load settings on startup
+    local function LoadSettings()
+        if isfile(Library.SettingsFile) then
+            local success, settings = pcall(function()
+                return HttpService:JSONDecode(readfile(Library.SettingsFile))
+            end)
+            if success and settings then
+                if settings.NotificationsEnabled ~= nil then
+                    Library.NotificationsEnabled = settings.NotificationsEnabled
+                end
+            end
+        end
+    end
+
+    local function SaveSettings()
+        local settings = {
+            NotificationsEnabled = Library.NotificationsEnabled
+        }
+        pcall(function()
+            writefile(Library.SettingsFile, HttpService:JSONEncode(settings))
+        end)
+    end
+
+    LoadSettings()
 --
 
 -- Library functions 
@@ -1047,6 +1074,7 @@ getgenv().Loaded = true
                 Prefix = properties.Prefix or "XEZIOS",
                 Suffix = properties.Suffix or "PRIME",
                 Size = properties.Size or dim2(0, 620, 0, 471),
+                AutoShow = properties.AutoShow ~= nil and properties.AutoShow or true,
                 TabInfo = nil,
                 Items = {},
                 Visible = true,
@@ -1246,6 +1274,12 @@ getgenv().Loaded = true
 
             Library:Draggify(Items.Window)
             Library:Resizify(Items.Window)
+
+            -- Handle AutoShow
+            if not Cfg.AutoShow then
+                Items.Window.Visible = false
+                Cfg.Visible = false
+            end
 
             function Cfg.ToggleMenu(bool) 
                 if Cfg.Tweening then 
@@ -2801,6 +2835,16 @@ getgenv().Loaded = true
                 end
             })
 
+            MenuSection:Toggle({
+                Name = "Notifications",
+                Flag = "notifications_enabled",
+                Default = Library.NotificationsEnabled,
+                Callback = function(bool)
+                    Library.NotificationsEnabled = bool
+                    SaveSettings()
+                end
+            })
+
             task.delay(1, function() window.Tweening = false end)
 
             -- Auto load config after UI is ready
@@ -2845,6 +2889,11 @@ getgenv().Loaded = true
         end 
         
         function Notifications:Create(properties)
+            -- Check if notifications are disabled
+            if not Library.NotificationsEnabled then
+                return
+            end
+
             local Cfg = {
                 Name = properties.Name or "Notification",
                 Lifetime = properties.LifeTime or properties.Lifetime or 3,
