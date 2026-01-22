@@ -1,10 +1,4 @@
 
---[[
-
-    Avenir Library
-    -> Originally made by @finobe 
-    -> Modified with auto-load config, notification control, and renamed to Avenir
-]]
 
 -- Variables 
     local uis = game:GetService("UserInputService") 
