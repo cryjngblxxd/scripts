@@ -1,4 +1,11 @@
+--[[
 
+    Avenir Library
+    -> Originally made by @finobe 
+    -> Modified with auto-load config, notification control, and renamed to Avenir
+]]
+
+-- Variables 
     local uis = game:GetService("UserInputService") 
     local players = game:GetService("Players") 
     local ws = game:GetService("Workspace")
@@ -1722,7 +1729,7 @@
                 cfg.set(cfg.enabled)
             end)
             
-                        if cfg.seperator then
+            if cfg.seperator then
                 library:create( "Frame" , {
                     AnchorPoint = vec2(0, 1);
                     Parent = self.items[ "elements" ];
