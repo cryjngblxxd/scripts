@@ -26,11 +26,12 @@ getgenv().Loaded = true
         Connections = {},   
         Notifications = {Notifs = {}},
         OpenElement = {},
+        AutoLoadFile = "xezios/autoload.txt",
     }
 
     local themes = {
         preset = {
-            accent = rgb(108, 109, 152),
+            accent = rgb(126, 72, 163),
             window_outline = rgb(0, 0, 0),
             inline = rgb(25, 27, 27),
             background = rgb(17, 19, 19),
@@ -108,6 +109,7 @@ getgenv().Loaded = true
         [Enum.UserInputType.MouseButton3] = "MB3",
         [Enum.KeyCode.Escape] = "ESC",
         [Enum.KeyCode.Space] = "SPC",
+        [Enum.KeyCode.End] = "END",
     }
     
     Library.__index = Library
@@ -337,6 +339,36 @@ getgenv().Loaded = true
             end
 
             ConfigHolder.RefreshOptions(List)
+        end
+
+        function Library:SetAutoLoad(configName)
+            if configName and configName ~= "" then
+                writefile(Library.AutoLoadFile, configName)
+            end
+        end
+
+        function Library:GetAutoLoad()
+            if isfile(Library.AutoLoadFile) then
+                return readfile(Library.AutoLoadFile)
+            end
+            return nil
+        end
+
+        function Library:RemoveAutoLoad()
+            if isfile(Library.AutoLoadFile) then
+                delfile(Library.AutoLoadFile)
+            end
+        end
+
+        function Library:LoadAutoConfig()
+            local autoLoadConfig = Library:GetAutoLoad()
+            if autoLoadConfig then
+                local path = Library.Directory .. "/configs/" .. autoLoadConfig .. ".cfg"
+                if isfile(path) then
+                    Library:LoadConfig(readfile(path))
+                    Notifications:Create({Name = "Auto Loaded Config (" .. autoLoadConfig .. ")"})
+                end
+            end
         end
 
         function Library:Keypicker(properties) 
@@ -2715,6 +2747,33 @@ getgenv().Loaded = true
                 end
             })
 
+            Section:Button({
+                Name = "Set Auto Load", 
+                Callback = function() 
+                    if Flags["config_name_text"] == "" then return end 
+                    local path = Library.Directory .. "/configs/" .. Flags["config_name_text"] .. ".cfg"
+                    if isfile(path) then
+                        Library:SetAutoLoad(Flags["config_name_text"])
+                        Notifications:Create({Name = "Set Auto Load (" .. Flags["config_name_text"] .. ")"})
+                    else
+                        Notifications:Create({Name = "Config does not exist!"})
+                    end
+                end
+            })
+
+            Section:Button({
+                Name = "Remove Auto Load", 
+                Callback = function() 
+                    local currentAutoLoad = Library:GetAutoLoad()
+                    if currentAutoLoad then
+                        Library:RemoveAutoLoad()
+                        Notifications:Create({Name = "Removed Auto Load (" .. currentAutoLoad .. ")"})
+                    else
+                        Notifications:Create({Name = "No Auto Load config set!"})
+                    end
+                end
+            })
+
             local Section = Tab:Section({Name = "Theme", Side = "Right"})
             Section:Label({Name = "Accent Color"}):Colorpicker({Flag = "theme_accent", Callback = function(clr, alpha) Library:RefreshTheme("accent", clr) end, Color = themes.preset.accent})
             Section:Label({Name = "Window Outline"}):Colorpicker({Flag = "theme_outline", Callback = function(clr, alpha) Library:RefreshTheme("window_outline", clr) end, Color = themes.preset.window_outline})
@@ -2731,7 +2790,7 @@ getgenv().Loaded = true
             MenuSection:Label({Name = "Menu Bind"}):Keybind({
                 Name = "Menu Bind", 
                 Flag = "menu_keybind",
-                Key = Enum.KeyCode.RightShift,
+                Key = Enum.KeyCode.End,
                 Mode = "Toggle",
                 Default = true,
                 Callback = function(bool) 
@@ -2743,6 +2802,11 @@ getgenv().Loaded = true
             })
 
             task.delay(1, function() window.Tweening = false end)
+
+            -- Auto load config after UI is ready
+            task.delay(1.5, function()
+                Library:LoadAutoConfig()
+            end)
         end
     --
 
