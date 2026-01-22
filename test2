@@ -1,13 +1,3 @@
-I now have the complete source code. Let me create the updated version with all the features you requested:
-
-1. **Auto Load Config** - Automatically load a saved config on startup
-2. **Remove Current Auto Load Config** - Option to disable auto-loading
-3. **Disable Notifications on Startup** - Toggle to suppress notifications until user enables them
-4. **Renamed to "avenir"**
-
-Here's the complete updated library:
-
-```lua
 --[[
 
     Avenir Library
