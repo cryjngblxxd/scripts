@@ -3712,7 +3712,7 @@
                 ui_section:keybind({
                     name = "Menu Toggle", 
                     flag = "menu_keybind",
-                    key = Enum.KeyCode.INS,
+                    key = Enum.KeyCode.Insert,
                     mode = "Toggle",
                     default = true,
                     callback = function(bool) 
