@@ -1,7 +1,7 @@
 --[[
-    Avenir Library - CS:GO Style
-    -> Modified with auto-load config, notification control
-    -> Horizontal layout like CS:GO/Gamesense
+    Avenir Library - CS:GO Style (Fixed)
+    -> Fixed dragging, keybind dropdown, project-based configs
+    -> Improved button styling
 ]]
 
 -- Variables 
@@ -67,6 +67,7 @@
 -- Library init
     getgenv().library = {
         directory = "avenir",
+        project_name = "default",
         folders = {
             "/fonts",
             "/configs",
@@ -158,14 +159,6 @@
         
     library.__index = library
 
-    pcall(function()
-        for _, path in next, library.folders do 
-            if not isfolder(library.directory .. path) then
-                makefolder(library.directory .. path)
-            end
-        end
-    end)
-
     local flags = library.flags 
     local config_flags = library.config_flags
     local notifications = library.notifications 
@@ -226,52 +219,27 @@
         return tween
     end
 
-    function library:resizify(frame) 
-        local Frame = Instance.new("TextButton")
-        Frame.Position = dim2(1, -10, 1, -10)
-        Frame.BorderColor3 = rgb(0, 0, 0)
-        Frame.Size = dim2(0, 10, 0, 10)
-        Frame.BorderSizePixel = 0
-        Frame.BackgroundColor3 = rgb(255, 255, 255)
-        Frame.Parent = frame
-        Frame.BackgroundTransparency = 1 
-        Frame.Text = ""
-
-        local resizing = false 
-        local start_size 
-        local start 
-        local og_size = frame.Size  
-
-        Frame.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                resizing = true
-                start = input.Position
-                start_size = frame.Size
+    function library:init_folders()
+        pcall(function()
+            if not isfolder(library.directory) then
+                makefolder(library.directory)
+            end
+            for _, path in next, library.folders do 
+                if not isfolder(library.directory .. path) then
+                    makefolder(library.directory .. path)
+                end
+            end
+            -- Create project-specific config folder
+            local project_path = library.directory .. "/configs/" .. library.project_name
+            if not isfolder(project_path) then
+                makefolder(project_path)
             end
         end)
+    end
 
-        Frame.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                resizing = false
-            end
-        end)
-
-        library:connection(uis.InputChanged, function(input, game_event) 
-            if resizing and input.UserInputType == Enum.UserInputType.MouseMovement then
-                local viewport_x = camera.ViewportSize.X
-                local viewport_y = camera.ViewportSize.Y
-
-                local current_size = dim2(
-                    start_size.X.Scale,
-                    math.clamp(start_size.X.Offset + (input.Position.X - start.X), og_size.X.Offset, viewport_x),
-                    start_size.Y.Scale,
-                    math.clamp(start_size.Y.Offset + (input.Position.Y - start.Y), og_size.Y.Offset, viewport_y)
-                )
-
-                library:tween(frame, {Size = current_size}, Enum.EasingStyle.Linear, 0.05)
-            end
-        end)
-    end 
+    function library:get_config_path()
+        return library.directory .. "/configs/" .. library.project_name
+    end
 
     function library:next_flag()
         local index = 0
@@ -287,12 +255,13 @@
         return (y_cond and x_cond)
     end
 
-    function library:draggify(frame)
+    function library:draggify(frame, drag_object)
         local dragging = false 
         local start_size = frame.Position
         local start 
+        local drag_target = drag_object or frame
 
-        frame.InputBegan:Connect(function(input)
+        drag_target.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 then
                 dragging = true
                 start = input.Position
@@ -300,7 +269,7 @@
             end
         end)
 
-        frame.InputEnded:Connect(function(input)
+        drag_target.InputEnded:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 then
                 dragging = false
             end
@@ -348,7 +317,7 @@
     end
 
     function library:get_settings_path()
-        return library.directory .. "/library_settings.json"
+        return library.directory .. "/configs/" .. library.project_name .. "/settings.json"
     end
 
     function library:save_library_settings()
@@ -392,7 +361,7 @@
     function library:do_auto_load()
         library:load_library_settings()
         if library.auto_load_config_name then
-            local config_path = library.directory .. "/configs/" .. library.auto_load_config_name .. ".cfg"
+            local config_path = library:get_config_path() .. "/" .. library.auto_load_config_name .. ".cfg"
             pcall(function()
                 if isfile(config_path) then
                     task.spawn(function()
@@ -416,7 +385,8 @@
         
         local list = {}
         pcall(function()
-            for _, file in ipairs(listfiles(library.directory .. "/configs")) do
+            local config_path = library:get_config_path()
+            for _, file in ipairs(listfiles(config_path)) do
                 local name = file:match("([^/\\]+)%.cfg$")
                 if name then
                     list[#list + 1] = name
@@ -540,10 +510,14 @@
             suffix = properties.suffix or "tech",
             name = properties.name or "avenir",
             game_name = properties.gameInfo or "Avenir UI",
-            size = properties.size or dim2(0, 850, 0, 520),
+            size = properties.size or dim2(0, 850, 0, 450),
             selected_tab = nil,
             items = {},
         }
+        
+        -- Set project name for config isolation
+        library.project_name = properties.project or properties.name or "default"
+        library:init_folders()
         
         library["items"] = library:create("ScreenGui", {
             Parent = coregui,
@@ -556,9 +530,17 @@
         library["other"] = library:create("ScreenGui", {
             Parent = coregui,
             Name = "AvenirOther",
-            Enabled = false,
-            ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+            Enabled = true,
+            ZIndexBehavior = Enum.ZIndexBehavior.Global,
             IgnoreGuiInset = true,
+        })
+        
+        -- Popups container (for dropdowns, keybind menus)
+        library["popups"] = library:create("Frame", {
+            Parent = library["items"],
+            BackgroundTransparency = 1,
+            Size = dim2(1, 0, 1, 0),
+            ZIndex = 100,
         })
 
         local items = cfg.items
@@ -585,7 +567,7 @@
             ApplyStrokeMode = Enum.ApplyStrokeMode.Border
         })
         
-        -- Top Bar (Title + Main Tabs)
+        -- Top Bar (Title + Main Tabs) - DRAGGABLE
         items["top_bar"] = library:create("Frame", {
             Parent = items["main"],
             Size = dim2(1, 0, 0, 32),
@@ -725,7 +707,7 @@
             FontFace = fonts.font,
             Parent = items["info"],
             TextColor3 = rgb(72, 72, 73),
-            Text = cfg.game_name,
+            Text = cfg.game_name .. " | " .. library.project_name,
             Size = dim2(1, 0, 0, 0),
             AnchorPoint = vec2(0, 0.5),
             Position = dim2(0, 10, 0.5, -1),
@@ -736,11 +718,12 @@
             TextSize = 12,
         })
 
-        library:draggify(items["top_bar"])
-        library:resizify(items["main"])
+        -- Apply dragging to the entire main frame via top bar
+        library:draggify(items["main"], items["top_bar"])
 
         function cfg.toggle_menu(bool) 
             library["items"].Enabled = bool
+            library["other"].Enabled = bool
         end 
             
         return setmetatable(cfg, library)
@@ -825,7 +808,7 @@
         
         -- Tab Content Holder
         items["tab_content"] = library:create("Frame", {
-            Parent = library.cache,
+            Parent = library["other"],
             Visible = false,
             BackgroundTransparency = 1,
             Size = dim2(1, -16, 1, -8),
@@ -835,7 +818,7 @@
         
         -- Sub Tab Holder (for this tab's sub-tabs)
         items["sub_tab_holder"] = library:create("Frame", {
-            Parent = library.cache,
+            Parent = library["other"],
             BackgroundTransparency = 1,
             Visible = false,
             Size = dim2(1, 0, 1, 0),
@@ -896,7 +879,7 @@
             
             -- Sub-tab page content
             sub_items["page"] = library:create("Frame", {
-                Parent = library.cache,
+                Parent = library["other"],
                 BackgroundTransparency = 1,
                 Size = dim2(1, 0, 1, 0),
                 BorderSizePixel = 0,
@@ -938,7 +921,7 @@
                 if page then
                     library:tween(page.text, {TextColor3 = rgb(90, 90, 95)})
                     page.page.Visible = false
-                    page.page.Parent = library["cache"] 
+                    page.page.Parent = library["other"] 
                 end 
                 
                 library:tween(data.text, {TextColor3 = themes.preset.accent})
@@ -973,9 +956,9 @@
                 library:tween(selected_tab[5], {BackgroundTransparency = 1})
 
                 selected_tab[4].Visible = false
-                selected_tab[4].Parent = library["cache"]
+                selected_tab[4].Parent = library["other"]
                 selected_tab[6].Visible = false
-                selected_tab[6].Parent = library["cache"]
+                selected_tab[6].Parent = library["other"]
             end
 
             library:tween(items["button"], {BackgroundTransparency = 0.95})
@@ -1632,12 +1615,12 @@
         })
 
         items["dropdown_holder"] = library:create("Frame", {
-            Parent = library["items"],
+            Parent = library["popups"],
             Visible = true,
             BackgroundTransparency = 1,
             Size = dim2(0, 0, 0, 0),
             BorderSizePixel = 0,
-            ZIndex = 10,
+            ZIndex = 100,
         })
         
         items["outline"] = library:create("Frame", {
@@ -1646,7 +1629,7 @@
             ClipsDescendants = true,
             BorderSizePixel = 0,
             BackgroundColor3 = rgb(30, 30, 35),
-            ZIndex = 10,
+            ZIndex = 100,
         })
         
         library:create("UIStroke", {
@@ -1686,7 +1669,7 @@
                 BorderSizePixel = 0,
                 AutomaticSize = Enum.AutomaticSize.Y,
                 TextSize = 11,
-                ZIndex = 10,
+                ZIndex = 100,
             })
             
             library:create("UIPadding", {
@@ -1702,7 +1685,8 @@
         function cfg.set_visible(bool)
             local a = bool and cfg.y_size or 0
             library:tween(items["dropdown_holder"], {Size = dim_offset(items["dropdown"].AbsoluteSize.X, a)})
-            items["dropdown_holder"].Position = dim2(0, items["dropdown"].AbsolutePosition.X, 0, items["dropdown"].AbsolutePosition.Y + 54)
+            local pos = items["dropdown"].AbsolutePosition
+            items["dropdown_holder"].Position = dim_offset(pos.X, pos.Y + items["dropdown"].AbsoluteSize.Y + 2)
             library:close_element(cfg)
         end
         
@@ -1905,12 +1889,13 @@
         })
 
         items["colorpicker_holder"] = library:create("Frame", {
-            Parent = library["other"],
+            Parent = library["popups"],
             Position = dim2(0, 0, 0, 0),
             Size = dim2(0, 150, 0, 160),
             BorderSizePixel = 0,
-            Visible = true,
-            BackgroundColor3 = rgb(28, 28, 32)
+            Visible = false,
+            BackgroundColor3 = rgb(28, 28, 32),
+            ZIndex = 100,
         })
         
         library:create("UICorner", {
@@ -1931,6 +1916,7 @@
             Size = dim2(1, 0, 1, 0),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
+            ZIndex = 100,
         })
         
         items["saturation_holder"] = library:create("Frame", {
@@ -1938,7 +1924,8 @@
             Position = dim2(0, 6, 0, 6),
             Size = dim2(1, -12, 1, -50),
             BorderSizePixel = 0,
-            BackgroundColor3 = hsv(h, 1, 1)
+            BackgroundColor3 = hsv(h, 1, 1),
+            ZIndex = 100,
         })
         
         library:create("UICorner", {
@@ -1951,7 +1938,7 @@
             Size = dim2(1, 0, 1, 0),
             Text = "",
             AutoButtonColor = false,
-            ZIndex = 2,
+            ZIndex = 101,
             BorderSizePixel = 0,
             BackgroundColor3 = rgb(255, 255, 255)
         })
@@ -1972,7 +1959,8 @@
             Parent = items["saturation_holder"],
             Size = dim2(1, 0, 1, 0),
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(255, 255, 255)
+            BackgroundColor3 = rgb(255, 255, 255),
+            ZIndex = 100,
         })
         
         library:create("UIGradient", {
@@ -1990,7 +1978,7 @@
             Parent = items["saturation_holder"],
             Position = dim2(s, 0, 1 - v, 0),
             Size = dim2(0, 8, 0, 8),
-            ZIndex = 5,
+            ZIndex = 102,
             BorderSizePixel = 0,
             BackgroundColor3 = hsv(h, s, v)
         })
@@ -2015,6 +2003,7 @@
             BackgroundColor3 = rgb(255, 255, 255),
             AutoButtonColor = false,
             Text = "",
+            ZIndex = 100,
         })
         
         library:create("UIGradient", {
@@ -2032,7 +2021,7 @@
             Parent = items["hue_gradient"],
             Position = dim2(h, 0, 0.5, 0),
             Size = dim2(0, 4, 0, 12),
-            ZIndex = 5,
+            ZIndex = 101,
             BorderSizePixel = 0,
             BackgroundColor3 = rgb(255, 255, 255)
         })
@@ -2050,6 +2039,7 @@
             BackgroundColor3 = rgb(25, 25, 29),
             AutoButtonColor = false,
             Text = "",
+            ZIndex = 100,
         })
         
         library:create("UICorner", {
@@ -2067,7 +2057,7 @@
             Parent = items["alpha_gradient"],
             Position = dim2(1 - a, 0, 0.5, 0),
             Size = dim2(0, 4, 0, 12),
-            ZIndex = 5,
+            ZIndex = 101,
             BorderSizePixel = 0,
             BackgroundColor3 = rgb(255, 255, 255)
         })
@@ -2078,8 +2068,9 @@
         })
 
         function cfg.set_visible(bool)
-            items["colorpicker_holder"].Parent = bool and library["items"] or library["other"]
-            items["colorpicker_holder"].Position = dim_offset(items["colorpicker"].AbsolutePosition.X, items["colorpicker"].AbsolutePosition.Y + items["colorpicker"].AbsoluteSize.Y + 40)
+            items["colorpicker_holder"].Visible = bool
+            local pos = items["colorpicker"].AbsolutePosition
+            items["colorpicker_holder"].Position = dim_offset(pos.X - 130 + items["colorpicker"].AbsoluteSize.X, pos.Y + items["colorpicker"].AbsoluteSize.Y + 2)
             library:close_element(cfg)
         end
 
@@ -2269,7 +2260,7 @@
     end
 --
 
--- Keybind (CS:GO Style)
+-- Keybind (CS:GO Style - Fixed dropdown position)
     function library:keybind(options) 
         local cfg = {
             flag = options.flag or library:next_flag(),
@@ -2384,21 +2375,23 @@
             PaddingLeft = dim(0, 6)
         })
 
+        -- Mode dropdown - placed in popups container
         items["dropdown"] = library:create("Frame", {
-            Parent = library["items"],
+            Parent = library["popups"],
             BackgroundTransparency = 1,
             Position = dim2(0, 0, 0, 0),
             Size = dim2(0, 0, 0, 0),
             BorderSizePixel = 0,
-            AutomaticSize = Enum.AutomaticSize.X,
+            ZIndex = 100,
+            ClipsDescendants = true,
         })
         
         items["inline"] = library:create("Frame", {
             Parent = items["dropdown"],
             Size = dim2(1, 0, 1, 0),
-            ClipsDescendants = true,
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(28, 28, 32)
+            BackgroundColor3 = rgb(28, 28, 32),
+            ZIndex = 100,
         })
         
         library:create("UIStroke", {
@@ -2441,6 +2434,7 @@
                 BorderSizePixel = 0,
                 AutomaticSize = Enum.AutomaticSize.XY,
                 TextSize = 10,
+                ZIndex = 100,
             })
             cfg.hold_instances[option] = name
             cfg.y_size = cfg.y_size + name.AbsoluteSize.Y
@@ -2520,8 +2514,9 @@
 
         function cfg.set_visible(bool)
             local size = bool and cfg.y_size or 0
-            library:tween(items["dropdown"], {Size = dim_offset(items["keybind_holder"].AbsoluteSize.X, size)})
-            items["dropdown"].Position = dim_offset(items["keybind_holder"].AbsolutePosition.X, items["keybind_holder"].AbsolutePosition.Y + items["keybind_holder"].AbsoluteSize.Y + 44)
+            library:tween(items["dropdown"], {Size = dim_offset(items["keybind_holder"].AbsoluteSize.X + 20, size)})
+            local pos = items["keybind_holder"].AbsolutePosition
+            items["dropdown"].Position = dim_offset(pos.X - 10, pos.Y + items["keybind_holder"].AbsoluteSize.Y + 2)
         end
     
         items["keybind_holder"].MouseButton1Down:Connect(function()
@@ -2571,7 +2566,7 @@
     end
 --
 
--- Button (CS:GO Style)
+-- Button (CS:GO Style - Improved with layers)
     function library:button(options) 
         local cfg = {
             name = options.name or "Button",
@@ -2589,15 +2584,44 @@
             AutomaticSize = Enum.AutomaticSize.Y,
         })
         
+        -- Outer container
+        items["button_outer"] = library:create("Frame", {
+            Parent = items["button_element"],
+            Size = dim2(1, 0, 0, 26),
+            BorderSizePixel = 0,
+            BackgroundColor3 = rgb(45, 45, 52)
+        })
+        
+        library:create("UICorner", {
+            Parent = items["button_outer"],
+            CornerRadius = dim(0, 4)
+        })
+        
+        -- Middle layer
+        items["button_middle"] = library:create("Frame", {
+            Parent = items["button_outer"],
+            Position = dim2(0, 1, 0, 1),
+            Size = dim2(1, -2, 1, -2),
+            BorderSizePixel = 0,
+            BackgroundColor3 = rgb(38, 38, 44)
+        })
+        
+        library:create("UICorner", {
+            Parent = items["button_middle"],
+            CornerRadius = dim(0, 3)
+        })
+        
+        -- Inner button
         items["button"] = library:create("TextButton", {
             FontFace = fonts.small,
             Text = "",
             AutoButtonColor = false,
-            Parent = items["button_element"],
-            Size = dim2(1, 0, 0, 22),
+            Parent = items["button_middle"],
+            Position = dim2(0, 1, 0, 1),
+            Size = dim2(1, -2, 1, -2),
             BorderSizePixel = 0,
-            TextSize = 12,
-            BackgroundColor3 = rgb(35, 35, 40)
+            TextSize = 11,
+            BackgroundColor3 = rgb(32, 32, 38)
         })
         
         library:create("UICorner", {
@@ -2605,36 +2629,55 @@
             CornerRadius = dim(0, 3)
         })
         
-        library:create("UIStroke", {
-            Color = rgb(55, 55, 60),
+        -- Gradient overlay
+        items["gradient"] = library:create("Frame", {
             Parent = items["button"],
-            Thickness = 1,
-            ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+            Size = dim2(1, 0, 0.5, 0),
+            BorderSizePixel = 0,
+            BackgroundColor3 = rgb(255, 255, 255),
+            BackgroundTransparency = 0.95,
+        })
+        
+        library:create("UICorner", {
+            Parent = items["gradient"],
+            CornerRadius = dim(0, 3)
+        })
+        
+        library:create("UIGradient", {
+            Parent = items["gradient"],
+            Rotation = 90,
+            Transparency = numseq{numkey(0, 0), numkey(1, 1)}
         })
         
         items["name"] = library:create("TextLabel", {
             FontFace = fonts.small,
-            TextColor3 = rgb(180, 180, 185),
+            TextColor3 = rgb(200, 200, 205),
             Text = cfg.name,
             Parent = items["button"],
             BackgroundTransparency = 1,
             Size = dim2(1, 0, 1, 0),
             BorderSizePixel = 0,
             TextSize = 11,
+            ZIndex = 2,
         })
 
         items["button"].MouseButton1Click:Connect(function()
             cfg.callback()
             items["name"].TextColor3 = themes.preset.accent 
-            library:tween(items["name"], {TextColor3 = rgb(180, 180, 185)})
+            library:tween(items["button"], {BackgroundColor3 = rgb(40, 40, 48)}, Enum.EasingStyle.Quad, 0.1)
+            task.wait(0.1)
+            library:tween(items["button"], {BackgroundColor3 = rgb(32, 32, 38)}, Enum.EasingStyle.Quad, 0.1)
+            library:tween(items["name"], {TextColor3 = rgb(200, 200, 205)})
         end)
         
         items["button"].MouseEnter:Connect(function()
-            library:tween(items["button"], {BackgroundColor3 = rgb(42, 42, 48)}, Enum.EasingStyle.Quad, 0.1)
+            library:tween(items["button"], {BackgroundColor3 = rgb(38, 38, 45)}, Enum.EasingStyle.Quad, 0.1)
+            library:tween(items["name"], {TextColor3 = rgb(230, 230, 235)}, Enum.EasingStyle.Quad, 0.1)
         end)
         
         items["button"].MouseLeave:Connect(function()
-            library:tween(items["button"], {BackgroundColor3 = rgb(35, 35, 40)}, Enum.EasingStyle.Quad, 0.1)
+            library:tween(items["button"], {BackgroundColor3 = rgb(32, 32, 38)}, Enum.EasingStyle.Quad, 0.1)
+            library:tween(items["name"], {TextColor3 = rgb(200, 200, 205)}, Enum.EasingStyle.Quad, 0.1)
         end)
         
         return setmetatable(cfg, library)
@@ -2653,12 +2696,13 @@
         
         items["outline"] = library:create("Frame", {
             Visible = true,
-            Parent = library["items"],
+            Parent = library["popups"],
             Size = dim2(0, 0, 0, 0),
             ClipsDescendants = true,
             BorderSizePixel = 0,
             AutomaticSize = Enum.AutomaticSize.Y,
-            BackgroundColor3 = rgb(28, 28, 32)
+            BackgroundColor3 = rgb(28, 28, 32),
+            ZIndex = 100,
         })
         
         library:create("UIStroke", {
@@ -2674,6 +2718,7 @@
             Size = dim2(1, 0, 1, 0),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
+            ZIndex = 100,
         })
         
         library:create("UICorner", {
@@ -2688,6 +2733,7 @@
             Size = dim2(1, -16, 0, 0),
             BorderSizePixel = 0,
             AutomaticSize = Enum.AutomaticSize.Y,
+            ZIndex = 100,
         })
         
         library:create("UIListLayout", {
@@ -2713,7 +2759,8 @@
 
         function cfg.set_visible(bool)                 
             library:tween(items["outline"], {Size = dim_offset(bool and 200 or 0, 0)})
-            items["outline"].Position = dim_offset(items["tick"].AbsolutePosition.X, items["tick"].AbsolutePosition.Y + 54)
+            local pos = items["tick"].AbsolutePosition
+            items["outline"].Position = dim_offset(pos.X - 188 + items["tick"].AbsoluteSize.X, pos.Y + items["tick"].AbsoluteSize.Y + 2)
             library:close_element(cfg)
         end
         
@@ -2766,17 +2813,37 @@
             cfg.data_store = {}
 
             for _, option_data in ipairs(options_to_refresh) do
+                -- Outer layer
+                local button_outer = library:create("Frame", {
+                    Parent = items["list"],
+                    Size = dim2(1, 0, 0, 24),
+                    BorderSizePixel = 0,
+                    BackgroundColor3 = rgb(40, 40, 46)
+                })
+                cfg.data_store[#cfg.data_store + 1] = button_outer
+
+                library:create("UICorner", {
+                    Parent = button_outer,
+                    CornerRadius = dim(0, 3)
+                })
+                
+                -- Inner button
                 local button = library:create("TextButton", {
                     FontFace = fonts.small,
                     Text = "",
                     AutoButtonColor = false,
-                    Parent = items["list"],
-                    Size = dim2(1, 0, 0, 22),
+                    Parent = button_outer,
+                    Position = dim2(0, 1, 0, 1),
+                    Size = dim2(1, -2, 1, -2),
                     BorderSizePixel = 0,
                     TextSize = 11,
                     BackgroundColor3 = rgb(30, 30, 35)
                 })
-                cfg.data_store[#cfg.data_store + 1] = button
+                
+                library:create("UICorner", {
+                    Parent = button,
+                    CornerRadius = dim(0, 3)
+                })
 
                 local name = library:create("TextLabel", {
                     FontFace = fonts.small,
@@ -2788,18 +2855,6 @@
                     BorderSizePixel = 0,
                     AutomaticSize = Enum.AutomaticSize.XY,
                     TextSize = 11,
-                })
-                
-                library:create("UICorner", {
-                    Parent = button,
-                    CornerRadius = dim(0, 3)
-                })
-                
-                library:create("UIStroke", {
-                    Color = rgb(45, 45, 50),
-                    Parent = button,
-                    Thickness = 1,
-                    ApplyStrokeMode = Enum.ApplyStrokeMode.Border
                 })
 
                 button.MouseButton1Click:Connect(function()
@@ -2816,11 +2871,13 @@
                 button.MouseEnter:Connect(function()
                     if cfg.current_element == name then return end 
                     library:tween(name, {TextColor3 = rgb(160, 160, 165)})
+                    library:tween(button, {BackgroundColor3 = rgb(35, 35, 40)})
                 end)
 
                 button.MouseLeave:Connect(function()
                     if cfg.current_element == name then return end 
                     library:tween(name, {TextColor3 = rgb(120, 120, 125)})
+                    library:tween(button, {BackgroundColor3 = rgb(30, 30, 35)})
                 end)
             end
         end
@@ -2854,7 +2911,7 @@
                 if config_name == "" then config_name = flags["config_name_list"] end
                 if config_name and config_name ~= "" and config_name ~= "No Configs" then
                     pcall(function()
-                        writefile(library.directory .. "/configs/" .. config_name .. ".cfg", library:get_config()) 
+                        writefile(library:get_config_path() .. "/" .. config_name .. ".cfg", library:get_config()) 
                     end)
                     library:update_config_list() 
                     if notifications.enabled then
@@ -2866,7 +2923,7 @@
             section2:button({name = "Load Config", callback = function() 
                 local config_name = flags["config_name_list"]
                 if config_name and config_name ~= "No Configs" then
-                    local path = library.directory .. "/configs/" .. config_name .. ".cfg"
+                    local path = library:get_config_path() .. "/" .. config_name .. ".cfg"
                     pcall(function()
                         if isfile(path) then
                             library:load_config(readfile(path))
@@ -2882,7 +2939,7 @@
             section2:button({name = "Delete Config", callback = function() 
                 local config_name = flags["config_name_list"]
                 if config_name and config_name ~= "No Configs" then
-                    local path = library.directory .. "/configs/" .. config_name .. ".cfg"
+                    local path = library:get_config_path() .. "/" .. config_name .. ".cfg"
                     pcall(function()
                         if isfile(path) then
                             delfile(path)
