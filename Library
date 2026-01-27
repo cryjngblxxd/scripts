@@ -313,8 +313,16 @@
     function library:get_config()
         local Config = {}
         for flag, value in pairs(flags) do
-            if type(value) == "table" and value["Transparency"] and value["Color"] then
+            if flag == "config_name_list" or flag == "config_name_text" then continue end
+            if type(value) == "table" and value["Transparency"] ~= nil and value["Color"] then
                 Config[flag] = {Transparency = value["Transparency"], Color = value["Color"]:ToHex()}
+            elseif type(value) == "table" and value["mode"] and value["key"] then
+                -- Keybind
+                local key_str = "NONE"
+                if value["key"] and tostring(value["key"]) ~= "NONE" and tostring(value["key"]) ~= "Enums" then
+                    key_str = tostring(value["key"])
+                end
+                Config[flag] = {mode = value["mode"], key = key_str, active = value["active"]}
             else
                 Config[flag] = value
             end
@@ -329,11 +337,13 @@
         if not success then return end
         for flag, value in pairs(config) do 
             local setter = config_flags[flag]
-            if flag == "config_name_list" then continue end
+            if flag == "config_name_list" or flag == "config_name_text" then continue end
             if setter then 
                 pcall(function()
-                    if type(value) == "table" and value["Transparency"] and value["Color"] then
+                    if type(value) == "table" and value["Transparency"] ~= nil and value["Color"] then
                         setter(hex(value["Color"]), value["Transparency"])
+                    elseif type(value) == "table" and value["mode"] and value["key"] then
+                        setter(value)
                     else
                         setter(value)
                     end
@@ -355,7 +365,7 @@
         for property, objects in pairs(themes.utility[theme]) do 
             for _, object in pairs(objects) do 
                 pcall(function()
-                    if object[property] then object[property] = new_color end
+                    if object[property] ~= nil then object[property] = new_color end
                 end)
             end 
         end 
@@ -398,6 +408,9 @@
             for _, connection in pairs(library.connections) do 
                 connection:Disconnect() 
             end
+            library.connections = {}
+            library.flags = {}
+            library.config_flags = {}
         end)
     end 
 
@@ -1002,6 +1015,7 @@
                 FontFace = fonts.small,
                 AutoButtonColor = false,
             })
+            library:apply_theme(tab.button, "accent", "TextColor3")
             
             tab.page = library:create("Frame", {
                 Parent = items["content"],
@@ -1282,7 +1296,7 @@
     end 
 --
 
--- Dropdown (Opens BELOW, matches width)
+-- Dropdown (Opens BELOW, matches width, with scrolling)
     function library:dropdown(options) 
         local cfg = {
             name = options.name or "Dropdown",
@@ -1330,7 +1344,6 @@
             BackgroundColor3 = rgb(35, 35, 40)
         })
         library:create("UICorner", {Parent = items["dropdown"], CornerRadius = dim(0, 4)})
-        library:create("UIStroke", {Color = rgb(50, 50, 55), Parent = items["dropdown"], Thickness = 1})
         
         items["sub_text"] = library:create("TextLabel", {
             FontFace = fonts.small,
@@ -1357,7 +1370,7 @@
             TextSize = 8,
         })
 
-        -- Dropdown list (opens below, same width)
+        -- Dropdown list (opens below, same width, NO STROKE, hidden when closed)
         items["dropdown_holder"] = library:create("Frame", {
             Parent = items["dropdown_object"],
             Visible = false,
@@ -1368,12 +1381,25 @@
             ZIndex = 50,
         })
         library:create("UICorner", {Parent = items["dropdown_holder"], CornerRadius = dim(0, 4)})
-        library:create("UIStroke", {Color = rgb(50, 50, 55), Parent = items["dropdown_holder"], Thickness = 1})
         
-        items["option_list"] = library:create("Frame", {
+        -- Scrolling frame for options
+        items["scroll_frame"] = library:create("ScrollingFrame", {
             Parent = items["dropdown_holder"],
             Size = dim2(1, 0, 1, 0),
             BackgroundTransparency = 1,
+            ScrollBarThickness = 2,
+            ScrollBarImageColor3 = rgb(60, 60, 65),
+            CanvasSize = dim2(0, 0, 0, 0),
+            AutomaticCanvasSize = Enum.AutomaticSize.Y,
+            BorderSizePixel = 0,
+            ZIndex = 50,
+        })
+        
+        items["option_list"] = library:create("Frame", {
+            Parent = items["scroll_frame"],
+            Size = dim2(1, -4, 0, 0),
+            BackgroundTransparency = 1,
+            AutomaticSize = Enum.AutomaticSize.Y,
         })
         library:create("UIListLayout", {Parent = items["option_list"], Padding = dim(0, 1), SortOrder = Enum.SortOrder.LayoutOrder})
         library:create("UIPadding", {Parent = items["option_list"], PaddingTop = dim(0, 3), PaddingBottom = dim(0, 3), PaddingLeft = dim(0, 3), PaddingRight = dim(0, 3)})
@@ -1397,15 +1423,19 @@
         function cfg.close()
             cfg.open = false
             library:tween(items["dropdown_holder"], {Size = dim2(1, 0, 0, 0)}, Enum.EasingStyle.Quad, 0.15)
-            task.wait(0.15)
-            items["dropdown_holder"].Visible = false
+            task.delay(0.15, function()
+                if not cfg.open then
+                    items["dropdown_holder"].Visible = false
+                end
+            end)
             library:tween(items["arrow"], {Rotation = 0}, Enum.EasingStyle.Quad, 0.1)
         end
         
         function cfg.set_visible(bool)
             if bool then
                 items["dropdown_holder"].Visible = true
-                library:tween(items["dropdown_holder"], {Size = dim2(1, 0, 0, min(cfg.y_size, 150))}, Enum.EasingStyle.Quad, 0.15)
+                local target_height = min(cfg.y_size, 120)
+                library:tween(items["dropdown_holder"], {Size = dim2(1, 0, 0, target_height)}, Enum.EasingStyle.Quad, 0.15)
                 library:tween(items["arrow"], {Rotation = 180}, Enum.EasingStyle.Quad, 0.1)
                 library.current_open = cfg
             else
@@ -1493,7 +1523,7 @@
     end
 --
 
--- Colorpicker
+-- Colorpicker (NO STROKE, hidden when closed)
     function library:colorpicker(options) 
         local cfg = {
             name = options.name or "Color", 
@@ -1541,19 +1571,18 @@
             BackgroundColor3 = cfg.color
         })
         library:create("UICorner", {Parent = items["colorpicker"], CornerRadius = dim(0, 3)})
-        library:create("UIStroke", {Color = rgb(60, 60, 65), Parent = items["colorpicker"], Thickness = 1})
 
-        -- Color picker panel (opens below)
+        -- Color picker panel (opens below, NO STROKE, hidden when closed)
         items["colorpicker_holder"] = library:create("Frame", {
             Parent = items["colorpicker_object"],
             Position = dim2(0, 0, 0, 20),
             Size = dim2(1, 0, 0, 0),
             BackgroundColor3 = rgb(28, 28, 32),
             ClipsDescendants = true,
+            Visible = false,
             ZIndex = 50,
         })
         library:create("UICorner", {Parent = items["colorpicker_holder"], CornerRadius = dim(0, 4)})
-        library:create("UIStroke", {Color = rgb(50, 50, 55), Parent = items["colorpicker_holder"], Thickness = 1})
 
         items["saturation_holder"] = library:create("Frame", {
             Parent = items["colorpicker_holder"],
@@ -1642,10 +1671,16 @@
         function cfg.close()
             cfg.open = false
             library:tween(items["colorpicker_holder"], {Size = dim2(1, 0, 0, 0)}, Enum.EasingStyle.Quad, 0.15)
+            task.delay(0.15, function()
+                if not cfg.open then
+                    items["colorpicker_holder"].Visible = false
+                end
+            end)
         end
 
         function cfg.set_visible(bool)
             if bool then
+                items["colorpicker_holder"].Visible = true
                 library:tween(items["colorpicker_holder"], {Size = dim2(1, 0, 0, 125)}, Enum.EasingStyle.Quad, 0.15)
                 library.current_open = cfg
             else
@@ -1668,7 +1703,7 @@
             cfg.callback(Color, a)
         end
         
-                function cfg.update_color() 
+        function cfg.update_color() 
             local mousePos = uis:GetMouseLocation() 
             local offset = vec2(mousePos.X, mousePos.Y - gui_offset) 
             if dragging_sat then    
@@ -1777,7 +1812,6 @@
             BackgroundColor3 = rgb(30, 30, 35)
         })
         library:create("UICorner", {Parent = items["input"], CornerRadius = dim(0, 4)})
-        library:create("UIStroke", {Color = rgb(50, 50, 55), Parent = items["input"], Thickness = 1})
         library:create("UIPadding", {Parent = items["input"], PaddingLeft = dim(0, 6), PaddingRight = dim(0, 6)})
         
         function cfg.set(text) 
@@ -1911,7 +1945,7 @@
     end 
 --
 
--- Keybind (Simple, no list)
+-- Keybind (NO STROKE on dropdown, hidden when closed)
     function library:keybind(options) 
         local cfg = {
             flag = options.flag or library:next_flag(),
@@ -1969,7 +2003,6 @@
             BackgroundColor3 = rgb(35, 35, 40)
         })
         library:create("UICorner", {Parent = items["keybind_holder"], CornerRadius = dim(0, 4)})
-        library:create("UIStroke", {Color = rgb(50, 50, 55), Parent = items["keybind_holder"], Thickness = 1})
         
         items["key"] = library:create("TextLabel", {
             FontFace = fonts.small,
@@ -1981,17 +2014,17 @@
             TextSize = 9,
         })
 
-        -- Mode dropdown (opens below)
+        -- Mode dropdown (opens below, NO STROKE, hidden when closed)
         items["dropdown"] = library:create("Frame", {
             Parent = items["keybind_element"],
             Position = dim2(1, -52, 0, 20),
             Size = dim2(0, 50, 0, 0),
             BackgroundColor3 = rgb(28, 28, 32),
             ClipsDescendants = true,
+            Visible = false,
             ZIndex = 50,
         })
         library:create("UICorner", {Parent = items["dropdown"], CornerRadius = dim(0, 4)})
-        library:create("UIStroke", {Color = rgb(50, 50, 55), Parent = items["dropdown"], Thickness = 1})
         
         items["mode_list"] = library:create("Frame", {
             Parent = items["dropdown"],
@@ -2033,6 +2066,11 @@
         function cfg.close()
             cfg.open = false
             library:tween(items["dropdown"], {Size = dim2(0, 50, 0, 0)}, Enum.EasingStyle.Quad, 0.15)
+            task.delay(0.15, function()
+                if not cfg.open then
+                    items["dropdown"].Visible = false
+                end
+            end)
         end
 
         function cfg.set(input)
@@ -2049,7 +2087,7 @@
                 if input.key == Enum.KeyCode.Escape then input.key = "NONE" end
                 cfg.key = input.key or "NONE"
                 cfg.mode = input.mode or "Toggle"
-                if input.active then cfg.active = input.active end
+                if input.active ~= nil then cfg.active = input.active end
                 for name, b in pairs(mode_buttons) do
                     b.TextColor3 = name == cfg.mode and themes.preset.accent or rgb(110, 110, 115)
                 end
@@ -2080,6 +2118,7 @@
             else
                 library:close_element()
                 cfg.open = true
+                items["dropdown"].Visible = true
                 library:tween(items["dropdown"], {Size = dim2(0, 50, 0, 50)}, Enum.EasingStyle.Quad, 0.15)
                 library.current_open = cfg
             end
@@ -2286,8 +2325,12 @@
             local column = settings_tab:column({})
             local ui_section = column:section({name = "Menu Settings", size = 1, icon = "http://www.roblox.com/asset/?id=6031280882"})
             
-            ui_section:colorpicker({name = "Accent Color", flag = "menu_accent", callback = function(clr) library:update_theme("accent", clr) end, color = themes.preset.accent})
             ui_section:keybind({name = "Menu Key", flag = "menu_keybind", key = Enum.KeyCode.Insert, mode = "Toggle", default = true, callback = function(bool) window.toggle_menu(bool) end})
+            ui_section:colorpicker({name = "Accent Color", flag = "menu_accent", callback = function(clr) library:update_theme("accent", clr) end, color = themes.preset.accent})
+            
+            ui_section:button({name = "Unload Menu", callback = function()
+                library:unload_menu()
+            end})
             
             local column2 = settings_tab:column({})
             local notif_section = column2:section({name = "Notifications", size = 1, icon = "http://www.roblox.com/asset/?id=6026568210"})
@@ -2387,6 +2430,7 @@
             BackgroundTransparency = 1,
             BackgroundColor3 = themes.preset.accent
         })
+        library:apply_theme(items["bar"], "accent", "BackgroundColor3")
         library:create("UICorner", {Parent = items["bar"], CornerRadius = dim(0, 2)})
         
         local index = #notifications.notifs + 1
