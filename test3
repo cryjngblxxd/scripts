@@ -1,4 +1,6 @@
+Here's the fixed code with those issues resolved:
 
+```lua
 --[[
     Avenir Library - CS:GO Style 
     With DPI Scaling, Mobile Support, Keybind List & Watermark
@@ -219,7 +221,6 @@
                 local frame_pos = frame.AbsolutePosition
                 local frame_size = frame.AbsoluteSize
                 
-                -- Check if clicking near bottom-right corner (resize zone)
                 if pos.X >= frame_pos.X + frame_size.X - 15 and pos.Y >= frame_pos.Y + frame_size.Y - 15 then
                     resizing = true
                     start_input = input
@@ -480,11 +481,9 @@
             end 
         end 
         themes.preset[theme] = new_color
-        -- Update keybind list accent line
         if library.keybind_list_items and library.keybind_list_items["accent_line"] then
             library.keybind_list_items["accent_line"].BackgroundColor3 = new_color
         end
-        -- Update watermark accent line
         if library.watermark_items and library.watermark_items["accent_line"] then
             library.watermark_items["accent_line"].BackgroundColor3 = new_color
         end
@@ -619,8 +618,24 @@
         local text_size = game:GetService("TextService"):GetTextSize(text, 11, Enum.Font.Gotham, Vector2.new(200, 100))
         library.tooltip.Size = dim2(0, text_size.X + 20, 0, text_size.Y + 10)
         
-        local pos = element.AbsolutePosition
-        library.tooltip.Position = dim_offset(pos.X, pos.Y + element.AbsoluteSize.Y + 5)
+        -- Position tooltip near the mouse cursor
+        local mousePos = uis:GetMouseLocation()
+        local tooltip_width = text_size.X + 20
+        local tooltip_height = text_size.Y + 10
+        
+        -- Adjust position to stay on screen
+        local pos_x = mousePos.X + 10
+        local pos_y = mousePos.Y + 10
+        
+        if pos_x + tooltip_width > camera.ViewportSize.X then
+            pos_x = mousePos.X - tooltip_width - 10
+        end
+        
+        if pos_y + tooltip_height > camera.ViewportSize.Y then
+            pos_y = mousePos.Y - tooltip_height - 10
+        end
+        
+        library.tooltip.Position = dim_offset(pos_x, pos_y)
         library.tooltip.Visible = true
     end
 
@@ -647,7 +662,6 @@
         })
         library:create("UICorner", {Parent = items["main"], CornerRadius = dim(0, 4)})
         
-        -- Accent line at top
         items["accent_line"] = library:create("Frame", {
             Parent = items["main"],
             Size = dim2(1, 0, 0, 2),
@@ -657,7 +671,6 @@
         library:apply_theme(items["accent_line"], "accent", "BackgroundColor3")
         library:create("UICorner", {Parent = items["accent_line"], CornerRadius = dim(0, 2)})
         
-        -- Title
         items["title"] = library:create("TextLabel", {
             Parent = items["main"],
             Position = dim2(0, 8, 0, 6),
@@ -670,7 +683,6 @@
             TextXAlignment = Enum.TextXAlignment.Left,
         })
         
-        -- Keybinds container
         items["container"] = library:create("Frame", {
             Parent = items["main"],
             Position = dim2(0, 0, 0, 24),
@@ -683,9 +695,8 @@
         
         items["keybind_entries"] = {}
         
-        -- Make draggable and resizable
+        -- Only draggable, no resize
         library:draggify_simple(items["main"])
-        library:resizify_simple(items["main"], dim_offset(120, 30), dim_offset(300, 400))
     end
 
     function library:register_keybind(name, flag, key, mode)
@@ -715,18 +726,23 @@
         }
     end
 
+    function library:update_keybind_mode(flag, mode)
+        if library.keybinds[flag] then
+            library.keybinds[flag].mode = mode
+            library:update_keybind_list()
+        end
+    end
+
     function library:update_keybind_list()
         if not library.keybind_list_items or not library.keybind_list_items["container"] then return end
         
         local items = library.keybind_list_items
         
-        -- Clear existing entries
         for _, entry in pairs(items["keybind_entries"]) do
             entry:Destroy()
         end
         items["keybind_entries"] = {}
         
-        -- Add active keybinds
         local has_active = false
         for flag, data in pairs(library.keybinds) do
             if data.active and data.key and data.key ~= "NONE" then
@@ -746,7 +762,6 @@
             end
         end
         
-        -- Show/hide based on content
         if not has_active then
             local empty = library:create("TextLabel", {
                 Parent = items["container"],
@@ -793,7 +808,6 @@
         })
         library:create("UICorner", {Parent = items["main"], CornerRadius = dim(0, 4)})
         
-        -- Accent line at top
         items["accent_line"] = library:create("Frame", {
             Parent = items["main"],
             Size = dim2(1, 0, 0, 2),
@@ -803,7 +817,6 @@
         library:apply_theme(items["accent_line"], "accent", "BackgroundColor3")
         library:create("UICorner", {Parent = items["accent_line"], CornerRadius = dim(0, 2)})
         
-        -- Text
         items["text"] = library:create("TextLabel", {
             Parent = items["main"],
             Position = dim2(0, 8, 0, 2),
@@ -817,11 +830,9 @@
             AutomaticSize = Enum.AutomaticSize.X,
         })
         
-        -- Make draggable and resizable
         library:draggify_simple(items["main"])
         library:resizify_simple(items["main"], dim_offset(100, 24), dim_offset(400, 24))
         
-        -- Start update loop
         library:start_watermark_updates(window_name)
     end
 
@@ -834,7 +845,6 @@
             if not library.watermark_items or not library.watermark_items["text"] then return end
             if not library.watermark_visible then return end
             
-            -- FPS calculation
             frame_count = frame_count + 1
             last_fps_update = last_fps_update + dt
             
@@ -844,7 +854,6 @@
                 last_fps_update = 0
             end
             
-            -- Build text
             local parts = {window_name or "avenirtech"}
             
             if library.watermark_elements.fps then
@@ -862,7 +871,6 @@
             
             library.watermark_items["text"].Text = concat(parts, " | ")
             
-            -- Auto-resize based on text
             local text_size = game:GetService("TextService"):GetTextSize(
                 library.watermark_items["text"].Text, 
                 11, 
@@ -909,7 +917,6 @@
             library["items"].Enabled = not library["items"].Enabled
         end)
         
-        -- Keep button visible even when menu is hidden
         library:connection(library["items"]:GetPropertyChangedSignal("Enabled"), function()
             toggle_btn.Visible = true
         end)
@@ -963,7 +970,6 @@
         library:create("UICorner", {Parent = items["main"], CornerRadius = dim(0, 6)})
         library:create("UIStroke", {Color = rgb(35, 35, 42), Parent = items["main"], Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border})
         
-        -- Top Bar
         items["top_bar"] = library:create("Frame", {
             Parent = items["main"],
             Size = dim2(1, 0, 0, library:scale(32)),
@@ -973,7 +979,6 @@
         library:create("UICorner", {Parent = items["top_bar"], CornerRadius = dim(0, 6)})
         library:create("Frame", {Parent = items["top_bar"], AnchorPoint = vec2(0, 1), Position = dim2(0, 0, 1, 0), Size = dim2(1, 0, 0, 6), BorderSizePixel = 0, BackgroundColor3 = rgb(22, 22, 26)})
         
-        -- Title
         items["title"] = library:create("TextLabel", {
             FontFace = fonts.font,
             Parent = items["top_bar"],
@@ -988,7 +993,6 @@
         })
         library:apply_theme(items["title"], "accent", "TextColor3")
         
-        -- Tab Holder
         items["tab_holder"] = library:create("Frame", {
             Parent = items["top_bar"],
             Position = dim2(0, library:scale(120), 0, 0),
@@ -999,7 +1003,6 @@
         library:create("UIListLayout", {Parent = items["tab_holder"], Padding = dim(0, 0), SortOrder = Enum.SortOrder.LayoutOrder, FillDirection = Enum.FillDirection.Horizontal, VerticalAlignment = Enum.VerticalAlignment.Center})
         library:create("UIPadding", {Parent = items["tab_holder"], PaddingLeft = dim(0, 5)})
         
-        -- Sub Tab Bar
         items["sub_tab_bar"] = library:create("Frame", {
             Parent = items["main"],
             Position = dim2(0, 0, 0, library:scale(32)),
@@ -1009,7 +1012,6 @@
         })
         library:create("Frame", {Parent = items["sub_tab_bar"], AnchorPoint = vec2(0, 1), Position = dim2(0, 0, 1, 0), Size = dim2(1, 0, 0, 1), BorderSizePixel = 0, BackgroundColor3 = rgb(35, 35, 42)})
         
-        -- Content Area
         items["content_area"] = library:create("Frame", {
             Parent = items["main"],
             Position = dim2(0, 0, 0, library:scale(58)),
@@ -1018,7 +1020,6 @@
             BackgroundTransparency = 1,
         })
         
-        -- Global Fade
         items["global_fade"] = library:create("Frame", {
             Parent = items["main"],
             BackgroundTransparency = 1,
@@ -1029,7 +1030,6 @@
             ZIndex = 2,
         })
         
-        -- Bottom Info
         items["info"] = library:create("Frame", {
             AnchorPoint = vec2(0, 1),
             Parent = items["main"],
@@ -1691,7 +1691,7 @@
             end)
         end
 
-                cfg.set(cfg.default)
+        cfg.set(cfg.default)
         config_flags[cfg.flag] = cfg.set
 
         return setmetatable(cfg, library)
@@ -2465,12 +2465,13 @@
                 if option == "Always" then 
                     cfg.active = true 
                     cfg.callback(true) 
-                    if cfg.show_in_list then
-                        library:set_keybind_active(cfg.flag, true)
-                    end
                 end
                 flags[cfg.flag].mode = option
-                library:update_keybind_list()
+                -- Update keybind list with correct mode
+                if cfg.show_in_list and library.keybinds[cfg.flag] then
+                    library.keybinds[cfg.flag].mode = option
+                    library:update_keybind_list()
+                end
                 cfg.close()
                 library.current_open = nil
             end)
@@ -2497,7 +2498,7 @@
             elseif tostring(input):find("Enum") then 
                 input = input.Name == "Escape" and "NONE" or input
                 cfg.key = input or "NONE"
-                -- Update keybind registry
+                -- Update keybind registry with current mode
                 local key_text = "None"
                 if cfg.key and tostring(cfg.key) ~= "Enums" and cfg.key ~= "NONE" then
                     key_text = keys_map[cfg.key] or tostring(cfg.key):gsub("Enum.KeyCode.", ""):gsub("Enum.UserInputType.", "")
@@ -2584,7 +2585,7 @@
             end)
         end
         
-        -- Register keybind for list
+        -- Register keybind for list with the correct mode from options
         if cfg.show_in_list then
             library:register_keybind(cfg.name, cfg.flag, cfg.key, cfg.mode)
         end
