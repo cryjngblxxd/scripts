@@ -62,6 +62,7 @@
         tooltip = nil,
         keybinds = {},
         keybind_list_visible = true,
+        keybind_show_all = false,
         watermark_visible = true,
         watermark_elements = {fps = true, ping = true, time = true},
         dpi_scale = 1,
@@ -346,6 +347,7 @@
             auto_load_config = library.auto_load_config_name,
             notifications_enabled = library.notifications_on,
             keybind_list_visible = library.keybind_list_visible,
+            keybind_show_all = library.keybind_show_all,
             watermark_visible = library.watermark_visible,
             watermark_elements = library.watermark_elements,
             dpi_scale = library.dpi_scale,
@@ -364,6 +366,7 @@
                 library.notifications_on = data.notifications_enabled or false
                 notifications.enabled = library.notifications_on
                 library.keybind_list_visible = data.keybind_list_visible ~= false
+                library.keybind_show_all = data.keybind_show_all or false
                 library.watermark_visible = data.watermark_visible ~= false
                 library.watermark_elements = data.watermark_elements or {fps = true, ping = true, time = true}
                 library.dpi_scale = data.dpi_scale or 1
@@ -520,6 +523,7 @@
         pcall(function()
             if library["items"] then library["items"]:Destroy() end
             if library["other"] then library["other"]:Destroy() end
+            if library["always_on_screen"] then library["always_on_screen"]:Destroy() end
             for _, connection in pairs(library.connections) do 
                 connection:Disconnect() 
             end
@@ -601,7 +605,7 @@
             Position = dim2(0, 5, 0, 0),
             BackgroundTransparency = 1,
             TextColor3 = rgb(180, 180, 180),
-            TextSize = 11,
+            TextSize = 12,
             FontFace = fonts.small,
             TextXAlignment = Enum.TextXAlignment.Left,
             TextWrapped = true,
@@ -613,15 +617,13 @@
         if not library.tooltip then return end
         library.tooltip_text.Text = text
         
-        local text_size = game:GetService("TextService"):GetTextSize(text, 11, Enum.Font.Gotham, Vector2.new(200, 100))
+        local text_size = game:GetService("TextService"):GetTextSize(text, 12, Enum.Font.Gotham, Vector2.new(200, 100))
         library.tooltip.Size = dim2(0, text_size.X + 20, 0, text_size.Y + 10)
         
-        -- Position tooltip near the mouse cursor
         local mousePos = uis:GetMouseLocation()
         local tooltip_width = text_size.X + 20
         local tooltip_height = text_size.Y + 10
         
-        -- Adjust position to stay on screen
         local pos_x = mousePos.X + 10
         local pos_y = mousePos.Y + 10
         
@@ -644,15 +646,24 @@
     end
 --
 
--- Keybind List
+-- Keybind List (Always visible even when UI is closed)
     function library:create_keybind_list()
+        -- Create separate ScreenGui that stays visible
+        library["always_on_screen"] = library:create("ScreenGui", {
+            Parent = coregui,
+            Name = "AvenirAlwaysOn",
+            Enabled = true,
+            ZIndexBehavior = Enum.ZIndexBehavior.Global,
+            IgnoreGuiInset = true,
+        })
+        
         library.keybind_list_items = {}
         local items = library.keybind_list_items
         
         items["main"] = library:create("Frame", {
-            Parent = library["items"],
+            Parent = library["always_on_screen"],
             Position = dim_offset(10, 150),
-            Size = dim_offset(180, 30),
+            Size = dim_offset(200, 30),
             BackgroundColor3 = rgb(20, 20, 24),
             BorderSizePixel = 0,
             Visible = library.keybind_list_visible,
@@ -671,30 +682,71 @@
         
         items["title"] = library:create("TextLabel", {
             Parent = items["main"],
-            Position = dim2(0, 8, 0, 6),
-            Size = dim2(1, -16, 0, 16),
+            Position = dim2(0, 10, 0, 6),
+            Size = dim2(1, -20, 0, 18),
             BackgroundTransparency = 1,
             Text = "Keybinds",
             TextColor3 = rgb(200, 200, 205),
-            TextSize = 12,
+            TextSize = 14,
             FontFace = fonts.font,
             TextXAlignment = Enum.TextXAlignment.Left,
         })
         
         items["container"] = library:create("Frame", {
             Parent = items["main"],
-            Position = dim2(0, 0, 0, 24),
+            Position = dim2(0, 0, 0, 26),
             Size = dim2(1, 0, 0, 0),
             BackgroundTransparency = 1,
             AutomaticSize = Enum.AutomaticSize.Y,
         })
-        library:create("UIListLayout", {Parent = items["container"], Padding = dim(0, 2), SortOrder = Enum.SortOrder.LayoutOrder})
-        library:create("UIPadding", {Parent = items["container"], PaddingLeft = dim(0, 8), PaddingRight = dim(0, 8), PaddingBottom = dim(0, 6)})
+        library:create("UIListLayout", {Parent = items["container"], Padding = dim(0, 3), SortOrder = Enum.SortOrder.LayoutOrder})
+        library:create("UIPadding", {Parent = items["container"], PaddingLeft = dim(0, 10), PaddingRight = dim(0, 10), PaddingBottom = dim(0, 8)})
         
         items["keybind_entries"] = {}
         
-        -- Only draggable, no resize
         library:draggify_simple(items["main"])
+    end
+
+    function library:create_watermark(window_name)
+        library.watermark_items = {}
+        local items = library.watermark_items
+        
+        items["main"] = library:create("Frame", {
+            Parent = library["always_on_screen"],
+            Position = dim_offset(10, 10),
+            Size = dim_offset(200, 26),
+            BackgroundColor3 = rgb(20, 20, 24),
+            BorderSizePixel = 0,
+            Visible = library.watermark_visible,
+        })
+        library:create("UICorner", {Parent = items["main"], CornerRadius = dim(0, 4)})
+        
+        items["accent_line"] = library:create("Frame", {
+            Parent = items["main"],
+            Size = dim2(1, 0, 0, 2),
+            BackgroundColor3 = themes.preset.accent,
+            BorderSizePixel = 0,
+        })
+        library:apply_theme(items["accent_line"], "accent", "BackgroundColor3")
+        library:create("UICorner", {Parent = items["accent_line"], CornerRadius = dim(0, 2)})
+        
+        items["text"] = library:create("TextLabel", {
+            Parent = items["main"],
+            Position = dim2(0, 10, 0, 2),
+            Size = dim2(1, -20, 1, -2),
+            BackgroundTransparency = 1,
+            Text = window_name or "avenirtech",
+            TextColor3 = rgb(200, 200, 205),
+            TextSize = 13,
+            FontFace = fonts.font,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            AutomaticSize = Enum.AutomaticSize.X,
+        })
+        
+        library:draggify_simple(items["main"])
+        library:resizify_simple(items["main"], dim_offset(100, 26), dim_offset(400, 26))
+        
+        library:start_watermark_updates(window_name)
     end
 
     function library:register_keybind(name, flag, key, mode)
@@ -722,6 +774,8 @@
             mode = mode,
             active = false,
         }
+        
+        library:update_keybind_list()
     end
 
     function library:update_keybind_mode(flag, mode)
@@ -741,17 +795,21 @@
         end
         items["keybind_entries"] = {}
         
-        local has_active = false
+        local has_entries = false
+        
         for flag, data in pairs(library.keybinds) do
-            if data.active and data.key and data.key ~= "NONE" then
-                has_active = true
+            -- Show if: show_all is true OR keybind is active
+            local should_show = library.keybind_show_all or data.active
+            
+            if should_show and data.key and data.key ~= "NONE" then
+                has_entries = true
                 local entry = library:create("TextLabel", {
                     Parent = items["container"],
-                    Size = dim2(1, 0, 0, 14),
+                    Size = dim2(1, 0, 0, 16),
                     BackgroundTransparency = 1,
                     Text = string.format("[%s] %s (%s)", data.key_text, data.name, data.mode),
-                    TextColor3 = rgb(150, 150, 155),
-                    TextSize = 10,
+                    TextColor3 = data.active and rgb(180, 180, 185) or rgb(100, 100, 105),
+                    TextSize = 12,
                     FontFace = fonts.small,
                     TextXAlignment = Enum.TextXAlignment.Left,
                     TextTruncate = Enum.TextTruncate.AtEnd,
@@ -760,14 +818,14 @@
             end
         end
         
-        if not has_active then
+        if not has_entries then
             local empty = library:create("TextLabel", {
                 Parent = items["container"],
-                Size = dim2(1, 0, 0, 14),
+                Size = dim2(1, 0, 0, 16),
                 BackgroundTransparency = 1,
-                Text = "No active keybinds",
+                Text = library.keybind_show_all and "No keybinds registered" or "No active keybinds",
                 TextColor3 = rgb(80, 80, 85),
-                TextSize = 10,
+                TextSize = 12,
                 FontFace = fonts.small,
                 TextXAlignment = Enum.TextXAlignment.Left,
             })
@@ -789,51 +847,15 @@
         end
         library:save_library_settings()
     end
+
+    function library:set_keybind_show_all(show_all)
+        library.keybind_show_all = show_all
+        library:update_keybind_list()
+        library:save_library_settings()
+    end
 --
 
 -- Watermark
-    function library:create_watermark(window_name)
-        library.watermark_items = {}
-        local items = library.watermark_items
-        
-        items["main"] = library:create("Frame", {
-            Parent = library["items"],
-            Position = dim_offset(10, 10),
-            Size = dim_offset(200, 24),
-            BackgroundColor3 = rgb(20, 20, 24),
-            BorderSizePixel = 0,
-            Visible = library.watermark_visible,
-        })
-        library:create("UICorner", {Parent = items["main"], CornerRadius = dim(0, 4)})
-        
-        items["accent_line"] = library:create("Frame", {
-            Parent = items["main"],
-            Size = dim2(1, 0, 0, 2),
-            BackgroundColor3 = themes.preset.accent,
-            BorderSizePixel = 0,
-        })
-        library:apply_theme(items["accent_line"], "accent", "BackgroundColor3")
-        library:create("UICorner", {Parent = items["accent_line"], CornerRadius = dim(0, 2)})
-        
-        items["text"] = library:create("TextLabel", {
-            Parent = items["main"],
-            Position = dim2(0, 8, 0, 2),
-            Size = dim2(1, -16, 1, -2),
-            BackgroundTransparency = 1,
-            Text = window_name or "avenirtech",
-            TextColor3 = rgb(200, 200, 205),
-            TextSize = 11,
-            FontFace = fonts.font,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            AutomaticSize = Enum.AutomaticSize.X,
-        })
-        
-        library:draggify_simple(items["main"])
-        library:resizify_simple(items["main"], dim_offset(100, 24), dim_offset(400, 24))
-        
-        library:start_watermark_updates(window_name)
-    end
-
     function library:start_watermark_updates(window_name)
         local last_fps_update = 0
         local fps_value = 0
@@ -871,11 +893,11 @@
             
             local text_size = game:GetService("TextService"):GetTextSize(
                 library.watermark_items["text"].Text, 
-                11, 
+                13, 
                 Enum.Font.GothamBold, 
-                Vector2.new(1000, 24)
+                Vector2.new(1000, 26)
             )
-            library.watermark_items["main"].Size = dim_offset(text_size.X + 20, 24)
+            library.watermark_items["main"].Size = dim_offset(text_size.X + 24, 26)
         end)
     end
 
@@ -898,7 +920,7 @@
         if not library.is_mobile then return end
         
         local toggle_btn = library:create("TextButton", {
-            Parent = library["items"],
+            Parent = library["always_on_screen"],
             Position = dim_offset(10, camera.ViewportSize.Y - 60),
             Size = dim_offset(50, 50),
             BackgroundColor3 = themes.preset.accent,
@@ -913,10 +935,6 @@
         
         toggle_btn.MouseButton1Click:Connect(function()
             library["items"].Enabled = not library["items"].Enabled
-        end)
-        
-        library:connection(library["items"]:GetPropertyChangedSignal("Enabled"), function()
-            toggle_btn.Visible = true
         end)
     end
 --
@@ -1478,7 +1496,7 @@
             BackgroundTransparency = 1,
             TextXAlignment = Enum.TextXAlignment.Left,
             AutomaticSize = Enum.AutomaticSize.Y,
-            TextSize = library:scale(11),
+            TextSize = library:scale(12),
         })
         library:create("UIPadding", {Parent = cfg.items["label"], PaddingLeft = dim(0, 2)})
         
@@ -1510,8 +1528,8 @@
             Text = "",
             Parent = self.items["elements"],
             BackgroundTransparency = 1,
-            Size = dim2(1, 0, 0, library:scale(18)),
-            TextSize = library:scale(11),
+            Size = dim2(1, 0, 0, library:scale(20)),
+            TextSize = library:scale(12),
         })
         
         items["name"] = library:create("TextLabel", {
@@ -1522,7 +1540,7 @@
             Size = dim2(1, -35, 1, 0),
             BackgroundTransparency = 1,
             TextXAlignment = Enum.TextXAlignment.Left,
-            TextSize = library:scale(11),
+            TextSize = library:scale(12),
         })
         library:create("UIPadding", {Parent = items["name"], PaddingLeft = dim(0, 2)})
         
@@ -1599,7 +1617,7 @@
         items["slider_object"] = library:create("Frame", {
             Parent = self.items["elements"],
             BackgroundTransparency = 1,
-            Size = dim2(1, 0, 0, library:scale(32)),
+            Size = dim2(1, 0, 0, library:scale(34)),
         })
         
         items["name"] = library:create("TextLabel", {
@@ -1607,10 +1625,10 @@
             TextColor3 = rgb(180, 180, 180),
             Text = cfg.name,
             Parent = items["slider_object"],
-            Size = dim2(1, 0, 0, library:scale(14)),
+            Size = dim2(1, 0, 0, library:scale(16)),
             BackgroundTransparency = 1,
             TextXAlignment = Enum.TextXAlignment.Left,
-            TextSize = library:scale(11),
+            TextSize = library:scale(12),
         })
         library:create("UIPadding", {Parent = items["name"], PaddingLeft = dim(0, 2)})
         
@@ -1619,10 +1637,10 @@
             TextColor3 = rgb(100, 100, 105),
             Text = "0",
             Parent = items["slider_object"],
-            Size = dim2(1, -4, 0, library:scale(14)),
+            Size = dim2(1, -4, 0, library:scale(16)),
             BackgroundTransparency = 1,
             TextXAlignment = Enum.TextXAlignment.Right,
-            TextSize = library:scale(10),
+            TextSize = library:scale(11),
         })
         
         items["slider"] = library:create("TextButton", {
@@ -1630,7 +1648,7 @@
             AutoButtonColor = false,
             Parent = items["slider_object"],
             Size = dim2(1, -4, 0, library:scale(8)),
-            Position = dim2(0, 2, 0, library:scale(18)),
+            Position = dim2(0, 2, 0, library:scale(20)),
             BackgroundColor3 = rgb(40, 40, 45)
         })
         library:create("UICorner", {Parent = items["slider"], CornerRadius = dim(0, 4)})
@@ -1674,7 +1692,7 @@
             end
         end)
 
-        library:connection(uis.InputEnded, function(input)
+                library:connection(uis.InputEnded, function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 cfg.dragging = false
             end 
@@ -1719,7 +1737,7 @@
         items["dropdown_object"] = library:create("Frame", {
             Parent = self.items["elements"],
             BackgroundTransparency = 1,
-            Size = dim2(1, 0, 0, library:scale(32)),
+            Size = dim2(1, 0, 0, library:scale(34)),
         })
         
         items["name"] = library:create("TextLabel", {
@@ -1727,10 +1745,10 @@
             TextColor3 = rgb(180, 180, 180),
             Text = cfg.name,
             Parent = items["dropdown_object"],
-            Size = dim2(1, 0, 0, library:scale(14)),
+            Size = dim2(1, 0, 0, library:scale(16)),
             BackgroundTransparency = 1,
             TextXAlignment = Enum.TextXAlignment.Left,
-            TextSize = library:scale(11),
+            TextSize = library:scale(12),
         })
         library:create("UIPadding", {Parent = items["name"], PaddingLeft = dim(0, 2)})
         
@@ -1738,7 +1756,7 @@
             Text = "",
             AutoButtonColor = false,
             Parent = items["dropdown_object"],
-            Position = dim2(0, 0, 0, library:scale(16)),
+            Position = dim2(0, 0, 0, library:scale(18)),
             Size = dim2(1, 0, 0, library:scale(16)),
             BackgroundColor3 = rgb(35, 35, 40)
         })
@@ -1754,7 +1772,7 @@
             BackgroundTransparency = 1,
             TextXAlignment = Enum.TextXAlignment.Left,
             TextTruncate = Enum.TextTruncate.AtEnd,
-            TextSize = library:scale(10),
+            TextSize = library:scale(11),
         })
         
         items["arrow"] = library:create("TextLabel", {
@@ -1772,7 +1790,7 @@
         items["dropdown_holder"] = library:create("Frame", {
             Parent = items["dropdown_object"],
             Visible = false,
-            Position = dim2(0, 0, 0, library:scale(33)),
+            Position = dim2(0, 0, 0, library:scale(35)),
             Size = dim2(1, 0, 0, 0),
             BackgroundColor3 = rgb(30, 30, 35),
             ClipsDescendants = true,
@@ -1807,10 +1825,10 @@
                 TextColor3 = rgb(130, 130, 135),
                 Text = text,
                 Parent = items["option_list"],
-                Size = dim2(1, 0, 0, library:scale(16)),
+                Size = dim2(1, 0, 0, library:scale(18)),
                 BackgroundTransparency = 1,
                 TextXAlignment = Enum.TextXAlignment.Left,
-                TextSize = library:scale(10),
+                TextSize = library:scale(11),
                 ZIndex = 51,
             })
             library:create("UIPadding", {Parent = button, PaddingLeft = dim(0, 4)})
@@ -1864,7 +1882,7 @@
             cfg.option_instances = {} 
             for _, option in ipairs(list) do 
                 local button = cfg.render_option(option)
-                cfg.y_size = cfg.y_size + library:scale(17)
+                cfg.y_size = cfg.y_size + library:scale(19)
                 insert(cfg.option_instances, button)
                 button.MouseButton1Click:Connect(function()
                     if cfg.multi then 
@@ -1942,7 +1960,7 @@
         items["colorpicker_object"] = library:create("Frame", {
             Parent = self.items["elements"],
             BackgroundTransparency = 1,
-            Size = dim2(1, 0, 0, library:scale(18)),
+            Size = dim2(1, 0, 0, library:scale(20)),
         })
         
         items["name"] = library:create("TextLabel", {
@@ -1953,7 +1971,7 @@
             Size = dim2(1, -30, 1, 0),
             BackgroundTransparency = 1,
             TextXAlignment = Enum.TextXAlignment.Left,
-            TextSize = library:scale(11),
+            TextSize = library:scale(12),
         })
         library:create("UIPadding", {Parent = items["name"], PaddingLeft = dim(0, 2)})
         
@@ -1963,14 +1981,14 @@
             AnchorPoint = vec2(1, 0.5),
             Parent = items["colorpicker_object"],
             Position = dim2(1, -2, 0.5, 0),
-            Size = dim_offset(library:scale(22), library:scale(14)),
+            Size = dim_offset(library:scale(24), library:scale(16)),
             BackgroundColor3 = cfg.color
         })
         library:create("UICorner", {Parent = items["colorpicker"], CornerRadius = dim(0, 3)})
 
         items["colorpicker_holder"] = library:create("Frame", {
             Parent = items["colorpicker_object"],
-            Position = dim2(0, 0, 0, library:scale(20)),
+            Position = dim2(0, 0, 0, library:scale(22)),
             Size = dim2(1, 0, 0, 0),
             BackgroundColor3 = rgb(28, 28, 32),
             ClipsDescendants = true,
@@ -2189,7 +2207,7 @@
         items["textbox"] = library:create("Frame", {
             Parent = self.items["elements"],
             BackgroundTransparency = 1,
-            Size = dim2(1, 0, 0, library:scale(34)),
+            Size = dim2(1, 0, 0, library:scale(36)),
         })
         
         items["name"] = library:create("TextLabel", {
@@ -2197,10 +2215,10 @@
             TextColor3 = rgb(180, 180, 180),
             Text = cfg.name,
             Parent = items["textbox"],
-            Size = dim2(1, 0, 0, library:scale(14)),
+            Size = dim2(1, 0, 0, library:scale(16)),
             BackgroundTransparency = 1,
             TextXAlignment = Enum.TextXAlignment.Left,
-            TextSize = library:scale(11),
+            TextSize = library:scale(12),
         })
         library:create("UIPadding", {Parent = items["name"], PaddingLeft = dim(0, 2)})
         
@@ -2208,13 +2226,13 @@
             FontFace = fonts.small,
             Text = cfg.default,
             Parent = items["textbox"],
-            Position = dim2(0, 0, 0, library:scale(16)),
+            Position = dim2(0, 0, 0, library:scale(18)),
             Size = dim2(1, 0, 0, library:scale(18)),
             PlaceholderText = cfg.placeholder,
             PlaceholderColor3 = rgb(80, 80, 85),
             CursorPosition = -1,
             ClearTextOnFocus = false,
-            TextSize = library:scale(10),
+            TextSize = library:scale(11),
             TextColor3 = rgb(180, 180, 185),
             TextXAlignment = Enum.TextXAlignment.Left,
             BackgroundColor3 = rgb(30, 30, 35)
@@ -2384,7 +2402,7 @@
         items["keybind_element"] = library:create("Frame", {
             Parent = self.items["elements"],
             BackgroundTransparency = 1,
-            Size = dim2(1, 0, 0, library:scale(18)),
+            Size = dim2(1, 0, 0, library:scale(20)),
         })
         
         items["name"] = library:create("TextLabel", {
@@ -2395,7 +2413,7 @@
             Size = dim2(1, -60, 1, 0),
             BackgroundTransparency = 1,
             TextXAlignment = Enum.TextXAlignment.Left,
-            TextSize = library:scale(11),
+            TextSize = library:scale(12),
         })
         library:create("UIPadding", {Parent = items["name"], PaddingLeft = dim(0, 2)})
         
@@ -2404,7 +2422,7 @@
             Parent = items["keybind_element"],
             AutoButtonColor = false,
             AnchorPoint = vec2(1, 0.5),
-            Size = dim_offset(library:scale(50), library:scale(14)),
+            Size = dim_offset(library:scale(50), library:scale(16)),
             Position = dim2(1, -2, 0.5, 0),
             BackgroundColor3 = rgb(35, 35, 40)
         })
@@ -2417,12 +2435,12 @@
             Parent = items["keybind_holder"],
             Size = dim2(1, 0, 1, 0),
             BackgroundTransparency = 1,
-            TextSize = library:scale(9),
+            TextSize = library:scale(10),
         })
 
         items["dropdown"] = library:create("Frame", {
             Parent = items["keybind_element"],
-            Position = dim2(1, -52, 0, library:scale(20)),
+            Position = dim2(1, -52, 0, library:scale(22)),
             Size = dim_offset(library:scale(50), 0),
             BackgroundColor3 = rgb(28, 28, 32),
             ClipsDescendants = true,
@@ -2450,7 +2468,7 @@
                 Parent = items["mode_list"],
                 Size = dim2(1, 0, 0, library:scale(14)),
                 BackgroundTransparency = 1,
-                TextSize = library:scale(9),
+                TextSize = library:scale(10),
                 ZIndex = 51,
             })
             mode_buttons[option] = btn
@@ -2465,7 +2483,6 @@
                     cfg.callback(true) 
                 end
                 flags[cfg.flag].mode = option
-                -- Update keybind list with correct mode
                 if cfg.show_in_list and library.keybinds[cfg.flag] then
                     library.keybinds[cfg.flag].mode = option
                     library:update_keybind_list()
@@ -2496,7 +2513,6 @@
             elseif tostring(input):find("Enum") then 
                 input = input.Name == "Escape" and "NONE" or input
                 cfg.key = input or "NONE"
-                -- Update keybind registry with current mode
                 local key_text = "None"
                 if cfg.key and tostring(cfg.key) ~= "Enums" and cfg.key ~= "NONE" then
                     key_text = keys_map[cfg.key] or tostring(cfg.key):gsub("Enum.KeyCode.", ""):gsub("Enum.UserInputType.", "")
@@ -2583,7 +2599,6 @@
             end)
         end
         
-        -- Register keybind for list with the correct mode from options
         if cfg.show_in_list then
             library:register_keybind(cfg.name, cfg.flag, cfg.key, cfg.mode)
         end
@@ -2622,7 +2637,7 @@
             for _, option_data in ipairs(options_to_refresh) do
                 local button_outer = library:create("Frame", {
                     Parent = items["list"],
-                    Size = dim2(1, 0, 0, library:scale(24)),
+                    Size = dim2(1, 0, 0, library:scale(26)),
                     BackgroundColor3 = rgb(40, 40, 46)
                 })
                 cfg.data_store[#cfg.data_store + 1] = button_outer
@@ -2645,7 +2660,7 @@
                     Parent = button,
                     BackgroundTransparency = 1,
                     Size = dim2(1, 0, 1, 0),
-                    TextSize = library:scale(11),
+                    TextSize = library:scale(12),
                 })
 
                 button.MouseButton1Click:Connect(function()
@@ -2806,6 +2821,10 @@
                 library:toggle_keybind_list(bool)
             end})
             
+            keybind_section:toggle({name = "Show All Keybinds", flag = "keybind_show_all", default = library.keybind_show_all, callback = function(bool)
+                library:set_keybind_show_all(bool)
+            end})
+            
             -- Notifications
             local notif_section = column2:section({name = "Notifications", size = 0.6, icon = "http://www.roblox.com/asset/?id=6026568210"})
             
@@ -2819,7 +2838,6 @@
             end})
         end
         
-        -- Update keybind list initially
         library:update_keybind_list()
         
         task.spawn(function()
@@ -2863,9 +2881,10 @@
 
         local items = cfg.items
         
+        -- Parent to always_on_screen so it shows when menu is closed
         items["notification"] = library:create("Frame", {
-            Parent = library["items"],
-            Size = dim_offset(library:scale(180), library:scale(45)),
+            Parent = library["always_on_screen"],
+            Size = dim_offset(library:scale(200), library:scale(50)),
             BackgroundTransparency = 1,
             AnchorPoint = vec2(1, 0),
             AutomaticSize = Enum.AutomaticSize.Y,
@@ -2880,9 +2899,9 @@
             Text = cfg.name,
             Parent = items["notification"],
             BackgroundTransparency = 1,
-            Position = dim2(0, 8, 0, 6),
+            Position = dim2(0, 10, 0, 8),
             AutomaticSize = Enum.AutomaticSize.XY,
-            TextSize = library:scale(11),
+            TextSize = library:scale(13),
         })
         
         items["info"] = library:create("TextLabel", {
@@ -2890,14 +2909,14 @@
             TextColor3 = rgb(150, 150, 155),
             Text = cfg.info,
             Parent = items["notification"],
-            Position = dim2(0, 8, 0, library:scale(20)),
+            Position = dim2(0, 10, 0, library:scale(24)),
             BackgroundTransparency = 1,
             TextXAlignment = Enum.TextXAlignment.Left,
             TextWrapped = true,
             AutomaticSize = Enum.AutomaticSize.XY,
-            TextSize = library:scale(10),
+            TextSize = library:scale(11),
         })
-        library:create("UIPadding", {PaddingBottom = dim(0, 14), PaddingRight = dim(0, 8), Parent = items["info"]})
+        library:create("UIPadding", {PaddingBottom = dim(0, 16), PaddingRight = dim(0, 10), Parent = items["info"]})
         
         items["bar"] = library:create("Frame", {
             AnchorPoint = vec2(0, 1),
