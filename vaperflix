@@ -3327,196 +3327,205 @@ end
     end
 
     -- CONFIG TAB BUILDER (ENHANCED with theme system)
-    function library:build_config_section(tab)
-        library:refresh_configs()
-        
-        local configSection = tab:section({name = "configuration"})
-        local uiSection = tab:section({name = "ui settings", side = "right"})
-        
-        -- Config name textbox
-        configSection:textbox({
-            name = "config name",
-            flag = "_config_name",
-            placeholder = "enter config name...",
-            default = "",
-        })
-        
-                -- Config list dropdown
-        local configs = library.config.list
-        if #configs == 0 then
-            configs = {"none"}
-        end
-        
-        local configDropdown = configSection:dropdown({
-            name = "select config",
-            flag = "_config_selected",
-            items = configs,
-            default = configs[1],
-            callback = function(value)
+    -- CONFIG TAB BUILDER (FIXED)
+function library:build_config_section(tab)
+    -- Ensure configs are loaded
+    library:refresh_configs()
+    
+    local configSection = tab:section({name = "configuration", side = "left", fill = 0.5})
+    local autoloadSection = tab:section({name = "autoload", side = "right", fill = 0.3})
+    local uiSection = tab:section({name = "ui settings", side = "right", fill = 0.5})
+    
+    -- Config name textbox
+    configSection:textbox({
+        name = "config name",
+        flag = "_config_name",
+        placeholder = "enter config name...",
+        default = "",
+    })
+    
+    -- Config list dropdown
+    local configs = library.config.list
+    if not configs or #configs == 0 then
+        configs = {"none"}
+    end
+    
+    local configDropdown = configSection:dropdown({
+        name = "select config",
+        flag = "_config_selected",
+        items = configs,
+        default = configs[1] or "none",
+        callback = function(value)
+            if value and value ~= "none" then
                 library.config.selected = value
             end
-        })
-        
-        config_holder = configDropdown
-        
-        -- Save button
-        configSection:button({
-            name = "save config",
-            callback = function()
-                local name = flags["_config_name"] or ""
-                if name == "" then
-                    name = library.config.selected or "config_" .. os.time()
-                end
-                library:save_config(name)
-                library:refresh_configs()
-                local newConfigs = library.config.list
+        end
+    })
+    
+    config_holder = configDropdown
+    
+    -- Save button
+    configSection:button({
+        name = "save config",
+        callback = function()
+            local name = flags["_config_name"]
+            if not name or name == "" then
+                name = library.config.selected
+            end
+            if not name or name == "" or name == "none" then
+                name = "config_" .. tostring(os.time())
+            end
+            library:save_config(name)
+            
+            -- Refresh dropdown
+            task.wait(0.1)
+            local newConfigs = library:refresh_configs()
+            if #newConfigs == 0 then
+                newConfigs = {"none"}
+            end
+            configDropdown.refresh_options(newConfigs)
+        end
+    })
+    
+    -- Load button
+    configSection:button({
+        name = "load config",
+        callback = function()
+            local selected = library.config.selected or flags["_config_selected"]
+            if selected and selected ~= "none" then
+                library:load_config(selected)
+            else
+                library:notify("Please select a config")
+            end
+        end
+    })
+    
+    -- Delete button
+    configSection:button({
+        name = "delete config",
+        callback = function()
+            local selected = library.config.selected or flags["_config_selected"]
+            if selected and selected ~= "none" then
+                library:delete_config(selected)
+                
+                -- Refresh dropdown
+                task.wait(0.1)
+                local newConfigs = library:refresh_configs()
                 if #newConfigs == 0 then
                     newConfigs = {"none"}
                 end
                 configDropdown.refresh_options(newConfigs)
+            else
+                library:notify("Please select a config")
             end
-        })
-        
-        -- Load button
-        configSection:button({
-            name = "load config",
-            callback = function()
-                local selected = library.config.selected or flags["_config_selected"]
-                if selected and selected ~= "none" then
-                    library:load_config(selected)
-                else
-                    notifications:create_notification({name = "Please select a config"})
+        end
+    })
+    
+    -- Refresh button
+    configSection:button({
+        name = "refresh configs",
+        callback = function()
+            local newConfigs = library:refresh_configs()
+            if #newConfigs == 0 then
+                newConfigs = {"none"}
+            end
+            configDropdown.refresh_options(newConfigs)
+            library:notify("Config list refreshed")
+        end
+    })
+    
+    -- Autoload Section
+    local currentAutoload = library:get_autoload() or "none"
+    
+    autoloadSection:label({name = "current: " .. currentAutoload})
+    
+    autoloadSection:button({
+        name = "set as autoload",
+        callback = function()
+            local selected = library.config.selected or flags["_config_selected"]
+            if selected and selected ~= "none" then
+                library:set_autoload(selected)
+            else
+                library:notify("Please select a config")
+            end
+        end
+    })
+    
+    autoloadSection:button({
+        name = "remove autoload",
+        callback = function()
+            library:remove_autoload()
+        end
+    })
+    
+    -- UI Settings Section
+    uiSection:toggle({
+        name = "show watermark",
+        flag = "_ui_watermark",
+        default = true,
+        callback = function(value)
+            if library.watermark_gui then
+                library.watermark_gui.Enabled = value
+            end
+        end
+    })
+    
+    uiSection:toggle({
+        name = "show keybind list",
+        flag = "_ui_keybindlist",
+        default = false,
+        callback = function(value)
+            if library.keybind_list_frame then
+                library.keybind_list_frame.Visible = value
+            end
+        end
+    })
+    
+    -- Theme dropdown
+    local themeNames = library:get_theme_names()
+    uiSection:dropdown({
+        name = "theme",
+        flag = "_ui_theme",
+        items = themeNames,
+        default = library.current_theme or "default",
+        callback = function(value)
+            library:set_theme(value)
+            library:notify("Theme set to: " .. value)
+        end
+    })
+    
+    -- Accent color picker
+    uiSection:colorpicker({
+        name = "accent color",
+        flag = "_ui_accent",
+        color = themes.preset.accent,
+        alpha = 0,
+        callback = function(clr, alpha)
+            library:set_accent(clr)
+        end
+    })
+    
+    -- Set current theme as default button
+    uiSection:button({
+        name = "save theme as default",
+        callback = function()
+            pcall(function()
+                if not isfolder(library.directory .. "/themes") then
+                    makefolder(library.directory .. "/themes")
                 end
-            end
-        })
-        
-        -- Delete button
-        configSection:button({
-            name = "delete config",
-            callback = function()
-                local selected = library.config.selected or flags["_config_selected"]
-                if selected and selected ~= "none" then
-                    library:delete_config(selected)
-                    library:refresh_configs()
-                    local newConfigs = library.config.list
-                    if #newConfigs == 0 then
-                        newConfigs = {"none"}
-                    end
-                    configDropdown.refresh_options(newConfigs)
-                else
-                    notifications:create_notification({name = "Please select a config"})
-                end
-            end
-        })
-        
-        -- Refresh button
-        configSection:button({
-            name = "refresh configs",
-            callback = function()
-                library:refresh_configs()
-                local newConfigs = library.config.list
-                if #newConfigs == 0 then
-                    newConfigs = {"none"}
-                end
-                configDropdown.refresh_options(newConfigs)
-                notifications:create_notification({name = "Config list refreshed"})
-            end
-        })
-        
-        -- Autoload Section
-        local currentAutoload = library:get_autoload() or "none"
-        
-        autoloadSection:label({name = "current: " .. currentAutoload})
-        
-        -- Set autoload button
-        autoloadSection:button({
-            name = "set as autoload",
-            callback = function()
-                local selected = library.config.selected or flags["_config_selected"]
-                if selected and selected ~= "none" then
-                    library:set_autoload(selected)
-                else
-                    notifications:create_notification({name = "Please select a config"})
-                end
-            end
-        })
-        
-        -- Remove autoload button
-        autoloadSection:button({
-            name = "remove autoload",
-            callback = function()
-                library:remove_autoload()
-            end
-        })
-        
-        -- UI Settings Section
-        uiSection:toggle({
-            name = "show watermark",
-            flag = "_ui_watermark",
-            default = true,
-            callback = function(value)
-                if library.watermark_gui then
-                    library.watermark_gui.Enabled = value
-                end
-            end
-        })
-        
-        uiSection:toggle({
-            name = "show keybind list",
-            flag = "_ui_keybindlist",
-            default = false,
-            callback = function(value)
-                if library.keybind_list_frame then
-                    library.keybind_list_frame.Visible = value
-                end
-            end
-        })
-        
-        -- Theme dropdown
-        local themeNames = library:get_theme_names()
-        uiSection:dropdown({
-            name = "theme",
-            flag = "_ui_theme",
-            items = themeNames,
-            default = library.current_theme or "default",
-            callback = function(value)
-                library:set_theme(value)
-                notifications:create_notification({name = "Theme set to: " .. value})
-            end
-        })
-        
-        -- Accent color picker
-        uiSection:colorpicker({
-            name = "accent color",
-            flag = "_ui_accent",
-            color = themes.preset.accent,
-            alpha = 0,
-            callback = function(clr, alpha)
-                library:set_accent(clr)
-            end
-        })
-        
-        -- Set current theme as default button
-        uiSection:button({
-            name = "set theme as default",
-            callback = function()
-                pcall(function()
-                    if not isfolder(library.directory .. "/themes") then
-                        makefolder(library.directory .. "/themes")
-                    end
-                    writefile(library.directory .. "/themes/current.txt", library.current_theme)
-                    notifications:create_notification({name = "Default theme saved"})
-                end)
-            end
-        })
-        
-        return {
-            configSection = configSection,
-            autoloadSection = autoloadSection,
-            uiSection = uiSection,
-            configDropdown = configDropdown,
-        }
-    end
+                writefile(library.directory .. "/themes/current.txt", library.current_theme or "default")
+                library:notify("Default theme saved")
+            end)
+        end
+    })
+    
+    return {
+        configSection = configSection,
+        autoloadSection = autoloadSection,
+        uiSection = uiSection,
+        configDropdown = configDropdown,
+    }
+end
 
     -- THEME PRESETS (add this near the top themes table if not already there)
     local theme_presets = {
