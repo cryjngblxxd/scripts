@@ -1,7 +1,3 @@
--- MODIFIED VADERHAXX LIBRARY WITH CONFIG SYSTEM (FIXED)
--- Original: October 2024
--- Fixed: Slider nil issues, config system, textbox, button
-
 -- Variables 
     local uis = game:GetService("UserInputService") 
     local players = game:GetService("Players") 
@@ -68,6 +64,7 @@
         folders = {
             "/fonts",
             "/configs",
+            "/themes",
         },
         flags = {},
         config_flags = {},
@@ -81,37 +78,100 @@
         },
         colorpicker_open = false,
         gui = nil,
+        watermark_gui = nil,
+        keybind_gui = nil,
         
         config = {
             selected = nil,
             autoload = nil,
             list = {},
         },
+        
+        current_theme = "default",
+    }
+
+    -- THEME PRESETS - Dark black with purple accent
+    local theme_presets = {
+        default = {
+            accent = rgb(147, 112, 219),
+            text = rgb(255, 255, 255),
+            text_outline = rgb(0, 0, 0),
+            a = rgb(8, 8, 8),
+            b = rgb(18, 18, 18),
+            c = rgb(14, 14, 14),
+            d = rgb(6, 6, 6),
+            e = rgb(10, 10, 10),
+            f = rgb(35, 35, 35),
+            g = rgb(25, 25, 25),
+        },
+        fatality = {
+            accent = rgb(255, 85, 85),
+            text = rgb(255, 255, 255),
+            text_outline = rgb(0, 0, 0),
+            a = rgb(5, 5, 5),
+            b = rgb(15, 15, 15),
+            c = rgb(12, 12, 12),
+            d = rgb(4, 4, 4),
+            e = rgb(8, 8, 8),
+            f = rgb(30, 30, 30),
+            g = rgb(20, 20, 20),
+        },
+        bbot = {
+            accent = rgb(0, 170, 255),
+            text = rgb(255, 255, 255),
+            text_outline = rgb(0, 0, 0),
+            a = rgb(10, 10, 10),
+            b = rgb(20, 20, 20),
+            c = rgb(15, 15, 15),
+            d = rgb(5, 5, 5),
+            e = rgb(12, 12, 12),
+            f = rgb(35, 35, 35),
+            g = rgb(25, 25, 25),
+        },
+        purple = {
+            accent = rgb(138, 43, 226),
+            text = rgb(255, 255, 255),
+            text_outline = rgb(0, 0, 0),
+            a = rgb(5, 5, 10),
+            b = rgb(15, 15, 20),
+            c = rgb(10, 10, 15),
+            d = rgb(3, 3, 8),
+            e = rgb(8, 8, 12),
+            f = rgb(30, 30, 40),
+            g = rgb(20, 20, 30),
+        },
+        midnight = {
+            accent = rgb(180, 120, 255),
+            text = rgb(255, 255, 255),
+            text_outline = rgb(0, 0, 0),
+            a = rgb(2, 2, 5),
+            b = rgb(12, 12, 18),
+            c = rgb(8, 8, 14),
+            d = rgb(1, 1, 3),
+            e = rgb(5, 5, 10),
+            f = rgb(25, 25, 35),
+            g = rgb(18, 18, 25),
+        },
+        rose = {
+            accent = rgb(255, 105, 180),
+            text = rgb(255, 255, 255),
+            text_outline = rgb(0, 0, 0),
+            a = rgb(8, 5, 8),
+            b = rgb(18, 12, 18),
+            c = rgb(14, 10, 14),
+            d = rgb(6, 3, 6),
+            e = rgb(10, 6, 10),
+            f = rgb(35, 25, 35),
+            g = rgb(25, 18, 25),
+        },
     }
 
     local themes = {
-        preset = {
-            accent = rgb(255, 200, 69),
-            text = rgb(255, 255, 255),
-            text_outline = rgb(0, 0, 0),
-            a = Color3.fromRGB(0, 0, 0),
-            b = Color3.fromRGB(56, 56, 56),
-            c = Color3.fromRGB(46, 46, 46),
-            d = Color3.fromRGB(12, 12, 12),
-            e = Color3.fromRGB(21, 21, 21),
-            f = Color3.fromRGB(84, 84, 84),
-            g = Color3.fromRGB(54, 54, 54),
-        },
-
+        preset = {},
         utility = {
             accent = {BackgroundColor3 = {}, Color = {}, ScrollBarImageColor3 = {}, TextColor3 = {}},
-            text = {
-                TextColor3 = {},
-                BackgroundColor3 = {},
-            },
-            text_outline = {
-                Color = {} 	
-            },
+            text = {TextColor3 = {}, BackgroundColor3 = {}},
+            text_outline = {Color = {}},
             a = {BackgroundColor3 = {}, Color = {}},
             b = {BackgroundColor3 = {}, Color = {}},
             c = {BackgroundColor3 = {}, Color = {}},
@@ -121,6 +181,11 @@
             g = {BackgroundColor3 = {}, Color = {}},
         }
     }
+
+    -- Initialize with default theme
+    for key, value in pairs(theme_presets.default) do
+        themes.preset[key] = value
+    end
 
     local keys = {
         [Enum.KeyCode.LeftShift] = "LS",
@@ -288,6 +353,7 @@
     end
 
     function library:mouse_in_frame(uiobject)
+        if not uiobject or not uiobject.Parent then return false end
         local y_cond = uiobject.AbsolutePosition.Y <= mouse.Y and mouse.Y <= uiobject.AbsolutePosition.Y + uiobject.AbsoluteSize.Y
         local x_cond = uiobject.AbsolutePosition.X <= mouse.X and mouse.X <= uiobject.AbsolutePosition.X + uiobject.AbsoluteSize.X
         return (y_cond and x_cond)
@@ -359,250 +425,316 @@
         return enum_table
     end
 
-    -- CONFIG SYSTEM
-    -- CONFIG SYSTEM FUNCTIONS (FIXED)
-function library:get_config_path()
-    return library.directory .. "/configs/" .. tostring(game.PlaceId)
-end
-
-function library:get_autoload_path()
-    return library:get_config_path() .. "/autoload.txt"
-end
-
-function library:refresh_configs()
-    local configs = {}
-    local path = library:get_config_path()
+    -- THEME SYSTEM FUNCTIONS
+    function library:set_theme(theme_name)
+        local preset = theme_presets[theme_name]
+        if not preset then
+            preset = theme_presets.default
+            theme_name = "default"
+        end
+        
+        library.current_theme = theme_name
+        
+        for key, color_value in pairs(preset) do
+            library:update_theme(key, color_value)
+        end
+        
+        pcall(function()
+            writefile(library.directory .. "/themes/current.txt", theme_name)
+        end)
+    end
     
-    local success, files = pcall(function()
-        return listfiles(path)
-    end)
+    function library:get_theme_names()
+        local names = {}
+        for name, _ in pairs(theme_presets) do
+            table.insert(names, name)
+        end
+        table.sort(names)
+        return names
+    end
     
-    if success and files then
-        for i = 1, #files do
-            local file = files[i]
-            local name = file:match("([^/\\]+)$")
-            if name and name:match("%.json$") then
-                local configName = string.gsub(name, "%.json$", "")
-                configs[#configs + 1] = configName
+    function library:set_accent(new_color)
+        library:update_theme("accent", new_color)
+        themes.preset.accent = new_color
+    end
+    
+    function library:load_saved_theme()
+        pcall(function()
+            if isfile(library.directory .. "/themes/current.txt") then
+                local saved_theme = readfile(library.directory .. "/themes/current.txt")
+                if theme_presets[saved_theme] then
+                    library:set_theme(saved_theme)
+                end
+            end
+        end)
+    end
+
+    function library:save_default_theme(theme_name)
+        pcall(function()
+            if not isfolder(library.directory .. "/themes") then
+                makefolder(library.directory .. "/themes")
+            end
+            writefile(library.directory .. "/themes/default.txt", theme_name)
+        end)
+    end
+
+    function library:load_default_theme()
+        local success, result = pcall(function()
+            if isfile(library.directory .. "/themes/default.txt") then
+                return readfile(library.directory .. "/themes/default.txt")
+            end
+            return nil
+        end)
+        if success and result and theme_presets[result] then
+            library:set_theme(result)
+            return result
+        end
+        return "default"
+    end
+
+    -- CONFIG SYSTEM FUNCTIONS
+    function library:get_config_path()
+        return library.directory .. "/configs/" .. tostring(game.PlaceId)
+    end
+
+    function library:get_autoload_path()
+        return library:get_config_path() .. "/autoload.txt"
+    end
+
+    function library:refresh_configs()
+        local configs = {}
+        local path = library:get_config_path()
+        
+        local success, files = pcall(function()
+            return listfiles(path)
+        end)
+        
+        if success and files then
+            for i = 1, #files do
+                local file = files[i]
+                local name = file:match("([^/\\]+)$")
+                if name and name:match("%.json$") then
+                    local configName = string.gsub(name, "%.json$", "")
+                    configs[#configs + 1] = configName
+                end
             end
         end
+        
+        table.sort(configs)
+        library.config.list = configs
+        
+        return configs
     end
-    
-    table.sort(configs)
-    library.config.list = configs
-    
-    return configs
-end
 
-function library:notify(message)
-    -- Safe notification wrapper
-    if notifications and notifications.create_notification then
-        notifications:create_notification({name = message})
-    else
-        print("[Notification]:", message)
-    end
-end
-
-function library:save_config(name)
-    if not name or name == "" then
-        library:notify("Please enter a config name")
-        return false
-    end
-    
-    -- Ensure folder exists
-    pcall(function()
-        if not isfolder(library:get_config_path()) then
-            makefolder(library:get_config_path())
+    function library:notify(message)
+        if notifications and notifications.create_notification then
+            notifications:create_notification({name = message})
+        else
+            print("[Notification]:", message)
         end
-    end)
-    
-    local path = library:get_config_path() .. "/" .. name .. ".json"
-    local data = {}
-    
-    for flag, value in pairs(flags) do
-        if type(value) == "table" and value.key then
-            data[flag] = {active = value.active, mode = value.mode, key = tostring(value.key)}
-        elseif type(value) == "table" and value["Transparency"] ~= nil and value["Color"] then
-            data[flag] = {Transparency = value["Transparency"], Color = value["Color"]:ToHex()}
-        elseif type(value) ~= "table" then
-            data[flag] = value
-        elseif type(value) == "table" then
-            local canSerialize = true
-            for k, v in pairs(value) do
-                if type(v) == "function" or type(v) == "userdata" or type(v) == "thread" then
-                    canSerialize = false
+    end
+
+    function library:save_config(name)
+        if not name or name == "" then
+            library:notify("Please enter a config name")
+            return false
+        end
+        
+        pcall(function()
+            if not isfolder(library:get_config_path()) then
+                makefolder(library:get_config_path())
+            end
+        end)
+        
+        local path = library:get_config_path() .. "/" .. name .. ".json"
+        local data = {}
+        
+        for flag, value in pairs(flags) do
+            if string.sub(flag, 1, 1) == "_" then continue end
+            
+            if type(value) == "table" and value.key then
+                data[flag] = {active = value.active, mode = value.mode, key = tostring(value.key)}
+            elseif type(value) == "table" and value["Transparency"] ~= nil and value["Color"] then
+                data[flag] = {Transparency = value["Transparency"], Color = value["Color"]:ToHex()}
+            elseif type(value) ~= "table" then
+                data[flag] = value
+            elseif type(value) == "table" then
+                local canSerialize = true
+                for k, v in pairs(value) do
+                    if type(v) == "function" or type(v) == "userdata" or type(v) == "thread" then
+                        canSerialize = false
+                        break
+                    end
+                end
+                if canSerialize then
+                    data[flag] = value
+                end
+            end
+        end
+        
+        local success, err = pcall(function()
+            writefile(path, http_service:JSONEncode(data))
+        end)
+        
+        if success then
+            library:notify("Config saved: " .. name)
+            library:refresh_configs()
+            return true
+        else
+            library:notify("Failed to save config")
+            return false
+        end
+    end
+
+    function library:load_config(name)
+        if not name or name == "" then
+            library:notify("Please select a config")
+            return false
+        end
+        
+        local path = library:get_config_path() .. "/" .. name .. ".json"
+        
+        if not isfile(path) then
+            library:notify("Config not found: " .. name)
+            return false
+        end
+        
+        local success, err = pcall(function()
+            local content = readfile(path)
+            local data = http_service:JSONDecode(content)
+            
+            for flag, value in pairs(data) do
+                local setter = config_flags[flag]
+                
+                if setter then
+                    if type(value) == "table" and value["Transparency"] ~= nil and value["Color"] then
+                        setter(hex(value["Color"]), value["Transparency"])
+                    elseif type(value) == "table" and value["active"] ~= nil then
+                        setter(value)
+                    else
+                        setter(value)
+                    end
+                end
+            end
+        end)
+        
+        if success then
+            library:notify("Config loaded: " .. name)
+            library.config.selected = name
+            return true
+        else
+            library:notify("Failed to load config")
+            return false
+        end
+    end
+
+    function library:delete_config(name)
+        if not name or name == "" then
+            library:notify("Please select a config")
+            return false
+        end
+        
+        local path = library:get_config_path() .. "/" .. name .. ".json"
+        
+        if not isfile(path) then
+            library:notify("Config not found: " .. name)
+            return false
+        end
+        
+        local success = pcall(function()
+            delfile(path)
+        end)
+        
+        if success then
+            if library:get_autoload() == name then
+                library:remove_autoload()
+            end
+            
+            library:notify("Config deleted: " .. name)
+            library:refresh_configs()
+            return true
+        else
+            library:notify("Failed to delete config")
+            return false
+        end
+    end
+
+    function library:get_autoload()
+        local path = library:get_autoload_path()
+        local success, content = pcall(function()
+            if isfile(path) then
+                return readfile(path)
+            end
+            return nil
+        end)
+        if success then
+            return content
+        end
+        return nil
+    end
+
+    function library:set_autoload(name)
+        if not name or name == "" then
+            library:notify("Please select a config")
+            return false
+        end
+        
+        pcall(function()
+            if not isfolder(library:get_config_path()) then
+                makefolder(library:get_config_path())
+            end
+        end)
+        
+        local success = pcall(function()
+            writefile(library:get_autoload_path(), name)
+        end)
+        
+        if success then
+            library.config.autoload = name
+            library:notify("Autoload set: " .. name)
+            return true
+        else
+            library:notify("Failed to set autoload")
+            return false
+        end
+    end
+
+    function library:remove_autoload()
+        local path = library:get_autoload_path()
+        local exists = pcall(function() return isfile(path) end)
+        
+        if exists and isfile(path) then
+            pcall(function()
+                delfile(path)
+            end)
+            library.config.autoload = nil
+            library:notify("Autoload removed")
+            return true
+        else
+            library:notify("No autoload set")
+            return false
+        end
+    end
+
+    function library:run_autoload()
+        local autoload = library:get_autoload()
+        if autoload and autoload ~= "" then
+            library:refresh_configs()
+            local found = false
+            for _, cfg in ipairs(library.config.list) do
+                if cfg == autoload then
+                    found = true
                     break
                 end
             end
-            if canSerialize then
-                data[flag] = value
+            if found then
+                task.wait(0.3)
+                library:load_config(autoload)
+                return true
             end
         end
-    end
-    
-    local success, err = pcall(function()
-        writefile(path, http_service:JSONEncode(data))
-    end)
-    
-    if success then
-        library:notify("Config saved: " .. name)
-        library:refresh_configs()
-        return true
-    else
-        library:notify("Failed to save config")
         return false
     end
-end
-
-function library:load_config(name)
-    if not name or name == "" then
-        library:notify("Please select a config")
-        return false
-    end
-    
-    local path = library:get_config_path() .. "/" .. name .. ".json"
-    
-    if not isfile(path) then
-        library:notify("Config not found: " .. name)
-        return false
-    end
-    
-    local success, err = pcall(function()
-        local content = readfile(path)
-        local data = http_service:JSONDecode(content)
-        
-        for flag, value in pairs(data) do
-            local setter = config_flags[flag]
-            
-            if setter then
-                if type(value) == "table" and value["Transparency"] ~= nil and value["Color"] then
-                    setter(hex(value["Color"]), value["Transparency"])
-                elseif type(value) == "table" and value["active"] ~= nil then
-                    setter(value)
-                else
-                    setter(value)
-                end
-            end
-        end
-    end)
-    
-    if success then
-        library:notify("Config loaded: " .. name)
-        return true
-    else
-        library:notify("Failed to load config")
-        return false
-    end
-end
-
-function library:delete_config(name)
-    if not name or name == "" then
-        library:notify("Please select a config")
-        return false
-    end
-    
-    local path = library:get_config_path() .. "/" .. name .. ".json"
-    
-    if not isfile(path) then
-        library:notify("Config not found: " .. name)
-        return false
-    end
-    
-    local success = pcall(function()
-        delfile(path)
-    end)
-    
-    if success then
-        if library:get_autoload() == name then
-            library:remove_autoload()
-        end
-        
-        library:notify("Config deleted: " .. name)
-        library:refresh_configs()
-        return true
-    else
-        library:notify("Failed to delete config")
-        return false
-    end
-end
-
-function library:get_autoload()
-    local path = library:get_autoload_path()
-    local success, content = pcall(function()
-        if isfile(path) then
-            return readfile(path)
-        end
-        return nil
-    end)
-    if success then
-        return content
-    end
-    return nil
-end
-
-function library:set_autoload(name)
-    if not name or name == "" then
-        library:notify("Please select a config")
-        return false
-    end
-    
-    -- Ensure folder exists
-    pcall(function()
-        if not isfolder(library:get_config_path()) then
-            makefolder(library:get_config_path())
-        end
-    end)
-    
-    local success = pcall(function()
-        writefile(library:get_autoload_path(), name)
-    end)
-    
-    if success then
-        library.config.autoload = name
-        library:notify("Autoload set: " .. name)
-        return true
-    else
-        library:notify("Failed to set autoload")
-        return false
-    end
-end
-
-function library:remove_autoload()
-    local path = library:get_autoload_path()
-    local exists = pcall(function() return isfile(path) end)
-    
-    if exists and isfile(path) then
-        pcall(function()
-            delfile(path)
-        end)
-        library.config.autoload = nil
-        library:notify("Autoload removed")
-        return true
-    else
-        library:notify("No autoload set")
-        return false
-    end
-end
-
-function library:run_autoload()
-    local autoload = library:get_autoload()
-    if autoload and autoload ~= "" then
-        library:refresh_configs()
-        local found = false
-        for _, cfg in ipairs(library.config.list) do
-            if cfg == autoload then
-                found = true
-                break
-            end
-        end
-        if found then
-            task.wait(0.3)
-            library:load_config(autoload)
-            return true
-        end
-    end
-    return false
-end
 
     local config_holder
     function library:update_config_list() 
@@ -635,16 +767,22 @@ end
     function library:apply_theme(instance, theme, property) 
         if themes.utility[theme] and themes.utility[theme][property] then
             insert(themes.utility[theme][property], instance)
+            instance[property] = themes.preset[theme]
         end
     end
 
     function library:update_theme(theme, color)
         if themes.utility[theme] then
-            for _, property in themes.utility[theme] do 
-                for m, object in property do 
-                    if object[_] == themes.preset[theme] then 
-                        object[_] = color 
-                    end 
+            for property, objects in pairs(themes.utility[theme]) do 
+                for i = #objects, 1, -1 do
+                    local object = objects[i]
+                    if object and object.Parent then
+                        pcall(function()
+                            object[property] = color
+                        end)
+                    else
+                        table.remove(objects, i)
+                    end
                 end 
             end 
         end
@@ -675,6 +813,12 @@ end
         if library.gui then 
             library.gui:Destroy()
         end
+        if library.watermark_gui then
+            library.watermark_gui:Destroy()
+        end
+        if library.keybind_gui then
+            library.keybind_gui:Destroy()
+        end
         for index, connection in next, library.connections do 
             connection:Disconnect() 
             connection = nil 
@@ -685,14 +829,33 @@ end
     -- WINDOW
     function library:window(properties)
         local cfg = {
-            name = properties.name or properties.Name or "vaderhaxx",
-            size = properties.size or properties.Size or dim2(0, 560, 0, 740),
+            name = properties.name or "vaderhaxx",
+            size = properties.size or dim2(0, 560, 0, 740),
             selected_tab = nil
         }
 
+        -- Main UI ScreenGui
         library.gui = library:create("ScreenGui", {
             Parent = coregui,
-            Name = "\0",
+            Name = "MainUI",
+            Enabled = true,
+            ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+            IgnoreGuiInset = true,
+        })
+        
+        -- SEPARATE ScreenGui for Watermark
+        library.watermark_gui = library:create("ScreenGui", {
+            Parent = coregui,
+            Name = "WatermarkUI",
+            Enabled = true,
+            ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+            IgnoreGuiInset = true,
+        })
+        
+        -- SEPARATE ScreenGui for Keybind List
+        library.keybind_gui = library:create("ScreenGui", {
+            Parent = coregui,
+            Name = "KeybindUI",
             Enabled = true,
             ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
             IgnoreGuiInset = true,
@@ -713,10 +876,12 @@ end
         
         library.main_frame = a
 
-        library:create("UIStroke", {
+        local main_stroke = library:create("UIStroke", {
             Parent = a,
-            LineJoinMode = Enum.LineJoinMode.Miter
+            LineJoinMode = Enum.LineJoinMode.Miter,
+            Color = themes.preset.accent
         })
+        library:apply_theme(main_stroke, "accent", "Color")
         
         local b = library:create("Frame", {
             Parent = a,
@@ -725,12 +890,12 @@ end
             BorderColor3 = rgb(0, 0, 0),
             Size = dim2(1, -2, 1, -2),
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(56, 56, 56)
+            BackgroundColor3 = themes.preset.b
         })
         library:apply_theme(b, "b", "BackgroundColor3")
         
         library:create("UIStroke", {
-            Color = rgb(56, 56, 56),
+            Color = themes.preset.b,
             LineJoinMode = Enum.LineJoinMode.Miter,
             Parent = b,
             Transparency = 0.25
@@ -743,12 +908,12 @@ end
             BorderColor3 = rgb(0, 0, 0),
             Size = dim2(1, -2, 1, -2),
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(46, 46, 46)
+            BackgroundColor3 = themes.preset.c
         })
         library:apply_theme(c, "c", "BackgroundColor3")
         
         library:create("UIStroke", {
-            Color = rgb(46, 46, 46),
+            Color = themes.preset.c,
             LineJoinMode = Enum.LineJoinMode.Miter,
             Parent = c,
             Transparency = 0.25
@@ -761,12 +926,12 @@ end
             BorderColor3 = rgb(0, 0, 0),
             Size = dim2(1, -2, 1, -2),
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(46, 46, 46)
+            BackgroundColor3 = themes.preset.c
         })
         library:apply_theme(c2, "c", "BackgroundColor3")
         
         library:create("UIStroke", {
-            Color = rgb(46, 46, 46),
+            Color = themes.preset.c,
             LineJoinMode = Enum.LineJoinMode.Miter,
             Parent = c2,
             Transparency = 0.25
@@ -779,12 +944,12 @@ end
             BorderColor3 = rgb(0, 0, 0),
             Size = dim2(1, -2, 1, -2),
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(46, 46, 46)
+            BackgroundColor3 = themes.preset.c
         })
         library:apply_theme(b2, "c", "BackgroundColor3")
         
         library:create("UIStroke", {
-            Color = rgb(56, 56, 56),
+            Color = themes.preset.b,
             LineJoinMode = Enum.LineJoinMode.Miter,
             Parent = b2,
             Transparency = 0.25
@@ -796,7 +961,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             Size = dim2(1, 0, 1, 0),
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(0, 0, 0)
+            BackgroundColor3 = themes.preset.a
         })
         library:apply_theme(a2, "a", "BackgroundColor3")
         
@@ -826,7 +991,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             Size = dim2(1, -34, 1, -46),
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(0, 0, 0)
+            BackgroundColor3 = themes.preset.a
         })
         library:apply_theme(content_frame, "a", "BackgroundColor3")
         
@@ -836,15 +1001,15 @@ end
             BorderColor3 = rgb(0, 0, 0),
             Size = dim2(1, -2, 1, -2),
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(46, 46, 46)
+            BackgroundColor3 = themes.preset.c
         })
         library:apply_theme(inline, "c", "BackgroundColor3")
         cfg.inline = inline
 
-        -- Keybind list (hidden by default)
+        -- Keybind list (in SEPARATE GUI)
         local keybindlist = library:create("Frame", {
             BorderColor3 = rgb(0, 0, 0),
-            Parent = library.gui,
+            Parent = library.keybind_gui,
             BackgroundTransparency = 1,
             Position = dim2(0, 100, 0, 600),
             Size = dim2(0, 202, 0, 66),
@@ -856,10 +1021,12 @@ end
         library:draggify(keybindlist)
         library.keybind_list_frame = keybindlist
         
-        library:create("UIStroke", {
+        local kl_stroke = library:create("UIStroke", {
             Parent = keybindlist,
-            LineJoinMode = Enum.LineJoinMode.Miter
+            LineJoinMode = Enum.LineJoinMode.Miter,
+            Color = themes.preset.accent
         })
+        library:apply_theme(kl_stroke, "accent", "Color")
 
         local kl_inline1 = library:create("Frame", {
             BorderColor3 = rgb(0, 0, 0),
@@ -869,12 +1036,12 @@ end
             Size = dim2(1, -2, 1, -2),
             BorderSizePixel = 0,
             AutomaticSize = Enum.AutomaticSize.XY,
-            BackgroundColor3 = rgb(56, 56, 56)
+            BackgroundColor3 = themes.preset.b
         })
         library:apply_theme(kl_inline1, "b", "BackgroundColor3")
 
         library:create("UIStroke", {
-            Color = rgb(56, 56, 56),
+            Color = themes.preset.b,
             LineJoinMode = Enum.LineJoinMode.Miter,
             Parent = kl_inline1,
             Transparency = 0.25
@@ -888,12 +1055,12 @@ end
             Size = dim2(1, -2, 1, -2),
             BorderSizePixel = 0,
             AutomaticSize = Enum.AutomaticSize.XY,
-            BackgroundColor3 = rgb(46, 46, 46)
+            BackgroundColor3 = themes.preset.c
         })
         library:apply_theme(kl_inline2, "c", "BackgroundColor3")
 
         library:create("UIStroke", {
-            Color = rgb(46, 46, 46),
+            Color = themes.preset.c,
             LineJoinMode = Enum.LineJoinMode.Miter,
             Parent = kl_inline2,
             Transparency = 0.25
@@ -907,12 +1074,12 @@ end
             Size = dim2(1, -2, 1, -2),
             BorderSizePixel = 0,
             AutomaticSize = Enum.AutomaticSize.XY,
-            BackgroundColor3 = rgb(46, 46, 46)
+            BackgroundColor3 = themes.preset.c
         })
         library:apply_theme(kl_inline3, "c", "BackgroundColor3")
 
         library:create("UIStroke", {
-            Color = rgb(46, 46, 46),
+            Color = themes.preset.c,
             LineJoinMode = Enum.LineJoinMode.Miter,
             Parent = kl_inline3,
             Transparency = 0.25
@@ -926,12 +1093,12 @@ end
             Size = dim2(1, -2, 1, -2),
             BorderSizePixel = 0,
             AutomaticSize = Enum.AutomaticSize.XY,
-            BackgroundColor3 = rgb(46, 46, 46)
+            BackgroundColor3 = themes.preset.b
         })
         library:apply_theme(kl_inline4, "b", "BackgroundColor3")
 
         library:create("UIStroke", {
-            Color = rgb(56, 56, 56),
+            Color = themes.preset.b,
             LineJoinMode = Enum.LineJoinMode.Miter,
             Parent = kl_inline4,
             Transparency = 0.25
@@ -944,7 +1111,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             BorderSizePixel = 0,
             AutomaticSize = Enum.AutomaticSize.XY,
-            BackgroundColor3 = rgb(0, 0, 0)
+            BackgroundColor3 = themes.preset.a
         })
         library:apply_theme(kl_inline5, "a", "BackgroundColor3")
 
@@ -1013,7 +1180,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             BorderSizePixel = 0,
             AutomaticSize = Enum.AutomaticSize.XY,
-            BackgroundColor3 = rgb(0, 0, 0)
+            BackgroundColor3 = themes.preset.a
         })
         library:apply_theme(kl_inline6, "a", "BackgroundColor3")
 
@@ -1024,7 +1191,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             BorderSizePixel = 0,
             AutomaticSize = Enum.AutomaticSize.XY,
-            BackgroundColor3 = rgb(56, 56, 56)
+            BackgroundColor3 = themes.preset.b
         })
         library:apply_theme(kl_inline7, "b", "BackgroundColor3")
 
@@ -1035,7 +1202,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             BorderSizePixel = 0,
             AutomaticSize = Enum.AutomaticSize.XY,
-            BackgroundColor3 = rgb(21, 21, 21)
+            BackgroundColor3 = themes.preset.e
         })
         library:apply_theme(kl_inline8, "e", "BackgroundColor3")
         library.keybind_list = kl_inline8
@@ -1100,7 +1267,7 @@ end
             Parent = keybindlist
         })
 
-        -- Menu toggle
+        -- Menu toggle - ONLY toggles main UI
         library:connection(uis.InputBegan, function(input, gameProcessed)
             if input.KeyCode == Enum.KeyCode.RightShift and not gameProcessed then
                 library.gui.Enabled = not library.gui.Enabled
@@ -1110,7 +1277,7 @@ end
         return setmetatable(cfg, library)
     end 
 
-    -- WATERMARK
+    -- WATERMARK (in SEPARATE GUI)
     function library:watermark(options)
         local cfg = {
             name = options.name or "vaderhaxx",
@@ -1118,18 +1285,25 @@ end
         }
         
         local outline = library:create("Frame", {
-            Parent = library.gui,
+            Parent = library.watermark_gui,
             Size = dim2(0, 0, 0, 18),
             Position = dim2(0, 50, 0, 50),
             BorderColor3 = rgb(0, 0, 0),
             BorderSizePixel = 0,
             AutomaticSize = Enum.AutomaticSize.XY,
-            BackgroundColor3 = rgb(46, 46, 46)
+            BackgroundColor3 = themes.preset.c
         })
         library:apply_theme(outline, "c", "BackgroundColor3")
         library:draggify(outline)
         
         cfg.frame = outline
+
+        local wm_stroke = library:create("UIStroke", {
+            Parent = outline,
+            LineJoinMode = Enum.LineJoinMode.Miter,
+            Color = themes.preset.accent
+        })
+        library:apply_theme(wm_stroke, "accent", "Color")
 
         local wm_inline = library:create("Frame", {
             Parent = outline,
@@ -1137,7 +1311,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             BorderSizePixel = 0,
             AutomaticSize = Enum.AutomaticSize.XY,
-            BackgroundColor3 = rgb(21, 21, 21)
+            BackgroundColor3 = themes.preset.e
         })
         library:apply_theme(wm_inline, "e", "BackgroundColor3")
         
@@ -1232,7 +1406,7 @@ end
 
         task.spawn(function()
             while task.wait(0.5) do
-                if cfg.visible then
+                if cfg.visible and outline and outline.Parent then
                     local offset = tick() * 0.2
                     
                     uigradient.Color = rgbseq{
@@ -1304,10 +1478,17 @@ end
             BorderColor3 = rgb(0, 0, 0),
             BorderSizePixel = 0,
             AutomaticSize = Enum.AutomaticSize.XY,
-            BackgroundColor3 = rgb(46, 46, 46)
+            BackgroundColor3 = themes.preset.c
         })
         library:apply_theme(outline, "c", "BackgroundColor3")
         library:draggify(outline)
+
+        local notif_stroke = library:create("UIStroke", {
+            Parent = outline,
+            LineJoinMode = Enum.LineJoinMode.Miter,
+            Color = themes.preset.accent
+        })
+        library:apply_theme(notif_stroke, "accent", "Color")
 
         local notif_inline = library:create("Frame", {
             Parent = outline,
@@ -1315,7 +1496,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             BorderSizePixel = 0,
             AutomaticSize = Enum.AutomaticSize.XY,
-            BackgroundColor3 = rgb(21, 21, 21)
+            BackgroundColor3 = themes.preset.e
         })
         library:apply_theme(notif_inline, "e", "BackgroundColor3")
         
@@ -1375,6 +1556,8 @@ end
         end)
     end
 
+    library.notifications = notifications
+
     -- TAB
     function library:tab(properties)
         local cfg = {
@@ -1401,7 +1584,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             Size = dim2(1, 0, 0, 4),
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(84, 84, 84)
+            BackgroundColor3 = themes.preset.f
         })
         library:apply_theme(accent, "f", "BackgroundColor3")
         
@@ -1412,7 +1595,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             Size = dim2(1, 0, 0, 2),
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(84, 84, 84)
+            BackgroundColor3 = themes.preset.f
         })
         library:apply_theme(split, "f", "BackgroundColor3")
         
@@ -1428,7 +1611,7 @@ end
             Size = dim2(1, -2, 1, -2),
             Visible = false,
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(21, 21, 21)
+            BackgroundColor3 = themes.preset.e
         })
         library:apply_theme(e, "e", "BackgroundColor3")
         cfg.page_holder = e
@@ -1545,8 +1728,9 @@ end
             BorderColor3 = rgb(0, 0, 0),
             Parent = section,
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(0, 0, 0)
+            BackgroundColor3 = themes.preset.a
         })
+        library:apply_theme(a, "a", "BackgroundColor3")
         
         local c = library:create("Frame", {
             Parent = a,
@@ -1554,7 +1738,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             Size = dim2(1, -2, 1, -2),
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(46, 46, 46)
+            BackgroundColor3 = themes.preset.c
         })
         library:apply_theme(c, "c", "BackgroundColor3")
         
@@ -1564,7 +1748,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             Size = dim2(1, -2, 1, -2),
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(21, 21, 21)
+            BackgroundColor3 = themes.preset.e
         })
         library:apply_theme(e, "e", "BackgroundColor3")
         
@@ -1631,7 +1815,7 @@ end
             Size = dim2(0, 3, 1, 0),
             BorderSizePixel = 0,
             ZIndex = -1,
-            BackgroundColor3 = rgb(46, 46, 46)
+            BackgroundColor3 = themes.preset.c
         })
         library:apply_theme(scrollbar_fill, "c", "BackgroundColor3")
         
@@ -1665,7 +1849,7 @@ end
             BackgroundColor3 = rgb(255, 255, 255)
         })
         
-        library:create("TextLabel", {
+        local label_text = library:create("TextLabel", {
             FontFace = library.font,
             TextColor3 = rgb(255, 255, 255),
             BorderColor3 = rgb(0, 0, 0),
@@ -1680,6 +1864,7 @@ end
             TextSize = 12,
             BackgroundColor3 = rgb(255, 255, 255)
         })
+        cfg.label_text = label_text
         
         local right_components = library:create("Frame", {
             Parent = label,
@@ -1699,6 +1884,10 @@ end
             HorizontalAlignment = Enum.HorizontalAlignment.Right,
             SortOrder = Enum.SortOrder.LayoutOrder
         })
+
+        function cfg:set_text(text)
+            label_text.Text = text
+        end
         
         return setmetatable(cfg, library)
     end 
@@ -1717,7 +1906,7 @@ end
         local toggle = library:create("TextButton", {
             FontFace = library.font,
             TextColor3 = rgb(0, 0, 0),
-                        BorderColor3 = rgb(0, 0, 0),
+            BorderColor3 = rgb(0, 0, 0),
             Text = "",
             Parent = self.elements,
             BackgroundTransparency = 1,
@@ -1733,7 +1922,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             Size = dim2(0, 10, 0, 10),
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(12, 12, 12)
+            BackgroundColor3 = themes.preset.d
         })
         library:apply_theme(d, "d", "BackgroundColor3")
         
@@ -1743,7 +1932,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             Size = dim2(1, -2, 1, -2),
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(84, 84, 84)
+            BackgroundColor3 = themes.preset.f
         })
         library:apply_theme(f, "f", "BackgroundColor3")
         
@@ -1825,7 +2014,7 @@ end
         return setmetatable(cfg, library)
     end 
 
-    -- SLIDER (FIXED)
+    -- SLIDER
     function library:slider(options) 
         local cfg = {
             name = options.name or "Slider",
@@ -1841,7 +2030,6 @@ end
             dragging = false,
         }
 
-        -- Safety checks
         if cfg.max == nil or cfg.max == 0 then cfg.max = 100 end
         if cfg.min == nil then cfg.min = 0 end
         if cfg.default == nil then cfg.default = cfg.min end
@@ -1887,7 +2075,7 @@ end
             AutoButtonColor = false,
             Text = "",
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(12, 12, 12)
+            BackgroundColor3 = themes.preset.d
         })
         library:apply_theme(slider_frame, "d", "BackgroundColor3")
         
@@ -1897,7 +2085,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             Size = dim2(1, -2, 1, -2),
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(56, 56, 56)
+            BackgroundColor3 = themes.preset.b
         })
         library:apply_theme(background, "b", "BackgroundColor3")
         
@@ -1937,7 +2125,6 @@ end
             BorderSizePixel = 0,
             BackgroundColor3 = rgb(255, 255, 255)
         })
-        library:apply_theme(plus, "text", "BackgroundColor3")
         
         local minus = library:create("ImageButton", {
             AnchorPoint = vec2(1, 0),
@@ -1948,7 +2135,6 @@ end
             BorderSizePixel = 0,
             BackgroundColor3 = rgb(255, 255, 255)
         })
-        library:apply_theme(minus, "text", "BackgroundColor3")
 
         function cfg.set(value)
             local numValue = tonumber(value)
@@ -2065,7 +2251,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             Size = dim2(1, -14, 0, 18),
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(12, 12, 12)
+            BackgroundColor3 = themes.preset.d
         })
         library:apply_theme(dropdown_holder, "d", "BackgroundColor3")
         
@@ -2075,7 +2261,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             Size = dim2(1, -2, 1, -2),
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(46, 46, 46)
+            BackgroundColor3 = themes.preset.c
         })
         library:apply_theme(inline, "c", "BackgroundColor3")
         
@@ -2116,7 +2302,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             BorderSizePixel = 0,
             AutomaticSize = Enum.AutomaticSize.Y,
-            BackgroundColor3 = rgb(12, 12, 12),
+            BackgroundColor3 = themes.preset.d,
             ZIndex = 50,
         })
         library:apply_theme(items, "d", "BackgroundColor3")
@@ -2128,7 +2314,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             BorderSizePixel = 0,
             AutomaticSize = Enum.AutomaticSize.Y,
-            BackgroundColor3 = rgb(46, 46, 46),
+            BackgroundColor3 = themes.preset.c,
             ZIndex = 50,
         })
         library:apply_theme(holder_items, "c", "BackgroundColor3")
@@ -2276,7 +2462,7 @@ end
             Size = dim2(1, 0, 0, 32),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
-            BackgroundColor3 = rgb(12, 12, 12)
+            BackgroundColor3 = themes.preset.d
         })
         
         library:create("TextLabel", {
@@ -2301,7 +2487,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             Size = dim2(1, -14, 0, 18),
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(12, 12, 12)
+            BackgroundColor3 = themes.preset.d
         })
         library:apply_theme(textbox, "d", "BackgroundColor3")
 
@@ -2311,7 +2497,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             Size = dim2(1, -2, 1, -2),
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(46, 46, 46)
+            BackgroundColor3 = themes.preset.c
         })
         library:apply_theme(tb_inline, "c", "BackgroundColor3")
 
@@ -2372,7 +2558,7 @@ end
             Size = dim2(1, 0, 0, 20),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
-            BackgroundColor3 = rgb(12, 12, 12)
+            BackgroundColor3 = themes.preset.d
         })
 
         local button = library:create("TextButton", {
@@ -2382,7 +2568,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             Size = dim2(1, -14, 1, 0),
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(12, 12, 12)
+            BackgroundColor3 = themes.preset.d
         })
         library:apply_theme(button, "d", "BackgroundColor3")
         
@@ -2392,7 +2578,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             Size = dim2(1, -2, 1, -2),
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(46, 46, 46)
+            BackgroundColor3 = themes.preset.c
         })
         library:apply_theme(btn_inline, "c", "BackgroundColor3")
         
@@ -2414,7 +2600,7 @@ end
             local originalColor = btn_inline.BackgroundColor3
             btn_inline.BackgroundColor3 = themes.preset.accent
             task.delay(0.1, function()
-                btn_inline.BackgroundColor3 = originalColor
+                btn_inline.BackgroundColor3 = themes.preset.c
             end)
             cfg.callback()
         end)
@@ -2444,7 +2630,7 @@ end
             Text = "",
             AutoButtonColor = false,
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(12, 12, 12)
+            BackgroundColor3 = themes.preset.d
         })
         library:apply_theme(colorpicker_element, "d", "BackgroundColor3")
         
@@ -2470,7 +2656,7 @@ end
             Visible = false,
             Size = dim2(0, 231, 0, 209),
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(46, 46, 46),
+            BackgroundColor3 = themes.preset.c,
             ZIndex = 100,
         })
         library:apply_theme(colorpicker, "c", "BackgroundColor3")
@@ -2481,7 +2667,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             Size = dim2(1, -2, 1, -2),
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(21, 21, 21),
+            BackgroundColor3 = themes.preset.e,
             ZIndex = 100,
         })
         library:apply_theme(cp_e, "e", "BackgroundColor3")
@@ -2500,7 +2686,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             Size = dim2(1, -1, 0, 16),
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(12, 12, 12),
+            BackgroundColor3 = themes.preset.d,
             ZIndex = 100,
         })
         library:apply_theme(textbox_frame, "d", "BackgroundColor3")
@@ -2511,7 +2697,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             Size = dim2(1, -2, 1, -2),
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(56, 56, 56),
+            BackgroundColor3 = themes.preset.b,
             ZIndex = 100,
         })
         library:apply_theme(cp_b, "b", "BackgroundColor3")
@@ -2532,7 +2718,7 @@ end
             TextXAlignment = Enum.TextXAlignment.Center,
             ZIndex = 100,
         })
-        
+
         local hue_button = library:create("TextButton", {
             AnchorPoint = vec2(1, 0),
             Text = "",
@@ -2542,7 +2728,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             Size = dim2(0, 14, 1, -60),
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(12, 12, 12),
+            BackgroundColor3 = themes.preset.d,
             ZIndex = 100,
         })
         library:apply_theme(hue_button, "d", "BackgroundColor3")
@@ -2582,7 +2768,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             Size = dim2(1, -1, 0, 14),
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(12, 12, 12),
+            BackgroundColor3 = themes.preset.d,
             ZIndex = 100,
         })
         library:apply_theme(alpha_button, "d", "BackgroundColor3")
@@ -2632,7 +2818,7 @@ end
             Text = "",
             AutoButtonColor = false,
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(12, 12, 12),
+            BackgroundColor3 = themes.preset.d,
             ZIndex = 100,
         })
         library:apply_theme(saturation_value_button, "d", "BackgroundColor3")
@@ -2838,7 +3024,7 @@ end
             Text = "",
             AutoButtonColor = false,
             BorderSizePixel = 0,
-            BackgroundColor3 = rgb(0, 0, 0)
+            BackgroundColor3 = themes.preset.a
         })
         library:apply_theme(keybind_element, "a", "BackgroundColor3")
         
@@ -2849,7 +3035,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             BorderSizePixel = 0,
             AutomaticSize = Enum.AutomaticSize.X,
-            BackgroundColor3 = rgb(46, 46, 46)
+            BackgroundColor3 = themes.preset.c
         })
         library:apply_theme(kb_b, "c", "BackgroundColor3")
 
@@ -2890,7 +3076,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             BorderSizePixel = 0,
             AutomaticSize = Enum.AutomaticSize.XY,
-            BackgroundColor3 = rgb(12, 12, 12),
+            BackgroundColor3 = themes.preset.d,
             ZIndex = 100,
         })
         library:apply_theme(items, "d", "BackgroundColor3")
@@ -2902,7 +3088,7 @@ end
             BorderColor3 = rgb(0, 0, 0),
             BorderSizePixel = 0,
             AutomaticSize = Enum.AutomaticSize.Y,
-            BackgroundColor3 = rgb(56, 56, 56),
+            BackgroundColor3 = themes.preset.b,
             ZIndex = 100,
         })
         library:apply_theme(item_holder, "b", "BackgroundColor3")
@@ -3104,12 +3290,11 @@ end
         return setmetatable(cfg, library)
     end
 
-    -- CONFIG TAB BUILDER
+    -- CONFIG TAB BUILDER (ENHANCED with theme system)
     function library:build_config_section(tab)
         library:refresh_configs()
         
         local configSection = tab:section({name = "configuration"})
-        local autoloadSection = tab:section({name = "autoload", side = "right"})
         local uiSection = tab:section({name = "ui settings", side = "right"})
         
         -- Config name textbox
@@ -3120,7 +3305,7 @@ end
             default = "",
         })
         
-        -- Config list dropdown
+                -- Config list dropdown
         local configs = library.config.list
         if #configs == 0 then
             configs = {"none"}
@@ -3202,6 +3387,11 @@ end
             end
         })
         
+        -- Autoload Section
+        local currentAutoload = library:get_autoload() or "none"
+        
+        autoloadSection:label({name = "current: " .. currentAutoload})
+        
         -- Set autoload button
         autoloadSection:button({
             name = "set as autoload",
@@ -3223,11 +3413,18 @@ end
             end
         })
         
-        -- Current autoload label
-        local currentAutoload = library:get_autoload() or "none"
-        autoloadSection:label({name = "current: " .. currentAutoload})
+        -- UI Settings Section
+        uiSection:toggle({
+            name = "show watermark",
+            flag = "_ui_watermark",
+            default = true,
+            callback = function(value)
+                if library.watermark_gui then
+                    library.watermark_gui.Enabled = value
+                end
+            end
+        })
         
-        -- UI Settings
         uiSection:toggle({
             name = "show keybind list",
             flag = "_ui_keybindlist",
@@ -3239,11 +3436,42 @@ end
             end
         })
         
-        uiSection:keybind({
-            name = "menu toggle",
-            flag = "_ui_menutoggle",
-            key = Enum.KeyCode.RightShift,
-            mode = "Toggle",
+        -- Theme dropdown
+        local themeNames = library:get_theme_names()
+        uiSection:dropdown({
+            name = "theme",
+            flag = "_ui_theme",
+            items = themeNames,
+            default = library.current_theme or "default",
+            callback = function(value)
+                library:set_theme(value)
+                notifications:create_notification({name = "Theme set to: " .. value})
+            end
+        })
+        
+        -- Accent color picker
+        uiSection:colorpicker({
+            name = "accent color",
+            flag = "_ui_accent",
+            color = themes.preset.accent,
+            alpha = 0,
+            callback = function(clr, alpha)
+                library:set_accent(clr)
+            end
+        })
+        
+        -- Set current theme as default button
+        uiSection:button({
+            name = "set theme as default",
+            callback = function()
+                pcall(function()
+                    if not isfolder(library.directory .. "/themes") then
+                        makefolder(library.directory .. "/themes")
+                    end
+                    writefile(library.directory .. "/themes/current.txt", library.current_theme)
+                    notifications:create_notification({name = "Default theme saved"})
+                end)
+            end
         })
         
         return {
@@ -3254,11 +3482,140 @@ end
         }
     end
 
--- Run autoload on initialization
+    -- THEME PRESETS (add this near the top themes table if not already there)
+    local theme_presets = {
+        default = {
+            accent = rgb(147, 112, 219), -- Purple accent
+            text = rgb(255, 255, 255),
+            text_outline = rgb(0, 0, 0),
+            a = rgb(8, 8, 8),        -- Very dark black
+            b = rgb(18, 18, 18),     -- Dark gray
+            c = rgb(14, 14, 14),     -- Darker gray
+            d = rgb(6, 6, 6),        -- Almost black
+            e = rgb(10, 10, 10),     -- Very dark
+            f = rgb(35, 35, 35),     -- Medium dark
+            g = rgb(25, 25, 25),     -- Dark
+        },
+        fatality = {
+            accent = rgb(255, 85, 85),  -- Red accent
+            text = rgb(255, 255, 255),
+            text_outline = rgb(0, 0, 0),
+            a = rgb(5, 5, 5),
+            b = rgb(15, 15, 15),
+            c = rgb(12, 12, 12),
+            d = rgb(4, 4, 4),
+            e = rgb(8, 8, 8),
+            f = rgb(30, 30, 30),
+            g = rgb(20, 20, 20),
+        },
+        bbot = {
+            accent = rgb(0, 170, 255),  -- Blue accent
+            text = rgb(255, 255, 255),
+            text_outline = rgb(0, 0, 0),
+            a = rgb(10, 10, 10),
+            b = rgb(20, 20, 20),
+            c = rgb(15, 15, 15),
+            d = rgb(5, 5, 5),
+            e = rgb(12, 12, 12),
+            f = rgb(35, 35, 35),
+            g = rgb(25, 25, 25),
+        },
+        purple = {
+            accent = rgb(138, 43, 226),  -- Bright purple
+            text = rgb(255, 255, 255),
+            text_outline = rgb(0, 0, 0),
+            a = rgb(5, 5, 10),
+            b = rgb(15, 15, 20),
+            c = rgb(10, 10, 15),
+            d = rgb(3, 3, 8),
+            e = rgb(8, 8, 12),
+            f = rgb(30, 30, 40),
+            g = rgb(20, 20, 30),
+        },
+        midnight = {
+            accent = rgb(180, 120, 255),  -- Light purple
+            text = rgb(255, 255, 255),
+            text_outline = rgb(0, 0, 0),
+            a = rgb(2, 2, 5),
+            b = rgb(12, 12, 18),
+            c = rgb(8, 8, 14),
+            d = rgb(1, 1, 3),
+            e = rgb(5, 5, 10),
+            f = rgb(25, 25, 35),
+            g = rgb(18, 18, 25),
+        },
+    }
+
+    -- THEME SYSTEM FUNCTIONS (add these to library functions section)
+    function library:set_theme(theme_name)
+        local preset = theme_presets[theme_name]
+        if not preset then
+            preset = theme_presets.default
+            theme_name = "default"
+        end
+        
+        library.current_theme = theme_name
+        
+        for key, color_value in pairs(preset) do
+            library:update_theme(key, color_value)
+        end
+        
+        -- Save theme preference
+        pcall(function()
+            if not isfolder(library.directory .. "/themes") then
+                makefolder(library.directory .. "/themes")
+            end
+            writefile(library.directory .. "/themes/current.txt", theme_name)
+        end)
+    end
+    
+    function library:get_theme_names()
+        local names = {}
+        for name, _ in pairs(theme_presets) do
+            table.insert(names, name)
+        end
+        table.sort(names)
+        return names
+    end
+    
+    function library:set_accent(new_color)
+        library:update_theme("accent", new_color)
+        themes.preset.accent = new_color
+    end
+    
+    function library:load_saved_theme()
+        pcall(function()
+            if isfile(library.directory .. "/themes/current.txt") then
+                local saved_theme = readfile(library.directory .. "/themes/current.txt")
+                if theme_presets[saved_theme] then
+                    library:set_theme(saved_theme)
+                end
+            end
+        end)
+    end
+
+    -- FIX: Update the update_theme function to properly update all elements
+    function library:update_theme(theme, color)
+        if themes.utility[theme] then
+            for property, objects in pairs(themes.utility[theme]) do 
+                for i, object in pairs(objects) do 
+                    if object and typeof(object) == "Instance" and object.Parent then
+                        pcall(function()
+                            object[property] = color
+                        end)
+                    end
+                end 
+            end 
+        end
+        themes.preset[theme] = color 
+    end
+
+-- Run autoload and load saved theme on initialization
 task.spawn(function()
-    task.wait(1)
+    task.wait(0.5)
+    library:load_saved_theme()
+    task.wait(0.5)
     library:run_autoload()
 end)
 
 return library, notifications
-            
