@@ -1,4 +1,210 @@
 
+local create_keybind = function(self, properties, label, is_toggle)
+	local name = properties and properties.name or "keybind";
+	local default = properties and properties.default or nil;
+	local flag = properties and properties.flag or name;
+	local callback = properties and properties.callback or function(...) end;
+	local index_mode = properties and properties.index_mode or false;
+	local mode = properties and properties.mode or "toggle";
+
+	library_t.flags[flag] = index_mode and default or false;
+	local current_key = default;
+	self.lib.base.key_flags[flag] = default;
+	local is_selecting = false;
+	local state = false;
+
+	local keybind_frame = utility_t.new_instance("Frame", {
+		Parent = label,
+		Position = UDim2.new(1, -10, 0, 0),
+		Size = UDim2.new(0, 0, 0, 0),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+	});
+
+	local keybind_text = utility_t.new_instance("TextLabel", {
+		Parent = keybind_frame,
+		Position = UDim2.new(0, 1, 0, 0),
+		Size = UDim2.new(1, 0, 1, 0),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		ZIndex = 2,
+		TextColor3 = library_t.theme.text_color,
+		TextSize = library_t.font_size,
+		Text = default and default.Name:lower() or "none",
+		FontFace = library_t.font,
+	});
+
+	local shadow = utility_t.new_instance("TextLabel", {
+		Parent = keybind_text,
+		Size = UDim2.new(1, 0, 1, 0),
+		Position = UDim2.new(0, 1, 0, 1),
+		ZIndex = 1,
+		FontFace = library_t.font,
+		TextSize = library_t.font_size,
+		BackgroundTransparency = 1,
+		TextColor3 = Color3.fromRGB(0, 0, 0),
+		Text = default and default.Name:lower() or "none",
+		BorderSizePixel = 0
+	});
+
+	local keybind_button, pressed_signal = utility_t.new_button({
+		Parent = keybind_frame,
+		Position = UDim2.new(0, 0, 0, 0),
+		Size = UDim2.new(1, 0, 1, 0),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		TextTransparency = 1
+	});
+
+	local update_pos = function()
+		local text_size = keybind_text.TextBounds;
+		keybind_frame.Size = UDim2.new(0, text_size.X + 9, 0, 10);
+		keybind_frame.Position = UDim2.new(1, -text_size.X - 4, 0, 0);
+	end;
+
+	local set_key = function(key)
+		if key then
+			local key_enum = nil;
+			
+			-- Handle if key is already an Enum
+			if typeof(key) == "EnumItem" then
+				key_enum = key;
+			-- Handle if key is a string (from config loading)
+			elseif type(key) == "string" then
+				key_enum = Enum.KeyCode[key] or Enum.UserInputType[key] or nil;
+			end;
+			
+			if key_enum then
+				current_key = key_enum;
+				keybind_text.Text = key_enum.Name:lower();
+				shadow.Text = key_enum.Name:lower();
+				self.lib.base.key_flags[flag] = key_enum;
+				
+				if index_mode then
+					library_t.flags[flag] = key_enum;
+				else
+					library_t.flags[flag] = false;
+				end;
+				
+				update_pos();
+				callback(key_enum);
+			end;
+		else
+			current_key = nil;
+			keybind_text.Text = "none";
+			shadow.Text = "none";
+			self.lib.base.key_flags[flag] = nil;
+			
+			if index_mode then
+				library_t.flags[flag] = nil;
+			else
+				library_t.flags[flag] = false;
+			end;
+			
+			update_pos();
+			callback(nil);
+		end;
+	end;
+
+	self.lib.base.save_flags[flag] = set_key;
+
+	update_pos();
+
+	utility_t.connect(pressed_signal, function()
+		if not is_selecting and self.lib.base.current_tab == self.tab and utility_t.is_in_main_frame(keybind_button, self.main_frame) then
+			is_selecting = true;
+			keybind_text.Text = "...";
+			shadow.Text = "...";
+			update_pos();
+		end;
+	end);
+
+	utility_t.connect(user_input_service.InputBegan, function(input)
+		-- Cancel selection with Escape
+		if is_selecting and input.KeyCode == Enum.KeyCode.Escape then
+			is_selecting = false;
+			keybind_text.Text = current_key and current_key.Name:lower() or "none";
+			shadow.Text = current_key and current_key.Name:lower() or "none";
+			update_pos();
+			return;
+		end;
+
+		-- Select new key
+		if is_selecting then
+			local key = nil;
+			
+			if input.UserInputType == Enum.UserInputType.Keyboard then
+				key = input.KeyCode;
+			elseif input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.MouseButton2 then
+				key = input.UserInputType;
+			end;
+			
+			if key then
+				is_selecting = false;
+				set_key(key);
+			end;
+			return;
+		end;
+
+		-- Trigger keybind action (only for non-index mode)
+		if not is_selecting and not index_mode and current_key then
+			local should_trigger = false;
+			
+			if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == current_key then
+				should_trigger = true;
+			elseif input.UserInputType == current_key then
+				should_trigger = true;
+			end;
+			
+			if should_trigger then
+				if mode == "toggle" then
+					state = not state;
+					library_t.flags[flag] = state;
+					callback(state);
+				elseif mode == "hold" then
+					state = true;
+					library_t.flags[flag] = state;
+					callback(state);
+				end;
+			end;
+		end;
+	end);
+
+	utility_t.connect(user_input_service.InputEnded, function(input)
+		if not index_mode and current_key and mode == "hold" then
+			local should_release = false;
+			
+			if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == current_key then
+				should_release = true;
+			elseif input.UserInputType == current_key then
+				should_release = true;
+			end;
+			
+			if should_release then
+				state = false;
+				library_t.flags[flag] = state;
+				callback(state);
+			end;
+		end;
+	end);
+end;
+```
+
+## Key Fixes:
+
+1. **Fixed `set_key` function** - Now properly handles both `EnumItem` (when setting programmatically) and `string` (when loading from config)
+
+2. **Fixed Escape key handling** - Now properly cancels selection and restores the previous key instead of clearing it
+
+3. **Fixed key trigger logic** - Separated the selection logic from the trigger logic to prevent conflicts
+
+4. **Fixed config saving/loading** - The `save_flags` function now properly converts string keys back to Enum values
+
+## Full Fixed Library:
+
+Here's the complete fixed library you should upload to your GitHub:
+
+```lua
 if getgenv and getgenv().unload_ui then
 	getgenv().unload_ui();
 end;
@@ -620,194 +826,189 @@ local library_t = {
 		end;
 
 		local create_keybind = function(self, properties, label, is_toggle)
-	local name = properties and properties.name or "keybind";
-	local default = properties and properties.default or nil;
-	local flag = properties and properties.flag or name;
-	local callback = properties and properties.callback or function(...) end;
-	local index_mode = properties and properties.index_mode or false;
-	local mode = properties and properties.mode or "toggle";
+			local name = properties and properties.name or "keybind";
+			local default = properties and properties.default or nil;
+			local flag = properties and properties.flag or name;
+			local callback = properties and properties.callback or function(...) end;
+			local index_mode = properties and properties.index_mode or false;
+			local mode = properties and properties.mode or "toggle";
 
-	library_t.flags[flag] = index_mode and default or false;
-	local current_key = default;
-	self.lib.base.key_flags[flag] = default;
-	local is_selecting = false;
-	local state = false;
+			library_t.flags[flag] = index_mode and default or false;
+			local current_key = default;
+			self.lib.base.key_flags[flag] = default;
+			local is_selecting = false;
+			local state = false;
 
-	local keybind_frame = utility_t.new_instance("Frame", {
-		Parent = label,
-		Position = UDim2.new(1, -10, 0, 0),
-		Size = UDim2.new(0, 0, 0, 0),
-		BackgroundTransparency = 1,
-		BorderSizePixel = 0,
-	});
+			local keybind_frame = utility_t.new_instance("Frame", {
+				Parent = label,
+				Position = UDim2.new(1, -10, 0, 0),
+				Size = UDim2.new(0, 0, 0, 0),
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+			});
 
-	local keybind_text = utility_t.new_instance("TextLabel", {
-		Parent = keybind_frame,
-		Position = UDim2.new(0, 1, 0, 0),
-		Size = UDim2.new(1, 0, 1, 0),
-		BackgroundTransparency = 1,
-		BorderSizePixel = 0,
-		ZIndex = 2,
-		TextColor3 = library_t.theme.text_color,
-		TextSize = library_t.font_size,
-		Text = default and default.Name:lower() or "none",
-		FontFace = library_t.font,
-	});
+			local keybind_text = utility_t.new_instance("TextLabel", {
+				Parent = keybind_frame,
+				Position = UDim2.new(0, 1, 0, 0),
+				Size = UDim2.new(1, 0, 1, 0),
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				ZIndex = 2,
+				TextColor3 = library_t.theme.text_color,
+				TextSize = library_t.font_size,
+				Text = default and default.Name:lower() or "none",
+				FontFace = library_t.font,
+			});
 
-	local shadow = utility_t.new_instance("TextLabel", {
-		Parent = keybind_text,
-		Size = UDim2.new(1, 0, 1, 0),
-		Position = UDim2.new(0, 1, 0, 1),
-		ZIndex = 1,
-		FontFace = library_t.font,
-		TextSize = library_t.font_size,
-		BackgroundTransparency = 1,
-		TextColor3 = Color3.fromRGB(0, 0, 0),
-		Text = default and default.Name:lower() or "none",
-		BorderSizePixel = 0
-	});
+			local shadow = utility_t.new_instance("TextLabel", {
+				Parent = keybind_text,
+				Size = UDim2.new(1, 0, 1, 0),
+				Position = UDim2.new(0, 1, 0, 1),
+				ZIndex = 1,
+				FontFace = library_t.font,
+				TextSize = library_t.font_size,
+				BackgroundTransparency = 1,
+				TextColor3 = Color3.fromRGB(0, 0, 0),
+				Text = default and default.Name:lower() or "none",
+				BorderSizePixel = 0
+			});
 
-	local keybind_button, pressed_signal = utility_t.new_button({
-		Parent = keybind_frame,
-		Position = UDim2.new(0, 0, 0, 0),
-		Size = UDim2.new(1, 0, 1, 0),
-		BackgroundTransparency = 1,
-		BorderSizePixel = 0,
-		TextTransparency = 1
-	});
+			local keybind_button, pressed_signal = utility_t.new_button({
+				Parent = keybind_frame,
+				Position = UDim2.new(0, 0, 0, 0),
+				Size = UDim2.new(1, 0, 1, 0),
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				TextTransparency = 1
+			});
 
-	local update_pos = function()
-		local text_size = keybind_text.TextBounds;
-		keybind_frame.Size = UDim2.new(0, text_size.X + 9, 0, 10);
-		keybind_frame.Position = UDim2.new(1, -text_size.X - 4, 0, 0);
-	end;
-
-	local set_key = function(key)
-		if key then
-			local key_enum = nil;
-			
-			-- Handle if key is already an Enum
-			if typeof(key) == "EnumItem" then
-				key_enum = key;
-			-- Handle if key is a string (from config loading)
-			elseif type(key) == "string" then
-				key_enum = Enum.KeyCode[key] or Enum.UserInputType[key] or nil;
+			local update_pos = function()
+				local text_size = keybind_text.TextBounds;
+				keybind_frame.Size = UDim2.new(0, text_size.X + 9, 0, 10);
+				keybind_frame.Position = UDim2.new(1, -text_size.X - 4, 0, 0);
 			end;
-			
-			if key_enum then
-				current_key = key_enum;
-				keybind_text.Text = key_enum.Name:lower();
-				shadow.Text = key_enum.Name:lower();
-				self.lib.base.key_flags[flag] = key_enum;
-				
-				if index_mode then
-					library_t.flags[flag] = key_enum;
+
+			local set_key = function(key)
+				if key then
+					local key_enum = nil;
+					
+					if typeof(key) == "EnumItem" then
+						key_enum = key;
+					elseif type(key) == "string" then
+						key_enum = Enum.KeyCode[key] or Enum.UserInputType[key] or nil;
+					end;
+					
+					if key_enum then
+						current_key = key_enum;
+						keybind_text.Text = key_enum.Name:lower();
+						shadow.Text = key_enum.Name:lower();
+						self.lib.base.key_flags[flag] = key_enum;
+						
+						if index_mode then
+							library_t.flags[flag] = key_enum;
+						else
+							library_t.flags[flag] = false;
+						end;
+						
+						update_pos();
+						callback(key_enum);
+					end;
 				else
-					library_t.flags[flag] = false;
-				end;
-				
-				update_pos();
-				callback(key_enum);
-			end;
-		else
-			current_key = nil;
-			keybind_text.Text = "none";
-			shadow.Text = "none";
-			self.lib.base.key_flags[flag] = nil;
-			
-			if index_mode then
-				library_t.flags[flag] = nil;
-			else
-				library_t.flags[flag] = false;
-			end;
-			
-			update_pos();
-			callback(nil);
-		end;
-	end;
-
-	self.lib.base.save_flags[flag] = set_key;
-
-	update_pos();
-
-	utility_t.connect(pressed_signal, function()
-		if not is_selecting and self.lib.base.current_tab == self.tab and utility_t.is_in_main_frame(keybind_button, self.main_frame) then
-			is_selecting = true;
-			keybind_text.Text = "...";
-			shadow.Text = "...";
-			update_pos();
-		end;
-	end);
-
-	utility_t.connect(user_input_service.InputBegan, function(input)
-		-- Cancel selection with Escape
-		if is_selecting and input.KeyCode == Enum.KeyCode.Escape then
-			is_selecting = false;
-			keybind_text.Text = current_key and current_key.Name:lower() or "none";
-			shadow.Text = current_key and current_key.Name:lower() or "none";
-			update_pos();
-			return;
-		end;
-
-		-- Select new key
-		if is_selecting then
-			local key = nil;
-			
-			if input.UserInputType == Enum.UserInputType.Keyboard then
-				key = input.KeyCode;
-			elseif input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.MouseButton2 then
-				key = input.UserInputType;
-			end;
-			
-			if key then
-				is_selecting = false;
-				set_key(key);
-			end;
-			return;
-		end;
-
-		-- Trigger keybind action (only for non-index mode)
-		if not is_selecting and not index_mode and current_key then
-			local should_trigger = false;
-			
-			if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == current_key then
-				should_trigger = true;
-			elseif input.UserInputType == current_key then
-				should_trigger = true;
-			end;
-			
-			if should_trigger then
-				if mode == "toggle" then
-					state = not state;
-					library_t.flags[flag] = state;
-					callback(state);
-				elseif mode == "hold" then
-					state = true;
-					library_t.flags[flag] = state;
-					callback(state);
+					current_key = nil;
+					keybind_text.Text = "none";
+					shadow.Text = "none";
+					self.lib.base.key_flags[flag] = nil;
+					
+					if index_mode then
+						library_t.flags[flag] = nil;
+					else
+						library_t.flags[flag] = false;
+					end;
+					
+					update_pos();
+					callback(nil);
 				end;
 			end;
-		end;
-	end);
 
-	utility_t.connect(user_input_service.InputEnded, function(input)
-		if not index_mode and current_key and mode == "hold" then
-			local should_release = false;
-			
-			if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == current_key then
-				should_release = true;
-			elseif input.UserInputType == current_key then
-				should_release = true;
-			end;
-			
-			if should_release then
-				state = false;
-				library_t.flags[flag] = state;
-				callback(state);
-			end;
+			self.lib.base.save_flags[flag] = set_key;
+
+			update_pos();
+
+			utility_t.connect(pressed_signal, function()
+				if not is_selecting and self.lib.base.current_tab == self.tab and utility_t.is_in_main_frame(keybind_button, self.main_frame) then
+					is_selecting = true;
+					keybind_text.Text = "...";
+					shadow.Text = "...";
+					update_pos();
+				end;
+			end);
+
+			utility_t.connect(user_input_service.InputBegan, function(input)
+				if is_selecting and input.KeyCode == Enum.KeyCode.Escape then
+					is_selecting = false;
+					keybind_text.Text = current_key and current_key.Name:lower() or "none";
+					shadow.Text = current_key and current_key.Name:lower() or "none";
+					update_pos();
+					return;
+				end;
+
+				if is_selecting then
+					local key = nil;
+					
+					if input.UserInputType == Enum.UserInputType.Keyboard then
+						key = input.KeyCode;
+					elseif input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.MouseButton2 then
+						key = input.UserInputType;
+					end;
+					
+					if key then
+						is_selecting = false;
+						set_key(key);
+					end;
+					return;
+				end;
+
+				if not is_selecting and not index_mode and current_key then
+					local should_trigger = false;
+					
+					if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == current_key then
+						should_trigger = true;
+					elseif input.UserInputType == current_key then
+						should_trigger = true;
+					end;
+					
+					if should_trigger then
+						if mode == "toggle" then
+							state = not state;
+							library_t.flags[flag] = state;
+							callback(state);
+						elseif mode == "hold" then
+							state = true;
+							library_t.flags[flag] = state;
+							callback(state);
+						end;
+					end;
+				end;
+			end);
+
+			utility_t.connect(user_input_service.InputEnded, function(input)
+				if not index_mode and current_key and mode == "hold" then
+					local should_release = false;
+					
+					if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == current_key then
+						should_release = true;
+					elseif input.UserInputType == current_key then
+						should_release = true;
+					end;
+					
+					if should_release then
+						state = false;
+						library_t.flags[flag] = state;
+						callback(state);
+					end;
+				end;
+			end);
 		end;
-	end);
-end;
 
 		library_t.watermark = function(self, name)
 			local screen_gui = utility_t.new_instance("ScreenGui", {
@@ -1211,7 +1412,6 @@ end;
 				local buttons = {};
 				local current_options = default;
 
-				-- Ensure current_options is proper type
 				if multi and type(current_options) ~= "table" then
 					current_options = {current_options};
 				end;
@@ -1557,7 +1757,7 @@ end;
 					Thickness = 1
 				});
 
-				utility_t.connect(user_input_service.InputBegan, function(input)
+								utility_t.connect(user_input_service.InputBegan, function(input)
 					if is_open and self.lib.base.is_open and input.UserInputType == Enum.UserInputType.MouseButton1 and not (utility_t.is_mouse_in_frame(dropdown_button) or utility_t.is_mouse_in_frame(dropdown_holder)) then
 						change_open(false);
 					end;
@@ -1618,7 +1818,7 @@ end;
 			section.keybind = function(self, properties)
 				local name = properties and properties.name or "keybind";
 				
-				local colorpicker_frame_holder = utility_t.new_instance("Frame", {
+				local keybind_frame_holder = utility_t.new_instance("Frame", {
 					Parent = self.content_frame,
 					Size = UDim2.new(1, 0, 0, 5),
 					BorderSizePixel = 0,
@@ -1626,7 +1826,7 @@ end;
 				});
 
 				local name_label = utility_t.new_instance("TextLabel", {
-					Parent = colorpicker_frame_holder,
+					Parent = keybind_frame_holder,
 					Position = UDim2.new(0, 30, 0, -3),
 					Size = UDim2.new(0, 9, 0, 12),
 					Text = name,
@@ -1654,7 +1854,7 @@ end;
 					BorderSizePixel = 0
 				});
 
-				create_keybind(self, properties, colorpicker_frame_holder, false);
+				create_keybind(self, properties, keybind_frame_holder, false);
 				
 				self.update_size();
 			end;
@@ -1741,7 +1941,7 @@ end;
 					ClearTextOnFocus = false
 				});
 
-								utility_t.connect(textbox:GetPropertyChangedSignal("Text"), function()
+				utility_t.connect(textbox:GetPropertyChangedSignal("Text"), function()
 					library_t.flags[flag] = textbox.Text;
 					callback(textbox.Text);
 				end);
