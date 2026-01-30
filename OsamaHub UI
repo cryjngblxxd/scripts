@@ -1,8 +1,4 @@
---[[
-    Avenir Library
-    -> Originally made by @finobe 
-    -> Modified with auto-load config, notification control, per-project configs
-]]
+
 
 -- Variables 
     local uis = game:GetService("UserInputService") 
@@ -751,6 +747,25 @@
             library["items"].Enabled = bool
             -- Notifications GUI stays visible regardless of menu state
         end 
+
+         
+        -- ADD THE FADE IN CODE HERE (right before return)
+        local fade_screen = library:create("Frame", {
+            Parent = library["items"],
+            Size = dim2(1, 0, 1, 0),
+            Position = dim2(0, 0, 0, 0),
+            BackgroundColor3 = rgb(0, 0, 0),
+            BackgroundTransparency = 0,
+            ZIndex = 100,
+            BorderSizePixel = 0,
+        })
+
+        task.spawn(function()
+            task.wait(0.1)
+            library:tween(fade_screen, {BackgroundTransparency = 1}, Enum.EasingStyle.Quad, 0.5)
+            task.wait(0.6)
+            fade_screen:Destroy()
+        end)
             
         return setmetatable(cfg, library)
     end 
