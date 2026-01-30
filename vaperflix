@@ -369,27 +369,28 @@
     end
 
     function library:refresh_configs()
-        local configs = {}
-        local path = library:get_config_path()
-        
-        local success, files = pcall(function()
-            return listfiles(path)
-        end)
-        
-        if success and files then
-            for _, file in ipairs(files) do
-                local name = file:match("([^/\\]+)$")
-                if name and name:match("%.json$") then
-                    insert(configs, name:gsub("%.json$", ""))
-                end
+    local configs = {}
+    local path = library:get_config_path()
+    
+    local success, files = pcall(function()
+        return listfiles(path)
+    end)
+    
+    if success and files then
+        for _, file in ipairs(files) do
+            local name = file:match("([^/\\]+)$")
+            if name and name:match("%.json$") then
+                local configName = name:gsub("%.json$", "")
+                table.insert(configs, configName)
             end
         end
-        
-        table.sort(configs)
-        library.config.list = configs
-        
-        return configs
     end
+    
+    table.sort(configs)
+    library.config.list = configs
+    
+    return configs
+end
 
     function library:save_config(name)
         if not name or name == "" then
