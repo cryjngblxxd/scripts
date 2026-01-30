@@ -1,3 +1,4 @@
+
 if getgenv and getgenv().unload_ui then
 	getgenv().unload_ui();
 end;
@@ -473,7 +474,7 @@ local library_t = {
 					Color = ColorSequence.new({
 						ColorSequenceKeypoint.new(0, default),
 						ColorSequenceKeypoint.new(1, utility_t.darken_color(default, 0.1))
-					});
+					})
 				});
 
 				transparency_slider_visualizer = utility_t.new_instance("Frame", {
@@ -1163,34 +1164,15 @@ local library_t = {
 				local default = properties and properties.default or (multi and {options[1]} or options[1]);
 
 				local is_open = false;
-				local option_buttons = {};
-				local current_options = multi and (type(default) == "table" and default or {default}) or default;
+				local buttons = {};
+				local current_options = default;
 
-				-- Helper function to check if option is selected
-				local function is_option_selected(option)
-					if multi then
-						return type(current_options) == "table" and table.find(current_options, option) ~= nil;
-					else
-						return current_options == option;
-					end;
+				-- Ensure current_options is proper type
+				if multi and type(current_options) ~= "table" then
+					current_options = {current_options};
 				end;
 
-				-- Helper function to get display text
-				local function get_display_text()
-					if multi then
-						if type(current_options) == "table" then
-							if #current_options == 0 then
-								return "none";
-							else
-								return table.concat(current_options, ", ");
-							end;
-						else
-							return tostring(current_options);
-						end;
-					else
-						return tostring(current_options);
-					end;
-				end;
+				library_t.flags[flag] = current_options;
 
 				local actual_dropdown_holder = utility_t.new_instance("Frame", {
 					Parent = self.content_frame,
@@ -1247,6 +1229,22 @@ local library_t = {
 					BorderSizePixel = 0,
 				});
 
+				local function get_display_text()
+					if multi then
+						if type(current_options) == "table" then
+							if #current_options == 0 then
+								return "none";
+							else
+								return table.concat(current_options, ", ");
+							end;
+						else
+							return tostring(current_options);
+						end;
+					else
+						return tostring(current_options);
+					end;
+				end;
+
 				local selected_text = utility_t.new_instance("TextLabel", {
 					Parent = dropdown_frame,
 					BackgroundTransparency = 1,
@@ -1301,6 +1299,8 @@ local library_t = {
 					dropdown_holder.Size = UDim2.new(0, 0, 0, ui_list_layout.AbsoluteContentSize.Y + 8);
 				end;
 
+				local dropdown_object = {};
+
 				local update_display = function()
 					selected_text.Text = get_display_text();
 					shadow.Text = selected_text.Text;
@@ -1321,11 +1321,19 @@ local library_t = {
 
 					update_display();
 
-					for option, button in option_buttons do
-						if is_option_selected(option) then
-							button.TextColor3 = library_t.theme.accent;
+					for option, button in pairs(buttons) do
+						if multi then
+							if type(current_options) == "table" and table.find(current_options, option) then
+								button.TextColor3 = library_t.theme.accent;
+							else
+								button.TextColor3 = library_t.theme.text_color;
+							end;
 						else
-							button.TextColor3 = library_t.theme.text_color;
+							if option == current_options then
+								button.TextColor3 = library_t.theme.accent;
+							else
+								button.TextColor3 = library_t.theme.text_color;
+							end;
 						end;
 					end;
 
@@ -1334,8 +1342,6 @@ local library_t = {
 				end;
 
 				self.lib.base.save_flags[flag] = set;
-
-				local dropdown_object = {};
 
 				local change_open = function(state)
 					is_open = state;
@@ -1350,6 +1356,7 @@ local library_t = {
 						local absolute_size = dropdown_button.AbsoluteSize;
 
 						dropdown_holder.Visible = true;
+
 						dropdown_holder.Size = UDim2.new(dropdown_holder.Size.X.Scale, absolute_size.X, dropdown_holder.Size.Y.Scale, dropdown_holder.Size.Y.Offset);
 						dropdown_holder.Position = UDim2.new(0, dropdown_button.AbsolutePosition.X, 0, dropdown_button.AbsolutePosition.Y + 23);
 					else
@@ -1361,6 +1368,13 @@ local library_t = {
 				dropdown_object.change_open = change_open;
 
 				local create_option = function(option)
+					local is_selected = false;
+					if multi then
+						is_selected = type(current_options) == "table" and table.find(current_options, option) ~= nil;
+					else
+						is_selected = current_options == option;
+					end;
+
 					local option_button, pressed_option = utility_t.new_button({
 						Parent = dropdown_padding,
 						Position = UDim2.new(0, 0, 0, 4),
@@ -1370,7 +1384,7 @@ local library_t = {
 						ZIndex = 100,
 						FontFace = library_t.font,
 						TextSize = library_t.font_size,
-						TextColor3 = is_option_selected(option) and library_t.theme.accent or library_t.theme.text_color,
+						TextColor3 = is_selected and library_t.theme.accent or library_t.theme.text_color,
 						TextXAlignment = Enum.TextXAlignment.Left,
 						TextYAlignment = Enum.TextYAlignment.Center,
 						Text = option
@@ -1391,7 +1405,7 @@ local library_t = {
 						BorderSizePixel = 0
 					});
 
-					option_buttons[option] = option_button;
+					buttons[option] = option_button;
 
 					utility_t.connect(pressed_option, function()
 						if self.lib.base.current_tab == self.tab and is_open then
@@ -1399,7 +1413,7 @@ local library_t = {
 								if type(current_options) ~= "table" then
 									current_options = {};
 								end;
-								
+
 								local index = table.find(current_options, option);
 								if index then
 									if not (no_none and #current_options == 1) then
@@ -1415,7 +1429,7 @@ local library_t = {
 								library_t.flags[flag] = current_options;
 								callback(current_options);
 							else
-								for _, button in option_buttons do
+								for _, button in pairs(buttons) do
 									button.TextColor3 = library_t.theme.text_color;
 								end;
 
@@ -1424,6 +1438,7 @@ local library_t = {
 								callback(current_options);
 								option_button.TextColor3 = library_t.theme.accent;
 								update_display();
+
 								change_open(false);
 							end;
 						end;
@@ -1432,43 +1447,40 @@ local library_t = {
 					update_size();
 				end;
 
-				for i, option in options do
+				for i, option in ipairs(options) do
 					create_option(option);
 				end;
 
-				-- Refresh dropdown options
 				dropdown_object.refresh = function(new_options)
-					-- Clear existing buttons
-					for option, button in option_buttons do
+					for option, button in pairs(buttons) do
 						button:Destroy();
 					end;
-					option_buttons = {};
-					
+					buttons = {};
+
 					options = new_options;
-					
-					-- Create new options
-					for i, option in new_options do
+
+					for i, option in ipairs(new_options) do
 						create_option(option);
 					end;
-					
-					-- Reset selection if current is not in new options
+
 					if multi then
-						if type(current_options) ~= "table" then
+						if type(current_options) == "table" then
+							local valid_options = {};
+							for _, opt in ipairs(current_options) do
+								if table.find(new_options, opt) then
+									table.insert(valid_options, opt);
+								end;
+							end;
+							current_options = valid_options;
+						else
 							current_options = {};
 						end;
-						local valid_options = {};
-						for _, opt in ipairs(current_options) do
-							if table.find(new_options, opt) then
-								table.insert(valid_options, opt);
-							end;
-						end;
-						current_options = valid_options;
 					else
 						if not table.find(new_options, current_options) then
 							current_options = new_options[1] or "none";
 						end;
 					end;
-					
+
 					update_display();
 					library_t.flags[flag] = current_options;
 				end;
@@ -1514,7 +1526,7 @@ local library_t = {
 				end);
 
 				self.update_size();
-				
+
 				return dropdown_object;
 			end;
 
@@ -1555,6 +1567,8 @@ local library_t = {
 				});
 
 				create_colorpicker(self, properties, colorpicker_frame_holder, false);
+				
+				self.update_size();
 			end;
 
 			section.keybind = function(self, properties)
@@ -1597,6 +1611,8 @@ local library_t = {
 				});
 
 				create_keybind(self, properties, colorpicker_frame_holder, false);
+				
+				self.update_size();
 			end;
 
 			section.textbox = function(self, properties)
@@ -1681,7 +1697,7 @@ local library_t = {
 					ClearTextOnFocus = false
 				});
 
-				utility_t.connect(textbox:GetPropertyChangedSignal("Text"), function()
+								utility_t.connect(textbox:GetPropertyChangedSignal("Text"), function()
 					library_t.flags[flag] = textbox.Text;
 					callback(textbox.Text);
 				end);
@@ -1691,6 +1707,8 @@ local library_t = {
 					library_t.flags[flag] = value;
 					callback(value);
 				end;
+				
+				self.update_size();
 			end;
 
 			section.button = function(self, properties)
@@ -1735,6 +1753,8 @@ local library_t = {
 						callback();
 					end;
 				end);
+				
+				self.update_size();
 			end;
 		end;
 
@@ -2264,7 +2284,6 @@ local library_t = {
 			main_library.tab_padding = tab_padding;
 			main_library.main_frame = main_frame;
 			
-			-- Set project name
 			main_library:set_project(project);
 
 			utility_t.connect(user_input_service.InputBegan, function(input)
@@ -2297,7 +2316,7 @@ local library_t = {
 		library_t.create_config = function(self)
 			local cfg = {};
 
-			for flag, value in library_t.flags do
+			for flag, value in pairs(library_t.flags) do
 				if not self.base.key_flags[flag] then
 					cfg[flag] = value;
 
@@ -2307,7 +2326,7 @@ local library_t = {
 				end;
 			end;
 
-			for flag, value in self.base.key_flags do
+			for flag, value in pairs(self.base.key_flags) do
 				if value then
 					cfg[flag] = value.Name;
 				end;
@@ -2321,15 +2340,17 @@ local library_t = {
 				return http_service:JSONDecode(cfg);
 			end);
 			
-			if success and actual_cfg then
-				for flag, value in actual_cfg do
-					if self.base.save_flags[flag] then
-						pcall(function()
-							self.base.save_flags[flag](value);
-						end);
-					end;
+			if not success then
+				return false;
+			end;
+
+			for flag, value in pairs(actual_cfg) do
+				if self.base.save_flags[flag] then
+					self.base.save_flags[flag](value);
 				end;
 			end;
+			
+			return true;
 		end;
 
 		library_t.save_config = function(self, config_name)
@@ -2341,8 +2362,7 @@ local library_t = {
 		library_t.load_config_by_name = function(self, config_name)
 			local path = self:get_config_path() .. "/" .. config_name .. ".json";
 			if isfile(path) then
-				self:load_config(readfile(path));
-				return true;
+				return self:load_config(readfile(path));
 			end;
 			return false;
 		end;
