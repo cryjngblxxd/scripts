@@ -393,37 +393,49 @@
 end
 
     function library:save_config(name)
-        if not name or name == "" then
-            notifications:create_notification({name = "Please enter a config name"})
-            return false
-        end
-        
-        local path = library:get_config_path() .. "/" .. name .. ".json"
-        local data = {}
-        
-        for flag, value in pairs(flags) do
-            if type(value) == "table" and value.key then
-                data[flag] = {active = value.active, mode = value.mode, key = tostring(value.key)}
-            elseif type(value) == "table" and value["Transparency"] and value["Color"] then
-                data[flag] = {Transparency = value["Transparency"], Color = value["Color"]:ToHex()}
-            else
+    if not name or name == "" then
+        notifications:create_notification({name = "Please enter a config name"})
+        return false
+    end
+    
+    local path = library:get_config_path() .. "/" .. name .. ".json"
+    local data = {}
+    
+    for flag, value in pairs(flags) do
+        if type(value) == "table" and value.key then
+            data[flag] = {active = value.active, mode = value.mode, key = tostring(value.key)}
+        elseif type(value) == "table" and value["Transparency"] and value["Color"] then
+            data[flag] = {Transparency = value["Transparency"], Color = value["Color"]:ToHex()}
+        elseif type(value) ~= "table" then
+            data[flag] = value
+        else
+            -- Handle other table types
+            local canSerialize = true
+            for k, v in pairs(value) do
+                if type(v) == "function" or type(v) == "userdata" then
+                    canSerialize = false
+                    break
+                end
+            end
+            if canSerialize then
                 data[flag] = value
             end
         end
-        
-        local success, err = pcall(function()
-            writefile(path, http_service:JSONEncode(data))
-        end)
-        
-        if success then
-            notifications:create_notification({name = "Config saved: " .. name})
-            library:refresh_configs()
-            return true
-        else
-            notifications:create_notification({name = "Failed to save config"})
-            return false
-        end
     end
+    
+    local success, err = pcall(function()
+        writefile(path, http_service:JSONEncode(data))
+    end)
+    
+    if success then
+        notifications:create_notification({name = "Config saved: " .. name})
+        library:refresh_configs()
+        return true
+    else
+        notifications:create_notification({name = "Failed to save config"})
+        return false
+    end
+end
 
     function library:load_config(name)
         if not name or name == "" then
