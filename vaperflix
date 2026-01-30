@@ -360,15 +360,16 @@
     end
 
     -- CONFIG SYSTEM
-    function library:get_config_path()
-        return library.directory .. "/configs/" .. tostring(game.PlaceId)
-    end
-    
-    function library:get_autoload_path()
-        return library:get_config_path() .. "/autoload.txt"
-    end
+    -- CONFIG SYSTEM FUNCTIONS (FIXED)
+function library:get_config_path()
+    return library.directory .. "/configs/" .. tostring(game.PlaceId)
+end
 
-    function library:refresh_configs()
+function library:get_autoload_path()
+    return library:get_config_path() .. "/autoload.txt"
+end
+
+function library:refresh_configs()
     local configs = {}
     local path = library:get_config_path()
     
@@ -377,11 +378,12 @@
     end)
     
     if success and files then
-        for _, file in ipairs(files) do
+        for i = 1, #files do
+            local file = files[i]
             local name = file:match("([^/\\]+)$")
             if name and name:match("%.json$") then
-                local configName = name:gsub("%.json$", "")
-                table.insert(configs, configName)
+                local configName = string.gsub(name, "%.json$", "")
+                configs[#configs + 1] = configName
             end
         end
     end
@@ -392,11 +394,27 @@
     return configs
 end
 
-    function library:save_config(name)
+function library:notify(message)
+    -- Safe notification wrapper
+    if notifications and notifications.create_notification then
+        notifications:create_notification({name = message})
+    else
+        print("[Notification]:", message)
+    end
+end
+
+function library:save_config(name)
     if not name or name == "" then
-        notifications:create_notification({name = "Please enter a config name"})
+        library:notify("Please enter a config name")
         return false
     end
+    
+    -- Ensure folder exists
+    pcall(function()
+        if not isfolder(library:get_config_path()) then
+            makefolder(library:get_config_path())
+        end
+    end)
     
     local path = library:get_config_path() .. "/" .. name .. ".json"
     local data = {}
@@ -404,15 +422,14 @@ end
     for flag, value in pairs(flags) do
         if type(value) == "table" and value.key then
             data[flag] = {active = value.active, mode = value.mode, key = tostring(value.key)}
-        elseif type(value) == "table" and value["Transparency"] and value["Color"] then
+        elseif type(value) == "table" and value["Transparency"] ~= nil and value["Color"] then
             data[flag] = {Transparency = value["Transparency"], Color = value["Color"]:ToHex()}
         elseif type(value) ~= "table" then
             data[flag] = value
-        else
-            -- Handle other table types
+        elseif type(value) == "table" then
             local canSerialize = true
             for k, v in pairs(value) do
-                if type(v) == "function" or type(v) == "userdata" then
+                if type(v) == "function" or type(v) == "userdata" or type(v) == "thread" then
                     canSerialize = false
                     break
                 end
@@ -428,142 +445,164 @@ end
     end)
     
     if success then
-        notifications:create_notification({name = "Config saved: " .. name})
+        library:notify("Config saved: " .. name)
         library:refresh_configs()
         return true
     else
-        notifications:create_notification({name = "Failed to save config"})
+        library:notify("Failed to save config")
         return false
     end
 end
 
-    function library:load_config(name)
-        if not name or name == "" then
-            notifications:create_notification({name = "Please select a config"})
-            return false
-        end
+function library:load_config(name)
+    if not name or name == "" then
+        library:notify("Please select a config")
+        return false
+    end
+    
+    local path = library:get_config_path() .. "/" .. name .. ".json"
+    
+    if not isfile(path) then
+        library:notify("Config not found: " .. name)
+        return false
+    end
+    
+    local success, err = pcall(function()
+        local content = readfile(path)
+        local data = http_service:JSONDecode(content)
         
-        local path = library:get_config_path() .. "/" .. name .. ".json"
-        
-        if not isfile(path) then
-            notifications:create_notification({name = "Config not found: " .. name})
-            return false
-        end
-        
-        local success, err = pcall(function()
-            local content = readfile(path)
-            local data = http_service:JSONDecode(content)
+        for flag, value in pairs(data) do
+            local setter = config_flags[flag]
             
-            for flag, value in pairs(data) do
-                local setter = config_flags[flag]
-                
-                if setter then
-                    if type(value) == "table" and value["Transparency"] and value["Color"] then
-                        setter(hex(value["Color"]), value["Transparency"])
-                    elseif type(value) == "table" and value["active"] ~= nil then
-                        setter(value)
-                    else
-                        setter(value)
-                    end
+            if setter then
+                if type(value) == "table" and value["Transparency"] ~= nil and value["Color"] then
+                    setter(hex(value["Color"]), value["Transparency"])
+                elseif type(value) == "table" and value["active"] ~= nil then
+                    setter(value)
+                else
+                    setter(value)
                 end
             end
-        end)
-        
-        if success then
-            notifications:create_notification({name = "Config loaded: " .. name})
-            return true
-        else
-            notifications:create_notification({name = "Failed to load config"})
-            return false
         end
+    end)
+    
+    if success then
+        library:notify("Config loaded: " .. name)
+        return true
+    else
+        library:notify("Failed to load config")
+        return false
     end
+end
 
-    function library:delete_config(name)
-        if not name or name == "" then
-            notifications:create_notification({name = "Please select a config"})
-            return false
-        end
-        
-        local path = library:get_config_path() .. "/" .. name .. ".json"
-        
-        if not isfile(path) then
-            notifications:create_notification({name = "Config not found: " .. name})
-            return false
-        end
-        
-        local success = pcall(function()
-            delfile(path)
-        end)
-        
-        if success then
-            if library:get_autoload() == name then
-                library:remove_autoload()
-            end
-            
-            notifications:create_notification({name = "Config deleted: " .. name})
-            library:refresh_configs()
-            return true
-        else
-            notifications:create_notification({name = "Failed to delete config"})
-            return false
-        end
+function library:delete_config(name)
+    if not name or name == "" then
+        library:notify("Please select a config")
+        return false
     end
+    
+    local path = library:get_config_path() .. "/" .. name .. ".json"
+    
+    if not isfile(path) then
+        library:notify("Config not found: " .. name)
+        return false
+    end
+    
+    local success = pcall(function()
+        delfile(path)
+    end)
+    
+    if success then
+        if library:get_autoload() == name then
+            library:remove_autoload()
+        end
+        
+        library:notify("Config deleted: " .. name)
+        library:refresh_configs()
+        return true
+    else
+        library:notify("Failed to delete config")
+        return false
+    end
+end
 
-    function library:get_autoload()
-        local path = library:get_autoload_path()
+function library:get_autoload()
+    local path = library:get_autoload_path()
+    local success, content = pcall(function()
         if isfile(path) then
             return readfile(path)
         end
         return nil
+    end)
+    if success then
+        return content
     end
+    return nil
+end
 
-    function library:set_autoload(name)
-        if not name or name == "" then
-            notifications:create_notification({name = "Please select a config"})
-            return false
-        end
-        
-        local success = pcall(function()
-            writefile(library:get_autoload_path(), name)
-        end)
-        
-        if success then
-            library.config.autoload = name
-            notifications:create_notification({name = "Autoload set: " .. name})
-            return true
-        else
-            notifications:create_notification({name = "Failed to set autoload"})
-            return false
-        end
-    end
-
-    function library:remove_autoload()
-        local path = library:get_autoload_path()
-        if isfile(path) then
-            pcall(function()
-                delfile(path)
-            end)
-            library.config.autoload = nil
-            notifications:create_notification({name = "Autoload removed"})
-            return true
-        else
-            notifications:create_notification({name = "No autoload set"})
-            return false
-        end
-    end
-
-    function library:run_autoload()
-        local autoload = library:get_autoload()
-        if autoload then
-            library:refresh_configs()
-            if find(library.config.list, autoload) then
-                task.wait(0.3)
-                library:load_config(autoload)
-                return true
-            end
-        end
+function library:set_autoload(name)
+    if not name or name == "" then
+        library:notify("Please select a config")
         return false
     end
+    
+    -- Ensure folder exists
+    pcall(function()
+        if not isfolder(library:get_config_path()) then
+            makefolder(library:get_config_path())
+        end
+    end)
+    
+    local success = pcall(function()
+        writefile(library:get_autoload_path(), name)
+    end)
+    
+    if success then
+        library.config.autoload = name
+        library:notify("Autoload set: " .. name)
+        return true
+    else
+        library:notify("Failed to set autoload")
+        return false
+    end
+end
+
+function library:remove_autoload()
+    local path = library:get_autoload_path()
+    local exists = pcall(function() return isfile(path) end)
+    
+    if exists and isfile(path) then
+        pcall(function()
+            delfile(path)
+        end)
+        library.config.autoload = nil
+        library:notify("Autoload removed")
+        return true
+    else
+        library:notify("No autoload set")
+        return false
+    end
+end
+
+function library:run_autoload()
+    local autoload = library:get_autoload()
+    if autoload and autoload ~= "" then
+        library:refresh_configs()
+        local found = false
+        for _, cfg in ipairs(library.config.list) do
+            if cfg == autoload then
+                found = true
+                break
+            end
+        end
+        if found then
+            task.wait(0.3)
+            library:load_config(autoload)
+            return true
+        end
+    end
+    return false
+end
 
     local config_holder
     function library:update_config_list() 
