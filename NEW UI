@@ -195,7 +195,6 @@ local library_t = {
 			local main_frame_position = main_frame.AbsolutePosition;
 			local main_frame_size = main_frame.AbsoluteSize;
 
-
 			return frame_position.X >= main_frame_position.X and frame_position.X + frame_size.X <= main_frame_position.X + main_frame_size.X and frame_position.Y >= main_frame_position.Y and frame_position.Y + frame_size.Y <= main_frame_position.Y + main_frame_size.Y;
 		end;
 
@@ -685,8 +684,8 @@ local library_t = {
 			self.lib.base.save_flags[flag] = function(key_string)
 				if key_string then
 					is_selecting = false;
-					keybind_text.Text = key_string:lower();
-					shadow.Text = key_string:lower();
+					keybind_text.Text = tostring(key_string):lower();
+					shadow.Text = tostring(key_string):lower();
 					update_pos();
 					current_key = (Enum.KeyCode[key_string] or Enum.UserInputType[key_string]) or nil;
 					if index_mode then
@@ -1161,11 +1160,37 @@ local library_t = {
 				local multi = properties and properties.multi or false;
 				local flag = properties and properties.flag or name;
 				local no_none = properties and properties.no_none or false;
-				local default = properties and properties.default or multi and {options[1]} or options[1];
+				local default = properties and properties.default or (multi and {options[1]} or options[1]);
 
 				local is_open = false;
-				local buttons = {};
-				local current_options = default;
+				local option_buttons = {};
+				local current_options = multi and (type(default) == "table" and default or {default}) or default;
+
+				-- Helper function to check if option is selected
+				local function is_option_selected(option)
+					if multi then
+						return type(current_options) == "table" and table.find(current_options, option) ~= nil;
+					else
+						return current_options == option;
+					end;
+				end;
+
+				-- Helper function to get display text
+				local function get_display_text()
+					if multi then
+						if type(current_options) == "table" then
+							if #current_options == 0 then
+								return "none";
+							else
+								return table.concat(current_options, ", ");
+							end;
+						else
+							return tostring(current_options);
+						end;
+					else
+						return tostring(current_options);
+					end;
+				end;
 
 				local actual_dropdown_holder = utility_t.new_instance("Frame", {
 					Parent = self.content_frame,
@@ -1225,7 +1250,7 @@ local library_t = {
 				local selected_text = utility_t.new_instance("TextLabel", {
 					Parent = dropdown_frame,
 					BackgroundTransparency = 1,
-					Text = type(current_options) == "table" and (#current_options == 0 and no_none and "none" or table.concat(current_options, ", ")) or current_options,
+					Text = get_display_text(),
 					TextColor3 = library_t.theme.text_color,
 					ZIndex = 2,
 					Position = UDim2.new(0, 7, 0, 7),
@@ -1276,23 +1301,36 @@ local library_t = {
 					dropdown_holder.Size = UDim2.new(0, 0, 0, ui_list_layout.AbsoluteContentSize.Y + 8);
 				end;
 
-				local set = function(options)
-					current_options = options;
-					selected_text.Text = type(options) == "table" and ((#options == 0 and "none") or table.concat(options, ", ")) or options;
+				local update_display = function()
+					selected_text.Text = get_display_text();
 					shadow.Text = selected_text.Text;
+					local text_bounds = selected_text.TextBounds;
+					selected_text.Position = UDim2.new(0, text_bounds.X / 2 + 5, 0, 7);
+				end;
 
-					for option, button in buttons do
-						if multi and table.find(options, option) then
-							button.TextColor3 = library_t.theme.accent;
-						elseif not multi and option == options then
+				local set = function(new_options)
+					if multi then
+						if type(new_options) == "table" then
+							current_options = new_options;
+						else
+							current_options = {new_options};
+						end;
+					else
+						current_options = new_options;
+					end;
+
+					update_display();
+
+					for option, button in option_buttons do
+						if is_option_selected(option) then
 							button.TextColor3 = library_t.theme.accent;
 						else
 							button.TextColor3 = library_t.theme.text_color;
-						end
+						end;
 					end;
 
-					library_t.flags[flag] = options;
-					callback(options);
+					library_t.flags[flag] = current_options;
+					callback(current_options);
 				end;
 
 				self.lib.base.save_flags[flag] = set;
@@ -1302,22 +1340,20 @@ local library_t = {
 				local change_open = function(state)
 					is_open = state;
 
-					self.lib.base.current_dropdown = dropdown_object;
-
 					if is_open then
 						if self.lib.base.current_dropdown and self.lib.base.current_dropdown ~= dropdown_object then
 							self.lib.base.current_dropdown.change_open(false);
-							return;
-						end
+						end;
+
+						self.lib.base.current_dropdown = dropdown_object;
 
 						local absolute_size = dropdown_button.AbsoluteSize;
 
 						dropdown_holder.Visible = true;
-
 						dropdown_holder.Size = UDim2.new(dropdown_holder.Size.X.Scale, absolute_size.X, dropdown_holder.Size.Y.Scale, dropdown_holder.Size.Y.Offset);
 						dropdown_holder.Position = UDim2.new(0, dropdown_button.AbsolutePosition.X, 0, dropdown_button.AbsolutePosition.Y + 23);
 					else
-						self.lib.base.current_dropdown = nil
+						self.lib.base.current_dropdown = nil;
 						dropdown_holder.Visible = false;
 					end;
 				end;
@@ -1334,7 +1370,7 @@ local library_t = {
 						ZIndex = 100,
 						FontFace = library_t.font,
 						TextSize = library_t.font_size,
-						TextColor3 = multi and table.find(current_options, option) and library_t.theme.accent or current_options == option and library_t.theme.accent or library_t.theme.text_color,
+						TextColor3 = is_option_selected(option) and library_t.theme.accent or library_t.theme.text_color,
 						TextXAlignment = Enum.TextXAlignment.Left,
 						TextYAlignment = Enum.TextYAlignment.Center,
 						Text = option
@@ -1355,45 +1391,41 @@ local library_t = {
 						BorderSizePixel = 0
 					});
 
-					buttons[option] = option_button;
+					option_buttons[option] = option_button;
 
 					utility_t.connect(pressed_option, function()
 						if self.lib.base.current_tab == self.tab and is_open then
 							if multi then
-								local index = table.find(current_options, option);
-								if index and (not (#current_options == 1 and no_none)) then
-									table.remove(current_options, index);
-									option_button.TextColor3 = library_t.theme.text_color;
-								else
-									if not index then
-										option_button.TextColor3 = library_t.theme.accent;
-										table.insert(current_options, option);
-									end;
+								if type(current_options) ~= "table" then
+									current_options = {};
 								end;
-	
-								selected_text.Text = multi and (#current_options == 0 and "none" or table.concat(current_options, ", ")) or current_options;
-								shadow.Text = selected_text.Text;
+								
+								local index = table.find(current_options, option);
+								if index then
+									if not (no_none and #current_options == 1) then
+										table.remove(current_options, index);
+										option_button.TextColor3 = library_t.theme.text_color;
+									end;
+								else
+									table.insert(current_options, option);
+									option_button.TextColor3 = library_t.theme.accent;
+								end;
+
+								update_display();
 								library_t.flags[flag] = current_options;
 								callback(current_options);
 							else
-								for _, button in buttons do
-									if button ~= option_button then
-										button.TextColor3 = library_t.theme.text_color;
-									end;
+								for _, button in option_buttons do
+									button.TextColor3 = library_t.theme.text_color;
 								end;
-	
+
 								current_options = option;
 								library_t.flags[flag] = current_options;
 								callback(current_options);
-								selected_text.Text = option;
-								shadow.Text = option;
 								option_button.TextColor3 = library_t.theme.accent;
-	
+								update_display();
 								change_open(false);
 							end;
-	
-							local text_bounds = selected_text.TextBounds;
-							selected_text.Position = UDim2.new(0, text_bounds.X / 2 + 5, 0, 7);
 						end;
 					end);
 
@@ -1407,10 +1439,10 @@ local library_t = {
 				-- Refresh dropdown options
 				dropdown_object.refresh = function(new_options)
 					-- Clear existing buttons
-					for option, button in buttons do
+					for option, button in option_buttons do
 						button:Destroy();
 					end;
-					buttons = {};
+					option_buttons = {};
 					
 					options = new_options;
 					
@@ -1421,21 +1453,23 @@ local library_t = {
 					
 					-- Reset selection if current is not in new options
 					if multi then
+						if type(current_options) ~= "table" then
+							current_options = {};
+						end;
 						local valid_options = {};
-						for _, opt in current_options do
+						for _, opt in ipairs(current_options) do
 							if table.find(new_options, opt) then
 								table.insert(valid_options, opt);
 							end;
 						end;
-						current_options = #valid_options > 0 and valid_options or {};
+						current_options = valid_options;
 					else
 						if not table.find(new_options, current_options) then
 							current_options = new_options[1] or "none";
 						end;
 					end;
 					
-					selected_text.Text = type(current_options) == "table" and ((#current_options == 0 and "none") or table.concat(current_options, ", ")) or current_options;
-					shadow.Text = selected_text.Text;
+					update_display();
 					library_t.flags[flag] = current_options;
 				end;
 
@@ -1654,7 +1688,7 @@ local library_t = {
 
 				self.lib.base.save_flags[flag] = function(value)
 					textbox.Text = value;
-					library_t.flags[name] = value;
+					library_t.flags[flag] = value;
 					callback(value);
 				end;
 			end;
@@ -2263,7 +2297,7 @@ local library_t = {
 		library_t.create_config = function(self)
 			local cfg = {};
 
-			for flag,value in library_t.flags do
+			for flag, value in library_t.flags do
 				if not self.base.key_flags[flag] then
 					cfg[flag] = value;
 
@@ -2273,7 +2307,7 @@ local library_t = {
 				end;
 			end;
 
-			for flag,value in self.base.key_flags do
+			for flag, value in self.base.key_flags do
 				if value then
 					cfg[flag] = value.Name;
 				end;
@@ -2283,11 +2317,17 @@ local library_t = {
 		end;
 		
 		library_t.load_config = function(self, cfg)
-			local actual_cfg = http_service:JSONDecode(cfg);
-
-			for flag,value in actual_cfg do
-				if self.base.save_flags[flag] then
-					self.base.save_flags[flag](value);
+			local success, actual_cfg = pcall(function()
+				return http_service:JSONDecode(cfg);
+			end);
+			
+			if success and actual_cfg then
+				for flag, value in actual_cfg do
+					if self.base.save_flags[flag] then
+						pcall(function()
+							self.base.save_flags[flag](value);
+						end);
+					end;
 				end;
 			end;
 		end;
