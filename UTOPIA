@@ -4251,7 +4251,8 @@ end
         Size = Data.Size or Data.size or UDim2New(0, 563, 0, 558),
 
         GradientTitle = Data.GradientTitle or Data.gradienttitle or false,
-        AutoShow = Data.AutoShow or Data.autoshow, 
+        AutoShow = Data.AutoShow or Data.autoshow,
+        Keybind = Data.Keybind or Data.keybind or Enum.KeyCode.Z,
 
         Pages = { },
         Sections = { },
@@ -4261,11 +4262,14 @@ end
         Items = { }
     }
 
-
+    
     if Window.AutoShow == nil then
         Window.AutoShow = true
     end
     Window.IsOpen = Window.AutoShow
+
+    
+    Library.MenuKeybind = tostring(Window.Keybind)
 
     local Items = Components.Window({
         Position = UDim2New(0, Camera.ViewportSize.X / 4, 0, Camera.ViewportSize.Y / 3),
@@ -4273,116 +4277,117 @@ end
         Parent = self.Holder,
         Draggable = true
     }) do 
-            Items["Title"] = Instances:Create("Frame", {
-                Parent = Items["Inline"].Instance,
-                Name = "\0",
-                Position = UDim2New(0, 13, 0, 20),
-                BorderColor3 = FromRGB(0, 0, 0),
-                Size = UDim2New(0.188, 0, 0, 37),
-                BorderSizePixel = 2,
-                BackgroundColor3 = FromRGB(13, 13, 13)
-            })  Items["Title"]:AddToTheme({BackgroundColor3 = "Inline", BorderColor3 = "Outline"})
+        Items["Title"] = Instances:Create("Frame", {
+            Parent = Items["Inline"].Instance,
+            Name = "\0",
+            Position = UDim2New(0, 13, 0, 20),
+            BorderColor3 = FromRGB(0, 0, 0),
+            Size = UDim2New(0.188, 0, 0, 37),
+            BorderSizePixel = 2,
+            BackgroundColor3 = FromRGB(13, 13, 13)
+        })  Items["Title"]:AddToTheme({BackgroundColor3 = "Inline", BorderColor3 = "Outline"})
 
-            Instances:Create("UIStroke", {
-                Parent = Items["Title"].Instance,
-                Color = FromRGB(68, 68, 68),
-                LineJoinMode = Enum.LineJoinMode.Miter,
-                ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-            }):AddToTheme({Color = "Border"})
+        Instances:Create("UIStroke", {
+            Parent = Items["Title"].Instance,
+            Color = FromRGB(68, 68, 68),
+            LineJoinMode = Enum.LineJoinMode.Miter,
+            ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        }):AddToTheme({Color = "Border"})
 
-            Items["Text"] = Instances:Create("TextLabel", {
-                Parent = Items["Title"].Instance,
-                FontFace = Library.Font,
-                TextColor3 = FromRGB(180, 180, 180),
-                BorderColor3 = FromRGB(0, 0, 0),
-                Text = Window.Name,
-                Name = "\0",
-                Size = UDim2New(1, 0, 1, -1),
-                BackgroundTransparency = 1,
-                Position = UDim2New(0, 0, 0, -1),
-                BorderSizePixel = 0,
-                RichText = true,
-                TextSize = 12,
-                BackgroundColor3 = FromRGB(255, 255, 255)
-            }) 
+        Items["Text"] = Instances:Create("TextLabel", {
+            Parent = Items["Title"].Instance,
+            FontFace = Library.Font,
+            TextColor3 = FromRGB(180, 180, 180),
+            BorderColor3 = FromRGB(0, 0, 0),
+            Text = Window.Name,
+            Name = "\0",
+            Size = UDim2New(1, 0, 1, -1),
+            BackgroundTransparency = 1,
+            Position = UDim2New(0, 0, 0, -1),
+            BorderSizePixel = 0,
+            RichText = true,
+            TextSize = 12,
+            BackgroundColor3 = FromRGB(255, 255, 255)
+        }) 
 
-            if Window.GradientTitle.Enabled then
-                local UIGradient = Instances:Create("UIGradient", {
-                    Parent = Items["Text"].Instance,
-                    Rotation = 0,
-                    Color = RGBSequence{
-                        RGBSequenceKeypoint(0, Window.GradientTitle.Start),
-                        RGBSequenceKeypoint(0.25, Window.GradientTitle.Middle),
-                        RGBSequenceKeypoint(1, Window.GradientTitle.End)
-                    }
-                })
+        if Window.GradientTitle and Window.GradientTitle.Enabled then
+            local UIGradient = Instances:Create("UIGradient", {
+                Parent = Items["Text"].Instance,
+                Rotation = 0,
+                Color = RGBSequence{
+                    RGBSequenceKeypoint(0, Window.GradientTitle.Start),
+                    RGBSequenceKeypoint(0.25, Window.GradientTitle.Middle),
+                    RGBSequenceKeypoint(1, Window.GradientTitle.End)
+                }
+            })
 
-                Items["Text"].Instance.TextColor3 = FromRGB(255, 255, 255)
+            Items["Text"].Instance.TextColor3 = FromRGB(255, 255, 255)
 
-                Library:Connect(RunService.Heartbeat, function()
-                    local GradientOffset = MathAbs(MathSin(tick() * Window.GradientTitle.Speed))
-                    UIGradient.Instance.Offset = Vector2New(GradientOffset, 0)   
-                end)
-            else
-                Items["Text"]:AddToTheme({TextColor3 = "Text"})
-            end
-
-            Items["Pages"] = Instances:Create("Frame", {
-                Parent = Items["Inline"].Instance,
-                Name = "\0",
-                Position = UDim2New(0.188, 28, 0, 20),
-                BorderColor3 = FromRGB(0, 0, 0),
-                Size = UDim2New(0.736, 0, 0, 37),
-                BorderSizePixel = 2,
-                BackgroundColor3 = FromRGB(13, 13, 13)
-            })  Items["Pages"]:AddToTheme({BackgroundColor3 = "Inline", BorderColor3 = "Outline"})
-
-            Instances:Create("UIStroke", {
-                Parent = Items["Pages"].Instance,
-                Color = FromRGB(68, 68, 68),
-                LineJoinMode = Enum.LineJoinMode.Miter,
-                ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-            }):AddToTheme({Color = "Border"})
-
-            Items["RealHolder"] = Instances:Create("Frame", {
-                Parent = Items["Pages"].Instance,
-                Name = "\0",
-                BackgroundTransparency = 1,
-                Position = UDim2New(0, 20, 0, 0),
-                BorderColor3 = FromRGB(0, 0, 0),
-                Size = UDim2New(1, -40, 1, 0),
-                BorderSizePixel = 0,
-                BackgroundColor3 = FromRGB(255, 255, 255)
-            }) 
-
-            Instances:Create("UIListLayout", {
-                Parent = Items["RealHolder"].Instance,
-                VerticalAlignment = Enum.VerticalAlignment.Center,
-                FillDirection = Enum.FillDirection.Horizontal,
-                HorizontalFlex = Enum.UIFlexAlignment.Fill,
-                Padding = UDimNew(0, 15),
-                SortOrder = Enum.SortOrder.LayoutOrder
-            }) 
-
-            Items["Content"] = Instances:Create("Frame", {
-                Parent = Items["Inline"].Instance,
-                Name = "\0",
-                Position = UDim2New(0, 13, 0, 77),
-                BorderColor3 = FromRGB(0, 0, 0),
-                Size = UDim2New(1, -28, 1, -93),
-                BorderSizePixel = 2,
-                BackgroundColor3 = FromRGB(12, 12, 12)
-            })  Items["Content"]:AddToTheme({BackgroundColor3 = "Inline", BorderColor3 = "Outline"})
-
-            Instances:Create("UIStroke", {
-                Parent = Items["Content"].Instance,
-                Color = FromRGB(68, 68, 68),
-                LineJoinMode = Enum.LineJoinMode.Miter,
-                ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-            }):AddToTheme({Color = "Border"})
+            Library:Connect(RunService.Heartbeat, function()
+                if not Library or not Library.Holder then return end
+                local GradientOffset = MathAbs(MathSin(tick() * Window.GradientTitle.Speed))
+                UIGradient.Instance.Offset = Vector2New(GradientOffset, 0)   
+            end)
+        else
+            Items["Text"]:AddToTheme({TextColor3 = "Text"})
         end
 
-           
+        Items["Pages"] = Instances:Create("Frame", {
+            Parent = Items["Inline"].Instance,
+            Name = "\0",
+            Position = UDim2New(0.188, 28, 0, 20),
+            BorderColor3 = FromRGB(0, 0, 0),
+            Size = UDim2New(0.736, 0, 0, 37),
+            BorderSizePixel = 2,
+            BackgroundColor3 = FromRGB(13, 13, 13)
+        })  Items["Pages"]:AddToTheme({BackgroundColor3 = "Inline", BorderColor3 = "Outline"})
+
+        Instances:Create("UIStroke", {
+            Parent = Items["Pages"].Instance,
+            Color = FromRGB(68, 68, 68),
+            LineJoinMode = Enum.LineJoinMode.Miter,
+            ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        }):AddToTheme({Color = "Border"})
+
+        Items["RealHolder"] = Instances:Create("Frame", {
+            Parent = Items["Pages"].Instance,
+            Name = "\0",
+            BackgroundTransparency = 1,
+            Position = UDim2New(0, 20, 0, 0),
+            BorderColor3 = FromRGB(0, 0, 0),
+            Size = UDim2New(1, -40, 1, 0),
+            BorderSizePixel = 0,
+            BackgroundColor3 = FromRGB(255, 255, 255)
+        }) 
+
+        Instances:Create("UIListLayout", {
+            Parent = Items["RealHolder"].Instance,
+            VerticalAlignment = Enum.VerticalAlignment.Center,
+            FillDirection = Enum.FillDirection.Horizontal,
+            HorizontalFlex = Enum.UIFlexAlignment.Fill,
+            Padding = UDimNew(0, 15),
+            SortOrder = Enum.SortOrder.LayoutOrder
+        }) 
+
+        Items["Content"] = Instances:Create("Frame", {
+            Parent = Items["Inline"].Instance,
+            Name = "\0",
+            Position = UDim2New(0, 13, 0, 77),
+            BorderColor3 = FromRGB(0, 0, 0),
+            Size = UDim2New(1, -28, 1, -93),
+            BorderSizePixel = 2,
+            BackgroundColor3 = FromRGB(12, 12, 12)
+        })  Items["Content"]:AddToTheme({BackgroundColor3 = "Inline", BorderColor3 = "Outline"})
+
+        Instances:Create("UIStroke", {
+            Parent = Items["Content"].Instance,
+            Color = FromRGB(68, 68, 68),
+            LineJoinMode = Enum.LineJoinMode.Miter,
+            ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        }):AddToTheme({Color = "Border"})
+    end
+
+   
     Items["Outline"].Instance.Visible = Window.IsOpen
 
     function Window:SetOpen(Bool)
@@ -4390,12 +4395,25 @@ end
         Items["Outline"].Instance.Visible = Bool
     end
 
+    function Window:SetKeybind(Key)
+        Window.Keybind = Key
+        Library.MenuKeybind = tostring(Key)
+    end
+
+    function Window:Notify(Text, Duration, Color, Icon)
+        Library:Notification(Text, Duration, Color, Icon)
+    end
+
+    
     Library:Connect(UserInputService.InputBegan, function(Input, GameProcessed)
         if GameProcessed then 
             return
         end
 
-        if tostring(Input.KeyCode) == Library.MenuKeybind or tostring(Input.UserInputType) == Library.MenuKeybind then
+        local KeyPressed = tostring(Input.KeyCode)
+        local InputType = tostring(Input.UserInputType)
+
+        if KeyPressed == Library.MenuKeybind or InputType == Library.MenuKeybind then
             Window:SetOpen(not Window.IsOpen)
         end
     end)
