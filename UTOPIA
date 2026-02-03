@@ -1082,15 +1082,27 @@ end
     end
 
     Library.ChangeItemTheme = function(self, Item, Properties)
-        Item = Item.Instance or Item
-
-        if not self.ThemeMap[Item] then 
-            return
-        end
-
-        self.ThemeMap[Item].Properties = Properties
-        self.ThemeMap[Item] = self.ThemeMap[Item]
+    if not self then
+        return
     end
+    
+    Item = Item.Instance or Item
+    
+    if not Item then
+        return
+    end
+
+    if not self.ThemeMap then
+        return
+    end
+    
+    if not self.ThemeMap[Item] then 
+        return
+    end
+
+    self.ThemeMap[Item].Properties = Properties
+    self.ThemeMap[Item] = self.ThemeMap[Item]
+end
 
     Library.ChangeTheme = function(self, Theme, Color)
         self.Theme[Theme] = Color
@@ -1933,91 +1945,105 @@ end
     end
 
     Components.Button = function(Data)
-        local Button = { }
+    local Button = { }
 
-        local Items = { } do 
-            Items["Button"] = Instances:Create("TextButton", {
-                Parent = Data.Parent.Instance,
-                FontFace = Library.Font,
-                TextColor3 = FromRGB(0, 0, 0),
-                BorderColor3 = FromRGB(0, 0, 0),
-                Text = "",
-                AutoButtonColor = false,
-                Name = "\0",
-                Size = UDim2New(1, 0, 0, 17),
-                BorderSizePixel = 0,
-                TextSize = 14,
-                BackgroundColor3 = FromRGB(63, 63, 63)
-            })  Items["Button"]:AddToTheme({BackgroundColor3 = "Element"})
+    local Items = { } do 
+        Items["Button"] = Instances:Create("TextButton", {
+            Parent = Data.Parent.Instance,
+            FontFace = Library.Font,
+            TextColor3 = FromRGB(0, 0, 0),
+            BorderColor3 = FromRGB(0, 0, 0),
+            Text = "",
+            AutoButtonColor = false,
+            Name = "\0",
+            Size = UDim2New(1, 0, 0, 17),
+            BorderSizePixel = 0,
+            TextSize = 14,
+            BackgroundColor3 = FromRGB(63, 63, 63)
+        })  Items["Button"]:AddToTheme({BackgroundColor3 = "Element"})
 
-            if Data.Tooltip then 
-                Items["Button"]:Tooltip(Data.Tooltip)
-            end
-
-            Instances:Create("UIStroke", {
-                Parent = Items["Button"].Instance,
-                ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-                LineJoinMode = Enum.LineJoinMode.Miter
-            }):AddToTheme({Color = "Outline"})
-
-            Instances:Create("UIGradient", {
-                Parent = Items["Button"].Instance,
-                Rotation = 90,
-                Color = RGBSequence{RGBSequenceKeypoint(0, FromRGB(255, 255, 255)), RGBSequenceKeypoint(1, FromRGB(127, 127, 127))}
-            }) 
-
-            Items["Text"] = Instances:Create("TextLabel", {
-                Parent = Items["Button"].Instance,
-                FontFace = Library.Font,
-                TextColor3 = FromRGB(180, 180, 180),
-                BorderColor3 = FromRGB(0, 0, 0),
-                Text = Data.Name,
-                Name = "\0",
-                Position = UDim2New(0, 0, 0, -1),
-                BackgroundTransparency = 1,
-                Size = UDim2New(1, 0, 1, 0),
-                BorderSizePixel = 0,
-                TextWrapped = true,
-                TextSize = 12,
-                BackgroundColor3 = FromRGB(255, 255, 255)
-            })  Items["Text"]:AddToTheme({TextColor3 = "Text"})
-
-            if Data.Risky then 
-                Items["Text"]:ChangeItemTheme({TextColor3 = "Risky"})
-            else
-                Items["Text"]:ChangeItemTheme({TextColor3 = "Text"})
-            end
+        if Data.Tooltip then 
+            Items["Button"]:Tooltip(Data.Tooltip)
         end
 
-        function Button:Press()
-            Library:SafeCall(Data.Callback)
+        Instances:Create("UIStroke", {
+            Parent = Items["Button"].Instance,
+            ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+            LineJoinMode = Enum.LineJoinMode.Miter
+        }):AddToTheme({Color = "Outline"})
 
-            Items["Text"]:ChangeItemTheme({TextColor3 = "Accent"})
-            Items["Button"]:ChangeItemTheme({BackgroundColor3 = "Accent"})
+        Instances:Create("UIGradient", {
+            Parent = Items["Button"].Instance,
+            Rotation = 90,
+            Color = RGBSequence{RGBSequenceKeypoint(0, FromRGB(255, 255, 255)), RGBSequenceKeypoint(1, FromRGB(127, 127, 127))}
+        }) 
 
-            Items["Text"]:Tween(nil, {TextColor3 = Library.Theme.Accent})
-            Items["Button"]:Tween(nil, {BackgroundColor3 = Library.Theme.Accent})
+        Items["Text"] = Instances:Create("TextLabel", {
+            Parent = Items["Button"].Instance,
+            FontFace = Library.Font,
+            TextColor3 = FromRGB(180, 180, 180),
+            BorderColor3 = FromRGB(0, 0, 0),
+            Text = Data.Name,
+            Name = "\0",
+            Position = UDim2New(0, 0, 0, -1),
+            BackgroundTransparency = 1,
+            Size = UDim2New(1, 0, 1, 0),
+            BorderSizePixel = 0,
+            TextWrapped = true,
+            TextSize = 12,
+            BackgroundColor3 = FromRGB(255, 255, 255)
+        })  Items["Text"]:AddToTheme({TextColor3 = "Text"})
 
-            task.wait(0.1)
+        if Data.Risky then 
+            Items["Text"]:ChangeItemTheme({TextColor3 = "Risky"})
+        else
+            Items["Text"]:ChangeItemTheme({TextColor3 = "Text"})
+        end
+    end
 
-            if not Data.Risky then 
-                Items["Text"]:ChangeItemTheme({TextColor3 = "Text"})
-                Items["Button"]:ChangeItemTheme({BackgroundColor3 = "Element"})
+    function Button:Press()
+        -- ADD THIS CHECK AT THE START
+        if not Library or not Library.Holder then
+            return
+        end
+        
+        if not Items["Text"] or not Items["Text"].Instance then
+            return
+        end
+        
+        Library:SafeCall(Data.Callback)
 
-                Items["Text"]:Tween(nil, {TextColor3 = Library.Theme.Text})
-                Items["Button"]:Tween(nil, {BackgroundColor3 = Library.Theme.Element})
-            else
-                Items["Text"]:ChangeItemTheme({TextColor3 = "Risky"})
-                Items["Button"]:ChangeItemTheme({BackgroundColor3 = "Element"})
+        Items["Text"]:ChangeItemTheme({TextColor3 = "Accent"})
+        Items["Button"]:ChangeItemTheme({BackgroundColor3 = "Accent"})
 
-                Items["Text"]:Tween(nil, {TextColor3 = Library.Theme.Risky})
-                Items["Button"]:Tween(nil, {BackgroundColor3 = Library.Theme.Element})
-            end
+        Items["Text"]:Tween(nil, {TextColor3 = Library.Theme.Accent})
+        Items["Button"]:Tween(nil, {BackgroundColor3 = Library.Theme.Accent})
+
+        task.wait(0.1)
+
+        -- ADD THIS CHECK TOO
+        if not Library or not Items["Text"] or not Items["Text"].Instance then
+            return
         end
 
-        function Button:SetVisibility(Bool)
-            Items["Button"].Instance.Visible = Bool
+        if not Data.Risky then 
+            Items["Text"]:ChangeItemTheme({TextColor3 = "Text"})
+            Items["Button"]:ChangeItemTheme({BackgroundColor3 = "Element"})
+
+            Items["Text"]:Tween(nil, {TextColor3 = Library.Theme.Text})
+            Items["Button"]:Tween(nil, {BackgroundColor3 = Library.Theme.Element})
+        else
+            Items["Text"]:ChangeItemTheme({TextColor3 = "Risky"})
+            Items["Button"]:ChangeItemTheme({BackgroundColor3 = "Element"})
+
+            Items["Text"]:Tween(nil, {TextColor3 = Library.Theme.Risky})
+            Items["Button"]:Tween(nil, {BackgroundColor3 = Library.Theme.Element})
         end
+    end
+
+    function Button:SetVisibility(Bool)
+        Items["Button"].Instance.Visible = Bool
+    end
 
         function Button:SubButton(Data)
             local SubButton = { }
