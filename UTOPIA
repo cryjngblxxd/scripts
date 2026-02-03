@@ -2002,7 +2002,7 @@ end
     end
 
     function Button:Press()
-        -- ADD THIS CHECK AT THE START
+        
         if not Library or not Library.Holder then
             return
         end
@@ -2021,7 +2021,7 @@ end
 
         task.wait(0.1)
 
-        -- ADD THIS CHECK TOO
+       
         if not Library or not Items["Text"] or not Items["Text"].Instance then
             return
         end
@@ -4244,28 +4244,35 @@ end
     end
 
     Library.Window = function(self, Data)
-        Data = Data or { }
+    Data = Data or { }
 
-        local Window = {
-            Name = Data.Name or Data.name or "Window",
-            Size = Data.Size or Data.size or UDim2New(0, 563, 0, 558),
+    local Window = {
+        Name = Data.Name or Data.name or "Window",
+        Size = Data.Size or Data.size or UDim2New(0, 563, 0, 558),
 
-            GradientTitle = Data.GradientTitle or Data.gradienttitle or false,
+        GradientTitle = Data.GradientTitle or Data.gradienttitle or false,
+        AutoShow = Data.AutoShow or Data.autoshow, 
 
-            Pages = { },
-            Sections = { },
+        Pages = { },
+        Sections = { },
 
-            IsOpen = true,
+        IsOpen = true,
 
-            Items = { }
-        }
+        Items = { }
+    }
 
-        local Items = Components.Window({
-            Position = UDim2New(0, Camera.ViewportSize.X / 4, 0, Camera.ViewportSize.Y / 3),
-            Size = Window.Size,
-            Parent = self.Holder,
-            Draggable = true
-        }) do 
+
+    if Window.AutoShow == nil then
+        Window.AutoShow = true
+    end
+    Window.IsOpen = Window.AutoShow
+
+    local Items = Components.Window({
+        Position = UDim2New(0, Camera.ViewportSize.X / 4, 0, Camera.ViewportSize.Y / 3),
+        Size = Window.Size,
+        Parent = self.Holder,
+        Draggable = true
+    }) do 
             Items["Title"] = Instances:Create("Frame", {
                 Parent = Items["Inline"].Instance,
                 Name = "\0",
@@ -4375,25 +4382,27 @@ end
             }):AddToTheme({Color = "Border"})
         end
 
-        function Window:SetOpen(Bool)
-            Window.IsOpen = Bool
+           
+    Items["Outline"].Instance.Visible = Window.IsOpen
 
-            Items["Outline"].Instance.Visible = Bool
+    function Window:SetOpen(Bool)
+        Window.IsOpen = Bool
+        Items["Outline"].Instance.Visible = Bool
+    end
+
+    Library:Connect(UserInputService.InputBegan, function(Input, GameProcessed)
+        if GameProcessed then 
+            return
         end
 
-        Library:Connect(UserInputService.InputBegan, function(Input, GameProcessed)
-            if GameProcessed then 
-                return
-            end
+        if tostring(Input.KeyCode) == Library.MenuKeybind or tostring(Input.UserInputType) == Library.MenuKeybind then
+            Window:SetOpen(not Window.IsOpen)
+        end
+    end)
 
-            if tostring(Input.KeyCode) == Library.MenuKeybind or tostring(Input.UserInputType) == Library.MenuKeybind then
-                Window:SetOpen(not Window.IsOpen)
-            end
-        end)
-
-        Window.Items = Items
-        return setmetatable(Window, self)
-    end
+    Window.Items = Items
+    return setmetatable(Window, self)
+end
 
     Library.Page = function(self, Data)
         Data = Data or { }
