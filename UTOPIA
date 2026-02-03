@@ -4249,27 +4249,29 @@ end
     local Window = {
         Name = Data.Name or Data.name or "Window",
         Size = Data.Size or Data.size or UDim2New(0, 563, 0, 558),
-
         GradientTitle = Data.GradientTitle or Data.gradienttitle or false,
-        AutoShow = Data.AutoShow or Data.autoshow,
-        Keybind = Data.Keybind or Data.keybind or Enum.KeyCode.Z,
 
         Pages = { },
         Sections = { },
 
-        IsOpen = true,
+        IsOpen = false,
 
         Items = { }
     }
 
-    
-    if Window.AutoShow == nil then
-        Window.AutoShow = true
+    -- Handle AutoShow
+    local AutoShow = Data.AutoShow
+    if AutoShow == nil then
+        AutoShow = Data.autoshow
     end
-    Window.IsOpen = Window.AutoShow
+    if AutoShow == nil then
+        AutoShow = true -- Default to true
+    end
+    Window.IsOpen = AutoShow
 
-    
-    Library.MenuKeybind = tostring(Window.Keybind)
+    -- Handle Keybind
+    local MenuKey = Data.Keybind or Data.keybind or Enum.KeyCode.Z
+    Library.MenuKeybind = tostring(MenuKey)
 
     local Items = Components.Window({
         Position = UDim2New(0, Camera.ViewportSize.X / 4, 0, Camera.ViewportSize.Y / 3),
@@ -4396,24 +4398,28 @@ end
     end
 
     function Window:SetKeybind(Key)
-        Window.Keybind = Key
         Library.MenuKeybind = tostring(Key)
+    end
+
+    function Window:GetKeybind()
+        return Library.MenuKeybind
     end
 
     function Window:Notify(Text, Duration, Color, Icon)
         Library:Notification(Text, Duration, Color, Icon)
     end
 
-    
+   
     Library:Connect(UserInputService.InputBegan, function(Input, GameProcessed)
         if GameProcessed then 
             return
         end
 
-        local KeyPressed = tostring(Input.KeyCode)
-        local InputType = tostring(Input.UserInputType)
+        local inputKey = tostring(Input.KeyCode)
+        local inputType = tostring(Input.UserInputType)
+        local menuKey = Library.MenuKeybind
 
-        if KeyPressed == Library.MenuKeybind or InputType == Library.MenuKeybind then
+        if inputKey == menuKey or inputType == menuKey then
             Window:SetOpen(not Window.IsOpen)
         end
     end)
