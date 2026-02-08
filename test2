@@ -1,9 +1,4 @@
---[[
-    Avenir Library
-    -> Originally made by @finobe 
-    -> Modified with auto-load config, notification control
-]]
-
+if library then library:unload_menu() end 
 -- Variables 
     local uis = game:GetService("UserInputService") 
     local players = game:GetService("Players") 
@@ -783,7 +778,7 @@
             Parent = library.cache,
             BackgroundTransparency = 1,
             Visible = false,
-            Size = dim2(1, 0, 1, 0),
+            Size = dim2(0, 0, 1, 0),
             BorderSizePixel = 0,
         })
         
@@ -1020,9 +1015,12 @@
         local cfg = {items = {}, size = properties.size or 1}
         local items = cfg.items
         
-        items["column"] = library:create("Frame", {
+        items["column"] = library:create("ScrollingFrame", {
             Parent = self["parent"] or self.items["tab_parent"],
             BackgroundTransparency = 1,
+            CanvasSize = UDim2.new(0,0,0,0),
+            AutomaticCanvasSize = Enum.AutomaticSize.Y,
+            ScrollBarThickness = 0,
             Size = dim2(0, 0, cfg.size, 0),
             BorderSizePixel = 0,
         })
@@ -3088,5 +3086,4 @@
         end)
     end
 --
-
 return library
