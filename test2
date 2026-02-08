@@ -1835,6 +1835,10 @@ if library then library:unload_menu() end
             })
         end 
 
+        function cfg:set(text)
+            items["name"].Text = text
+        end 
+
         return setmetatable(cfg, library)
     end 
 --
