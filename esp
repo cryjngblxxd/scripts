@@ -144,7 +144,7 @@ local function CreateESP(Config)
         d.Name.Visible = false
         d.Name.Center = true
         d.Name.Outline = true
-        d.Name.Font = Drawing.Fonts.Code
+        d.Name.Font = Drawing.Fonts.Plex
         d.Name.Size = 13
 
         -- Distance
@@ -152,7 +152,7 @@ local function CreateESP(Config)
         d.Distance.Visible = false
         d.Distance.Center = true
         d.Distance.Outline = true
-        d.Distance.Font = Drawing.Fonts.Code
+        d.Distance.Font = Drawing.Fonts.Plex
         d.Distance.Size = 12
 
         -- Weapon
@@ -160,7 +160,7 @@ local function CreateESP(Config)
         d.Weapon.Visible = false
         d.Weapon.Center = true
         d.Weapon.Outline = true
-        d.Weapon.Font = Drawing.Fonts.Code
+        d.Weapon.Font = Drawing.Fonts.Plex
         d.Weapon.Size = 12
 
         -- Health bar
@@ -182,7 +182,7 @@ local function CreateESP(Config)
         d.HealthText.Visible = false
         d.HealthText.Center = true
         d.HealthText.Outline = true
-        d.HealthText.Font = Drawing.Fonts.Code
+        d.HealthText.Font = Drawing.Fonts.Plex
         d.HealthText.Size = 10
 
         -- Armor bar
