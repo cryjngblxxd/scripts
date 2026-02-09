@@ -9,7 +9,6 @@ local function CreateESP(Config)
     local Cache = {}
     local Friends = {}
     local Connection = nil
-    local Tick = 0
 
     local function UpdateFriends()
         for _, plr in ipairs(Players:GetPlayers()) do
@@ -30,10 +29,6 @@ local function CreateESP(Config)
         end)
     end)
 
-    local function Lerp(a, b, t)
-        return a + (b - a) * math.clamp(t, 0, 1)
-    end
-
     local function LerpColor(a, b, t)
         t = math.clamp(t, 0, 1)
         return Color3.new(
@@ -43,178 +38,183 @@ local function CreateESP(Config)
         )
     end
 
-    local function Gradient3(c1, c2, c3, t)
-        t = math.clamp(t, 0, 1)
-        if t < 0.5 then
-            return LerpColor(c1, c2, t * 2)
-        else
-            return LerpColor(c2, c3, (t - 0.5) * 2)
-        end
-    end
-
     local function GetAlpha(dist, maxDist, fade)
         if not fade or maxDist <= 0 then return 1 end
         local start = maxDist * 0.7
         if dist < start then return 1 end
-        return math.clamp(1 - ((dist - start) / (maxDist - start)), 0.15, 1)
+        return math.clamp(1 - ((dist - start) / (maxDist - start)), 0.2, 1)
     end
 
+    -- Proper box calculation based on character size
     local function GetBox(char)
-        local root = char:FindFirstChild('HumanoidRootPart')
+        local hrp = char:FindFirstChild('HumanoidRootPart')
         local head = char:FindFirstChild('Head')
-        if not root or not head then return nil end
+        local humanoid = char:FindFirstChild('Humanoid')
+        if not hrp or not head or not humanoid then return nil end
 
-        local rootPos = root.Position
-        local headPos = head.Position + Vector3.new(0, 0.5, 0)
-        local footPos = rootPos - Vector3.new(0, 3, 0)
+        -- Get character bounds
+        local torso = char:FindFirstChild('UpperTorso') or char:FindFirstChild('Torso')
+        local leftLeg = char:FindFirstChild('LeftFoot') or char:FindFirstChild('Left Leg')
+        local rightLeg = char:FindFirstChild('RightFoot') or char:FindFirstChild('Right Leg')
+        
+        -- Calculate top and bottom positions
+        local headTop = head.Position + Vector3.new(0, head.Size.Y / 2 + 0.3, 0)
+        local bottom
+        
+        if leftLeg and rightLeg then
+            local leftPos = leftLeg.Position.Y - (leftLeg.Size.Y / 2)
+            local rightPos = rightLeg.Position.Y - (rightLeg.Size.Y / 2)
+            bottom = Vector3.new(hrp.Position.X, math.min(leftPos, rightPos), hrp.Position.Z)
+        else
+            bottom = hrp.Position - Vector3.new(0, 3, 0)
+        end
 
-        local headScreen, headVisible = Camera:WorldToViewportPoint(headPos)
-        local footScreen, footVisible = Camera:WorldToViewportPoint(footPos)
+        -- Project to screen
+        local topScreen, topVisible = Camera:WorldToViewportPoint(headTop)
+        local bottomScreen, bottomVisible = Camera:WorldToViewportPoint(bottom)
 
-        if not headVisible and not footVisible then return nil end
+        if not topVisible and not bottomVisible then return nil end
 
-        local top = Vector2.new(headScreen.X, headScreen.Y)
-        local bottom = Vector2.new(footScreen.X, footScreen.Y)
-        local height = bottom.Y - top.Y
-        local width = height * 0.6
-        local center = (top.X + bottom.X) / 2
+        local top = Vector2.new(topScreen.X, topScreen.Y)
+        local bot = Vector2.new(bottomScreen.X, bottomScreen.Y)
+        
+        local height = math.abs(bot.Y - top.Y)
+        local width = height * 0.5
+        
+        -- Clamp minimum size
+        if height < 20 then return nil end
+        
+        local centerX = (top.X + bot.X) / 2
 
         return {
-            TL = Vector2.new(center - width/2, top.Y),
-            TR = Vector2.new(center + width/2, top.Y),
-            BL = Vector2.new(center - width/2, bottom.Y),
-            BR = Vector2.new(center + width/2, bottom.Y),
-            W = width, 
+            X = centerX - width / 2,
+            Y = top.Y,
+            W = width,
             H = height,
-            CX = center, 
-            TY = top.Y, 
-            BY = bottom.Y
+            CX = centerX,
+            TY = top.Y,
+            BY = bot.Y
         }
     end
 
     local function NewDraw()
         local d = {}
         
-        -- Box outlines (black background)
-        d.BoxOutlines = {}
-        for i = 1, 4 do
-            local line = Drawing.new("Line")
-            line.Visible = false
-            line.Color = Color3.fromRGB(0, 0, 0)
-            line.Thickness = 3
-            d.BoxOutlines[i] = line
-        end
+        -- Box outline (black)
+        d.OutlineOuter = Drawing.new("Square")
+        d.OutlineOuter.Visible = false
+        d.OutlineOuter.Filled = false
+        d.OutlineOuter.Color = Color3.fromRGB(0, 0, 0)
+        d.OutlineOuter.Thickness = 3
 
-        -- Box lines (main color)
-        d.BoxLines = {}
-        for i = 1, 4 do
-            local line = Drawing.new("Line")
-            line.Visible = false
-            line.Thickness = 1
-            d.BoxLines[i] = line
-        end
+        -- Box main
+        d.Box = Drawing.new("Square")
+        d.Box.Visible = false
+        d.Box.Filled = false
+        d.Box.Thickness = 1
 
-        -- Corner outlines
+        -- Box inner outline
+        d.OutlineInner = Drawing.new("Square")
+        d.OutlineInner.Visible = false
+        d.OutlineInner.Filled = false
+        d.OutlineInner.Color = Color3.fromRGB(0, 0, 0)
+        d.OutlineInner.Thickness = 1
+
+        -- Corner lines (8 total - 2 per corner)
+        d.Corners = {}
         d.CornerOutlines = {}
         for i = 1, 8 do
-            local line = Drawing.new("Line")
-            line.Visible = false
-            line.Color = Color3.fromRGB(0, 0, 0)
-            line.Thickness = 3
-            d.CornerOutlines[i] = line
+            d.CornerOutlines[i] = Drawing.new("Line")
+            d.CornerOutlines[i].Visible = false
+            d.CornerOutlines[i].Color = Color3.fromRGB(0, 0, 0)
+            d.CornerOutlines[i].Thickness = 3
+
+            d.Corners[i] = Drawing.new("Line")
+            d.Corners[i].Visible = false
+            d.Corners[i].Thickness = 1
         end
 
-        -- Corner lines
-        d.CornerLines = {}
-        for i = 1, 8 do
-            local line = Drawing.new("Line")
-            line.Visible = false
-            line.Thickness = 1
-            d.CornerLines[i] = line
-        end
-
-        -- Filled box
+        -- Fill
         d.Fill = Drawing.new("Square")
         d.Fill.Visible = false
         d.Fill.Filled = true
 
-        -- Name text
+        -- Name
         d.Name = Drawing.new("Text")
         d.Name.Visible = false
         d.Name.Center = true
         d.Name.Outline = true
-        d.Name.Font = Drawing.Fonts.System
+        d.Name.Font = Drawing.Fonts.Plex
         d.Name.Size = 13
 
-        -- Weapon text
-        d.Weapon = Drawing.new("Text")
-        d.Weapon.Visible = false
-        d.Weapon.Center = true
-        d.Weapon.Outline = true
-        d.Weapon.Font = Drawing.Fonts.System
-        d.Weapon.Size = 11
-
-        -- Distance text (separate)
+        -- Distance
         d.Distance = Drawing.new("Text")
         d.Distance.Visible = false
         d.Distance.Center = true
         d.Distance.Outline = true
-        d.Distance.Font = Drawing.Fonts.System
-        d.Distance.Size = 11
+        d.Distance.Font = Drawing.Fonts.Plex
+        d.Distance.Size = 12
+
+        -- Weapon
+        d.Weapon = Drawing.new("Text")
+        d.Weapon.Visible = false
+        d.Weapon.Center = true
+        d.Weapon.Outline = true
+        d.Weapon.Font = Drawing.Fonts.Plex
+        d.Weapon.Size = 12
 
         -- Health bar
-        d.HealthOutline = Drawing.new("Line")
+        d.HealthOutline = Drawing.new("Square")
         d.HealthOutline.Visible = false
+        d.HealthOutline.Filled = true
         d.HealthOutline.Color = Color3.fromRGB(0, 0, 0)
-        d.HealthOutline.Thickness = 5
 
-        d.HealthBG = Drawing.new("Line")
+        d.HealthBG = Drawing.new("Square")
         d.HealthBG.Visible = false
-        d.HealthBG.Color = Color3.fromRGB(40, 40, 40)
-        d.HealthBG.Thickness = 3
+        d.HealthBG.Filled = true
+        d.HealthBG.Color = Color3.fromRGB(35, 35, 35)
 
-        d.HealthFill = Drawing.new("Line")
+        d.HealthFill = Drawing.new("Square")
         d.HealthFill.Visible = false
-        d.HealthFill.Thickness = 2
+        d.HealthFill.Filled = true
 
         d.HealthText = Drawing.new("Text")
         d.HealthText.Visible = false
         d.HealthText.Center = true
         d.HealthText.Outline = true
-        d.HealthText.Font = Drawing.Fonts.System
+        d.HealthText.Font = Drawing.Fonts.Plex
         d.HealthText.Size = 10
 
         -- Armor bar
-        d.ArmorOutline = Drawing.new("Line")
+        d.ArmorOutline = Drawing.new("Square")
         d.ArmorOutline.Visible = false
+        d.ArmorOutline.Filled = true
         d.ArmorOutline.Color = Color3.fromRGB(0, 0, 0)
-        d.ArmorOutline.Thickness = 5
 
-        d.ArmorBG = Drawing.new("Line")
+        d.ArmorBG = Drawing.new("Square")
         d.ArmorBG.Visible = false
-        d.ArmorBG.Color = Color3.fromRGB(40, 40, 40)
-        d.ArmorBG.Thickness = 3
+        d.ArmorBG.Filled = true
+        d.ArmorBG.Color = Color3.fromRGB(35, 35, 35)
 
-        d.ArmorFill = Drawing.new("Line")
+        d.ArmorFill = Drawing.new("Square")
         d.ArmorFill.Visible = false
-        d.ArmorFill.Thickness = 2
+        d.ArmorFill.Filled = true
 
         return d
     end
 
     local function Hide(d)
-        for i = 1, 4 do
-            d.BoxOutlines[i].Visible = false
-            d.BoxLines[i].Visible = false
-        end
+        d.OutlineOuter.Visible = false
+        d.Box.Visible = false
+        d.OutlineInner.Visible = false
         for i = 1, 8 do
+            d.Corners[i].Visible = false
             d.CornerOutlines[i].Visible = false
-            d.CornerLines[i].Visible = false
         end
         d.Fill.Visible = false
         d.Name.Visible = false
-        d.Weapon.Visible = false
         d.Distance.Visible = false
+        d.Weapon.Visible = false
         d.HealthOutline.Visible = false
         d.HealthBG.Visible = false
         d.HealthFill.Visible = false
@@ -225,18 +225,17 @@ local function CreateESP(Config)
     end
 
     local function Destroy(d)
-        for i = 1, 4 do
-            d.BoxOutlines[i]:Remove()
-            d.BoxLines[i]:Remove()
-        end
+        d.OutlineOuter:Remove()
+        d.Box:Remove()
+        d.OutlineInner:Remove()
         for i = 1, 8 do
+            d.Corners[i]:Remove()
             d.CornerOutlines[i]:Remove()
-            d.CornerLines[i]:Remove()
         end
         d.Fill:Remove()
         d.Name:Remove()
-        d.Weapon:Remove()
         d.Distance:Remove()
+        d.Weapon:Remove()
         d.HealthOutline:Remove()
         d.HealthBG:Remove()
         d.HealthFill:Remove()
@@ -249,10 +248,9 @@ local function CreateESP(Config)
     local function Start()
         if Connection then return end
         
-        Connection = RunService.RenderStepped:Connect(function(dt)
+        Connection = RunService.RenderStepped:Connect(function()
             local cfg = Config.Esp
-            Tick = Tick + dt
-
+            
             if not cfg or not cfg.Enabled then
                 for _, d in pairs(Cache) do 
                     Hide(d) 
@@ -263,9 +261,6 @@ local function CreateESP(Config)
             local localChar = LocalPlayer.Character
             local localRoot = localChar and localChar:FindFirstChild('HumanoidRootPart')
             local alive = {}
-            
-            local animSpeed = (cfg.Boxes and cfg.Boxes.RotationSpeed or 300) / 200
-            local gradientShift = (math.sin(Tick * animSpeed) + 1) / 2
 
             for _, plr in ipairs(Players:GetPlayers()) do
                 if plr == LocalPlayer then continue end
@@ -273,13 +268,11 @@ local function CreateESP(Config)
 
                 local isFriend = Friends[plr.UserId] or false
                 
-                -- Friend check
                 if cfg.FriendCheck and isFriend then
                     if Cache[plr] then Hide(Cache[plr]) end
                     continue
                 end
 
-                -- Team check
                 if cfg.TeamCheck and plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then
                     if Cache[plr] then Hide(Cache[plr]) end
                     continue
@@ -300,25 +293,17 @@ local function CreateESP(Config)
                 local hum = char:FindFirstChild('Humanoid')
                 local root = char:FindFirstChild('HumanoidRootPart')
                 
-                if not hum or not root then 
+                if not hum or not root or hum.Health <= 0 then 
                     Hide(d) 
                     continue 
                 end
                 
-                if hum.Health <= 0 then 
-                    Hide(d) 
-                    continue 
-                end
-                
-                -- Check knocked/dead
-                local knocked = char:GetAttribute('Knocked')
-                local dead = char:GetAttribute('Dead')
-                if knocked or dead then 
+                if char:GetAttribute('Knocked') or char:GetAttribute('Dead') then 
                     Hide(d) 
                     continue 
                 end
 
-                local screenPos, onScreen = Camera:WorldToViewportPoint(root.Position)
+                local _, onScreen = Camera:WorldToViewportPoint(root.Position)
                 if not onScreen then 
                     Hide(d) 
                     continue 
@@ -330,10 +315,7 @@ local function CreateESP(Config)
                     continue 
                 end
 
-                local dist = 0
-                if localRoot then
-                    dist = (localRoot.Position - root.Position).Magnitude
-                end
+                local dist = localRoot and (localRoot.Position - root.Position).Magnitude or 0
                 
                 if cfg.MaxDistance and cfg.MaxDistance > 0 and dist > cfg.MaxDistance then 
                     Hide(d) 
@@ -343,31 +325,40 @@ local function CreateESP(Config)
                 local alpha = GetAlpha(dist, cfg.MaxDistance or 200, cfg.FadeOutOnDistance)
                 local hp = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
                 
-                -- Get armor
                 local armor = 0
                 pcall(function() 
                     armor = char:GetAttribute("Armor") or 0 
                 end)
                 local armorPct = math.clamp(armor / 130, 0, 1)
 
-                local fontSize = cfg.FontSize or 11
+                local fontSize = cfg.FontSize or 13
                 
-                -- Colors
+                -- Box color
                 local boxColor = Color3.fromRGB(255, 255, 255)
                 if isFriend and cfg.FriendRGB then
                     boxColor = cfg.FriendRGB
+                elseif cfg.Boxes and cfg.Boxes.Corner and cfg.Boxes.Corner.RGB then
+                    boxColor = cfg.Boxes.Corner.RGB
                 elseif cfg.Boxes and cfg.Boxes.Full and cfg.Boxes.Full.RGB then
                     boxColor = cfg.Boxes.Full.RGB
                 end
 
-                local gradEnabled = cfg.Boxes and cfg.Boxes.Gradient
-                local gradAnimate = cfg.Boxes and cfg.Boxes.Animate
-                local gradCol1 = cfg.Boxes and cfg.Boxes.GradientRGB1 or boxColor
-                local gradCol2 = cfg.Boxes and cfg.Boxes.GradientRGB2 or Color3.fromRGB(0, 0, 0)
+                local showFull = cfg.Boxes and cfg.Boxes.Full and cfg.Boxes.Full.Enabled
+                local showCorner = cfg.Boxes and cfg.Boxes.Corner and cfg.Boxes.Corner.Enabled
+                local showFill = cfg.Boxes and cfg.Boxes.Filled and cfg.Boxes.Filled.Enabled
+
+                -- Hide all box elements first
+                d.OutlineOuter.Visible = false
+                d.Box.Visible = false
+                d.OutlineInner.Visible = false
+                for i = 1, 8 do
+                    d.Corners[i].Visible = false
+                    d.CornerOutlines[i].Visible = false
+                end
 
                 -- ═══ FILLED BOX ═══
-                if cfg.Boxes and cfg.Boxes.Filled and cfg.Boxes.Filled.Enabled then
-                    d.Fill.Position = box.TL
+                if showFill then
+                    d.Fill.Position = Vector2.new(box.X, box.Y)
                     d.Fill.Size = Vector2.new(box.W, box.H)
                     d.Fill.Color = cfg.Boxes.Filled.RGB or Color3.fromRGB(0, 0, 0)
                     d.Fill.Transparency = (1 - (cfg.Boxes.Filled.Transparency or 0.75)) * alpha
@@ -376,107 +367,73 @@ local function CreateESP(Config)
                     d.Fill.Visible = false
                 end
 
-                -- ═══ BOX TYPE ═══
-                local showFull = cfg.Boxes and cfg.Boxes.Full and cfg.Boxes.Full.Enabled
-                local showCorner = cfg.Boxes and cfg.Boxes.Corner and cfg.Boxes.Corner.Enabled
-
-                -- Hide all first
-                for i = 1, 4 do
-                    d.BoxOutlines[i].Visible = false
-                    d.BoxLines[i].Visible = false
-                end
-                for i = 1, 8 do
-                    d.CornerOutlines[i].Visible = false
-                    d.CornerLines[i].Visible = false
-                end
-
-                if showCorner then
-                    -- Corner box
-                    local cornerLen = 0.25
-                    local cW = box.W * cornerLen
-                    local cH = box.H * cornerLen
-
+                -- ═══ CORNER BOX ═══
+                if showCorner and not showFull then
+                    local cornerSize = math.clamp(box.H * 0.2, 8, 25)
+                    
                     local corners = {
-                        {box.TL, box.TL + Vector2.new(cW, 0)},   -- TL horizontal
-                        {box.TL, box.TL + Vector2.new(0, cH)},   -- TL vertical
-                        {box.TR, box.TR + Vector2.new(-cW, 0)},  -- TR horizontal
-                        {box.TR, box.TR + Vector2.new(0, cH)},   -- TR vertical
-                        {box.BL, box.BL + Vector2.new(cW, 0)},   -- BL horizontal
-                        {box.BL, box.BL + Vector2.new(0, -cH)},  -- BL vertical
-                        {box.BR, box.BR + Vector2.new(-cW, 0)},  -- BR horizontal
-                        {box.BR, box.BR + Vector2.new(0, -cH)},  -- BR vertical
+                        -- Top Left
+                        {Vector2.new(box.X, box.Y), Vector2.new(box.X + cornerSize, box.Y)},
+                        {Vector2.new(box.X, box.Y), Vector2.new(box.X, box.Y + cornerSize)},
+                        -- Top Right
+                        {Vector2.new(box.X + box.W, box.Y), Vector2.new(box.X + box.W - cornerSize, box.Y)},
+                        {Vector2.new(box.X + box.W, box.Y), Vector2.new(box.X + box.W, box.Y + cornerSize)},
+                        -- Bottom Left
+                        {Vector2.new(box.X, box.Y + box.H), Vector2.new(box.X + cornerSize, box.Y + box.H)},
+                        {Vector2.new(box.X, box.Y + box.H), Vector2.new(box.X, box.Y + box.H - cornerSize)},
+                        -- Bottom Right
+                        {Vector2.new(box.X + box.W, box.Y + box.H), Vector2.new(box.X + box.W - cornerSize, box.Y + box.H)},
+                        {Vector2.new(box.X + box.W, box.Y + box.H), Vector2.new(box.X + box.W, box.Y + box.H - cornerSize)},
                     }
 
                     for i = 1, 8 do
-                        local col = boxColor
-                        if gradEnabled then
-                            local t = i / 8
-                            if gradAnimate then
-                                t = (t + gradientShift) % 1
-                            end
-                            col = LerpColor(gradCol1, gradCol2, t)
-                        end
-
                         -- Outline
                         d.CornerOutlines[i].From = corners[i][1]
                         d.CornerOutlines[i].To = corners[i][2]
                         d.CornerOutlines[i].Transparency = alpha
                         d.CornerOutlines[i].Visible = true
 
-                        -- Main line
-                        d.CornerLines[i].From = corners[i][1]
-                        d.CornerLines[i].To = corners[i][2]
-                        d.CornerLines[i].Color = col
-                        d.CornerLines[i].Transparency = alpha
-                        d.CornerLines[i].Visible = true
+                        -- Main
+                        d.Corners[i].From = corners[i][1]
+                        d.Corners[i].To = corners[i][2]
+                        d.Corners[i].Color = boxColor
+                        d.Corners[i].Transparency = alpha
+                        d.Corners[i].Visible = true
                     end
 
+                -- ═══ FULL BOX ═══
                 elseif showFull then
-                    -- Full box
-                    local sides = {
-                        {box.TL, box.TR},  -- Top
-                        {box.TR, box.BR},  -- Right
-                        {box.BR, box.BL},  -- Bottom
-                        {box.BL, box.TL},  -- Left
-                    }
+                    -- Outer outline
+                    d.OutlineOuter.Position = Vector2.new(box.X - 1, box.Y - 1)
+                    d.OutlineOuter.Size = Vector2.new(box.W + 2, box.H + 2)
+                    d.OutlineOuter.Transparency = alpha
+                    d.OutlineOuter.Visible = true
 
-                    for i = 1, 4 do
-                        local col = boxColor
-                        if gradEnabled then
-                            local t = i / 4
-                            if gradAnimate then
-                                t = (t + gradientShift) % 1
-                            end
-                            col = LerpColor(gradCol1, gradCol2, t)
-                        end
+                    -- Main box
+                    d.Box.Position = Vector2.new(box.X, box.Y)
+                    d.Box.Size = Vector2.new(box.W, box.H)
+                    d.Box.Color = boxColor
+                    d.Box.Transparency = alpha
+                    d.Box.Visible = true
 
-                        -- Outline
-                        d.BoxOutlines[i].From = sides[i][1]
-                        d.BoxOutlines[i].To = sides[i][2]
-                        d.BoxOutlines[i].Transparency = alpha
-                        d.BoxOutlines[i].Visible = true
-
-                        -- Main line
-                        d.BoxLines[i].From = sides[i][1]
-                        d.BoxLines[i].To = sides[i][2]
-                        d.BoxLines[i].Color = col
-                        d.BoxLines[i].Transparency = alpha
-                        d.BoxLines[i].Visible = true
-                    end
+                    -- Inner outline
+                    d.OutlineInner.Position = Vector2.new(box.X + 1, box.Y + 1)
+                    d.OutlineInner.Size = Vector2.new(box.W - 2, box.H - 2)
+                    d.OutlineInner.Transparency = alpha
+                    d.OutlineInner.Visible = true
                 end
 
                 -- ═══ NAME ═══
                 if cfg.Names and cfg.Names.Enabled then
                     local nameText = plr.DisplayName or plr.Name
                     
-                    -- Add distance to name if Position is "Text"
                     if cfg.Distances and cfg.Distances.Enabled and cfg.Distances.Position == "Text" then
                         local distStr = dist < 10 and string.format("%.1f", dist) or tostring(math.floor(dist))
                         nameText = nameText .. " [" .. distStr .. "m]"
                     end
 
                     d.Name.Text = nameText
-                    d.Name.Position = Vector2.new(box.CX, box.TY - fontSize - 4)
+                    d.Name.Position = Vector2.new(box.CX, box.TY - fontSize - 2)
                     d.Name.Size = fontSize
                     d.Name.Color = isFriend and (cfg.FriendRGB or Color3.fromRGB(0, 255, 0)) or (cfg.Names.RGB or Color3.fromRGB(255, 255, 255))
                     d.Name.Transparency = alpha
@@ -485,17 +442,17 @@ local function CreateESP(Config)
                     d.Name.Visible = false
                 end
 
-                -- ═══ DISTANCE (Below box) ═══
+                -- ═══ DISTANCE (Below) ═══
                 local bottomY = box.BY + 2
                 if cfg.Distances and cfg.Distances.Enabled and cfg.Distances.Position ~= "Text" then
                     local distStr = dist < 10 and string.format("%.1f", dist) or tostring(math.floor(dist))
-                    d.Distance.Text = "[" .. distStr .. "m]"
+                    d.Distance.Text = distStr .. "m"
                     d.Distance.Position = Vector2.new(box.CX, bottomY)
-                    d.Distance.Size = fontSize
-                    d.Distance.Color = cfg.Distances.RGB or Color3.fromRGB(255, 255, 255)
+                    d.Distance.Size = fontSize - 1
+                    d.Distance.Color = cfg.Distances.RGB or Color3.fromRGB(200, 200, 200)
                     d.Distance.Transparency = alpha
                     d.Distance.Visible = true
-                    bottomY = bottomY + fontSize + 2
+                    bottomY = bottomY + fontSize
                 else
                     d.Distance.Visible = false
                 end
@@ -506,8 +463,8 @@ local function CreateESP(Config)
                     if tool then
                         d.Weapon.Text = tool.Name
                         d.Weapon.Position = Vector2.new(box.CX, bottomY)
-                        d.Weapon.Size = fontSize
-                        d.Weapon.Color = cfg.Weapons.WeaponTextRGB or Color3.fromRGB(100, 120, 255)
+                        d.Weapon.Size = fontSize - 1
+                        d.Weapon.Color = cfg.Weapons.WeaponTextRGB or Color3.fromRGB(180, 180, 180)
                         d.Weapon.Transparency = alpha
                         d.Weapon.Visible = true
                     else
@@ -519,53 +476,42 @@ local function CreateESP(Config)
 
                 -- ═══ HEALTH BAR ═══
                 if cfg.Healthbar and cfg.Healthbar.Enabled then
-                    local barWidth = cfg.Healthbar.Width or 2.5
-                    local barX = box.TL.X - 6 - barWidth
-                    local barCenter = barX + barWidth / 2
-                    local fillY = box.BY - (box.H * hp)
+                    local barWidth = cfg.Healthbar.Width or 2
+                    local barX = box.X - barWidth - 4
+                    local fillHeight = box.H * hp
 
                     -- Outline
-                    d.HealthOutline.From = Vector2.new(barCenter, box.TY - 1)
-                    d.HealthOutline.To = Vector2.new(barCenter, box.BY + 1)
+                    d.HealthOutline.Position = Vector2.new(barX - 1, box.Y - 1)
+                    d.HealthOutline.Size = Vector2.new(barWidth + 2, box.H + 2)
                     d.HealthOutline.Transparency = alpha
                     d.HealthOutline.Visible = true
 
                     -- Background
-                    d.HealthBG.From = Vector2.new(barCenter, box.TY)
-                    d.HealthBG.To = Vector2.new(barCenter, box.BY)
-                    d.HealthBG.Transparency = alpha * 0.5
+                    d.HealthBG.Position = Vector2.new(barX, box.Y)
+                    d.HealthBG.Size = Vector2.new(barWidth, box.H)
+                    d.HealthBG.Transparency = alpha * 0.8
                     d.HealthBG.Visible = true
 
                     -- Health color
                     local healthColor
-                    if cfg.Healthbar.Gradient then
-                        healthColor = Gradient3(
-                            cfg.Healthbar.GradientRGB1 or Color3.fromRGB(255, 0, 0),
-                            cfg.Healthbar.GradientRGB2 or Color3.fromRGB(255, 255, 0),
-                            cfg.Healthbar.GradientRGB3 or Color3.fromRGB(0, 255, 0),
-                            hp
-                        )
+                    if hp > 0.5 then
+                        healthColor = LerpColor(Color3.fromRGB(255, 255, 0), Color3.fromRGB(0, 255, 0), (hp - 0.5) * 2)
                     else
-                        if hp > 0.5 then
-                            healthColor = LerpColor(Color3.fromRGB(255, 255, 0), Color3.fromRGB(0, 255, 0), (hp - 0.5) * 2)
-                        else
-                            healthColor = LerpColor(Color3.fromRGB(255, 0, 0), Color3.fromRGB(255, 255, 0), hp * 2)
-                        end
+                        healthColor = LerpColor(Color3.fromRGB(255, 0, 0), Color3.fromRGB(255, 255, 0), hp * 2)
                     end
 
                     -- Fill
-                    d.HealthFill.From = Vector2.new(barCenter, fillY)
-                    d.HealthFill.To = Vector2.new(barCenter, box.BY)
+                    d.HealthFill.Position = Vector2.new(barX, box.Y + box.H - fillHeight)
+                    d.HealthFill.Size = Vector2.new(barWidth, fillHeight)
                     d.HealthFill.Color = healthColor
                     d.HealthFill.Transparency = alpha
                     d.HealthFill.Visible = hp > 0.01
 
-                    -- Health text
+                    -- Text
                     if cfg.Healthbar.HealthText and hp < 1 then
                         d.HealthText.Text = tostring(math.floor(hum.Health))
-                        d.HealthText.Position = Vector2.new(barCenter, fillY - fontSize - 2)
-                        d.HealthText.Size = fontSize - 1
-                        d.HealthText.Color = cfg.Healthbar.HealthTextRGB or healthColor
+                        d.HealthText.Position = Vector2.new(barX + barWidth / 2, box.Y + box.H - fillHeight - 12)
+                        d.HealthText.Color = healthColor
                         d.HealthText.Transparency = alpha
                         d.HealthText.Visible = true
                     else
@@ -580,36 +526,35 @@ local function CreateESP(Config)
 
                 -- ═══ ARMOR BAR ═══
                 if cfg.Armor and cfg.Armor.Enabled and armor > 0 then
-                    local barWidth = cfg.Armor.BarWidth or 2.5
-                    local barX = box.TR.X + 4
-                    local barCenter = barX + barWidth / 2
-                    local fillY = box.BY - (box.H * armorPct)
+                    local barWidth = cfg.Armor.BarWidth or 2
+                    local barX = box.X + box.W + 3
+                    local fillHeight = box.H * armorPct
 
                     -- Outline
-                    d.ArmorOutline.From = Vector2.new(barCenter, box.TY - 1)
-                    d.ArmorOutline.To = Vector2.new(barCenter, box.BY + 1)
+                    d.ArmorOutline.Position = Vector2.new(barX - 1, box.Y - 1)
+                    d.ArmorOutline.Size = Vector2.new(barWidth + 2, box.H + 2)
                     d.ArmorOutline.Transparency = alpha
                     d.ArmorOutline.Visible = true
 
                     -- Background
-                    d.ArmorBG.From = Vector2.new(barCenter, box.TY)
-                    d.ArmorBG.To = Vector2.new(barCenter, box.BY)
-                    d.ArmorBG.Transparency = alpha * 0.5
+                    d.ArmorBG.Position = Vector2.new(barX, box.Y)
+                    d.ArmorBG.Size = Vector2.new(barWidth, box.H)
+                    d.ArmorBG.Transparency = alpha * 0.8
                     d.ArmorBG.Visible = true
 
-                    -- Armor color based on amount
+                    -- Color
                     local armorColor
                     if armorPct >= 0.7 then
-                        armorColor = cfg.Armor.HighRGB or Color3.fromRGB(50, 100, 255)
+                        armorColor = cfg.Armor.HighRGB or Color3.fromRGB(50, 150, 255)
                     elseif armorPct >= 0.3 then
                         armorColor = cfg.Armor.MediumRGB or Color3.fromRGB(100, 180, 255)
                     else
-                        armorColor = cfg.Armor.LowRGB or Color3.fromRGB(180, 180, 180)
+                        armorColor = cfg.Armor.LowRGB or Color3.fromRGB(150, 150, 150)
                     end
 
                     -- Fill
-                    d.ArmorFill.From = Vector2.new(barCenter, fillY)
-                    d.ArmorFill.To = Vector2.new(barCenter, box.BY)
+                    d.ArmorFill.Position = Vector2.new(barX, box.Y + box.H - fillHeight)
+                    d.ArmorFill.Size = Vector2.new(barWidth, fillHeight)
                     d.ArmorFill.Color = armorColor
                     d.ArmorFill.Transparency = alpha
                     d.ArmorFill.Visible = true
@@ -620,7 +565,7 @@ local function CreateESP(Config)
                 end
             end
 
-            -- Cleanup dead players
+            -- Cleanup
             for plr, d in pairs(Cache) do
                 if not alive[plr] then
                     Hide(d)
@@ -643,7 +588,6 @@ local function CreateESP(Config)
         Cache = {}
     end
 
-    -- Cleanup on player leave
     Players.PlayerRemoving:Connect(function(plr)
         Friends[plr.UserId] = nil
         if Cache[plr] then
@@ -653,20 +597,18 @@ local function CreateESP(Config)
         end
     end)
 
-    -- Keybind toggle
+    -- Keybind
     if Config.Esp and Config.Esp.Use_KeyBind then
-        UserInputService.InputBegan:Connect(function(input, gameProcessed)
-            if gameProcessed then return end
+        UserInputService.InputBegan:Connect(function(input, gpe)
+            if gpe then return end
             if input.KeyCode == Config.Esp.KeyBind then
                 Config.Esp.Enabled = not Config.Esp.Enabled
             end
         end)
     end
 
-    -- Start ESP
     Start()
 
-    -- Return API
     ESP.Start = Start
     ESP.Stop = Stop
     ESP.Toggle = function() 
