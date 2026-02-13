@@ -56,7 +56,6 @@ local library_t = {
 
 		connection_mt.Disconnect = function(self)
 			local index = table.find(self._signal._connections, self);
-
 			if index then
 				table.remove(self._signal._connections, index);
 			end;
@@ -70,37 +69,29 @@ local library_t = {
 				_callback = callback,
 				_signal = self
 			}, connection_mt);
-
 			self._connections[#self._connections + 1] = connection;
-
 			return connection
 		end;
 
 		signal_mt.fire = function(self, ...)
-			local connections = self._connections;
-
-			for i = 1, #connections do
-				connections[i]._callback(...);
+			local conns = self._connections;
+			for i = 1, #conns do
+				conns[i]._callback(...);
 			end;
 		end;
 
 		signal_t.new = function()
-			return setmetatable({
-				_connections = {}
-			}, signal_mt);
+			return setmetatable({ _connections = {} }, signal_mt);
 		end;
 	end;
 
 	local utility_t = {}; do
 		utility_t.new_instance = function(class, properties)
 			local instance = Instance.new(class);
-
 			instances[#instances + 1] = instance;
-
 			for property, value in properties do
 				instance[property] = value;
 			end;
-
 			return instance;
 		end;
 
@@ -117,47 +108,38 @@ local library_t = {
 		end;
 
 		utility_t.is_mouse_in_frame = function(frame)
-			local frame_position = frame.AbsolutePosition;
-			local frame_size = frame.AbsoluteSize;
-
-			local mouse_position = user_input_service:GetMouseLocation();
-
-			local mouse_x = mouse_position.X;
-			local mouse_y = mouse_position.Y - 58;
-
-			return mouse_x >= frame_position.X and mouse_x <= frame_position.X + frame_size.X and mouse_y >= frame_position.Y and mouse_y <= frame_position.Y + frame_size.Y;
+			local fp = frame.AbsolutePosition;
+			local fs = frame.AbsoluteSize;
+			local mp = user_input_service:GetMouseLocation();
+			local mx = mp.X;
+			local my = mp.Y - 58;
+			return mx >= fp.X and mx <= fp.X + fs.X and my >= fp.Y and my <= fp.Y + fs.Y;
 		end;
 
 		utility_t.connect = function(signal, func)
 			local connection = signal:Connect(func);
-
 			connections[#connections + 1] = connection;
-
 			return connection;
 		end;
 
 		utility_t.get_textbounds = function(text, size)
-			local text_bounds_info = utility_t.new_instance("GetTextBoundsParams", {
+			local tbp = utility_t.new_instance("GetTextBoundsParams", {
 				Text = text,
 				Font = library_t.font,
 				Width = math.huge,
 				Size = size
 			});
-
-			return text_service:GetTextBoundsAsync(text_bounds_info);
+			return text_service:GetTextBoundsAsync(tbp);
 		end;
 
 		utility_t.create_outlines = function(frame, outline_data)
 			local total_thickness = 0;
 			local border_size_pixel = -1;
-
 			for i, data in outline_data do
 				local outline_color = data.color or Color3.new(1, 1, 1);
 				local outline_thickness = 1;
 				local outlineTransparency = data.transparency or 0;
-
 				local newtotal_thickness = total_thickness + outline_thickness;
-
 				local outline_frame = utility_t.new_instance("Frame", {
 					Size = UDim2.new(1, (total_thickness + border_size_pixel) * 2 + outline_thickness * 2, 1, (total_thickness + border_size_pixel) * 2 + outline_thickness * 2),
 					Position = UDim2.new(0, -(total_thickness + border_size_pixel) - outline_thickness, 0, -(total_thickness + border_size_pixel) - outline_thickness),
@@ -165,11 +147,9 @@ local library_t = {
 					Parent = frame,
 					Active = false
 				});
-
 				if data.zindex then
 					outline_frame.ZIndex = data.zindex;
 				end;
-
 				utility_t.new_instance("UIStroke", {
 					LineJoinMode = Enum.LineJoinMode.Miter,
 					ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
@@ -178,7 +158,6 @@ local library_t = {
 					Transparency = outlineTransparency,
 					Parent = outline_frame
 				});
-
 				total_thickness = newtotal_thickness;
 			end;
 		end;
@@ -191,46 +170,36 @@ local library_t = {
 		end;
 
 		utility_t.is_in_main_frame = function(frame, main_frame)
-			local frame_position = frame.AbsolutePosition;
-			local frame_size = frame.AbsoluteSize;
-
-			local main_frame_position = main_frame.AbsolutePosition;
-			local main_frame_size = main_frame.AbsoluteSize;
-
-			return frame_position.X >= main_frame_position.X and frame_position.X + frame_size.X <= main_frame_position.X + main_frame_size.X and frame_position.Y >= main_frame_position.Y and frame_position.Y + frame_size.Y <= main_frame_position.Y + main_frame_size.Y;
+			local fp = frame.AbsolutePosition;
+			local fs = frame.AbsoluteSize;
+			local mfp = main_frame.AbsolutePosition;
+			local mfs = main_frame.AbsoluteSize;
+			return fp.X >= mfp.X and fp.X + fs.X <= mfp.X + mfs.X and fp.Y >= mfp.Y and fp.Y + fs.Y <= mfp.Y + mfs.Y;
 		end;
 
 		utility_t.is_parents_visible = function(instance)
 			local parent = instance.Parent;
-
 			local result = true;
-
 			while parent do
 				if not utility_t.has_property(parent, "Visible") then
 					parent = parent.Parent;
 					continue;
 				end;
-
 				if parent.Visible == false then
 					result = false;
 				end;
-
 				parent = parent.Parent;
 			end;
-
 			return result;
 		end;
 
 		utility_t.new_button = function(properties)
 			local button = utility_t.new_instance("TextLabel", properties);
-
 			local button_object = {
 				pressed = signal_t.new();
 				button = button
-			}
-
+			};
 			buttons[#buttons + 1] = button_object;
-
 			return button_object.button, button_object.pressed;
 		end;
 
@@ -238,21 +207,16 @@ local library_t = {
 			if not isfolder(library_t.assets_dir) then
 				makefolder(library_t.assets_dir);
 			end;
-
 			writefile(library_t.assets_dir.."/font.ttf", game:HttpGet(library_t.font_link));
-
 			local custom_font = {
 				name = "FONT",
-				faces = {
-					{
-						name = "Regular",
-						weight = 400,
-						style = "normal",
-						assetId = getcustomasset(library_t.assets_dir.."/font.ttf")
-					}
-				}
+				faces = {{
+					name = "Regular",
+					weight = 400,
+					style = "normal",
+					assetId = getcustomasset(library_t.assets_dir.."/font.ttf")
+				}}
 			};
-
 			writefile(library_t.assets_dir.."/menu_font.font", http_service:JSONEncode(custom_font));
 			library_t.font = Font.new(getcustomasset(library_t.assets_dir.."/menu_font.font"), Enum.FontWeight.Regular, Enum.FontStyle.Normal);
 		end;
@@ -262,13 +226,16 @@ local library_t = {
 				for i, connection in connections do
 					connection:Disconnect();
 				end;
-
 				for i, instance in instances do
 					instance:Destroy();
 				end;
 			end;
 		end;
 	end;
+
+	-- consistent layout constants
+	local ELEMENT_PAD_LEFT = 4;
+	local ELEMENT_PAD_RIGHT = 4;
 
 	do
 		local create_colorpicker = function(self, properties, label, is_toggle)
@@ -380,12 +347,12 @@ local library_t = {
 			});
 
 			utility_t.create_outlines(colorpicker_content_holder, {
-				{ color = Color3.fromRGB(60, 60, 60), thickness = 1, zindex = 1000, },
-				{ color = Color3.fromRGB(40, 40, 40), thickness = 1, zindex = 1000, },
-				{ color = Color3.fromRGB(40, 40, 40), thickness = 1, zindex = 1000, },
-				{ color = Color3.fromRGB(40, 40, 40), thickness = 1, zindex = 1000, },
-				{ color = Color3.fromRGB(60, 60, 60), thickness = 1, zindex = 1000, },
-				{ color = Color3.fromRGB(31, 31, 31), thickness = 1, zindex = 1000, }
+				{ color = Color3.fromRGB(60, 60, 60), thickness = 1, zindex = 1000 },
+				{ color = Color3.fromRGB(40, 40, 40), thickness = 1, zindex = 1000 },
+				{ color = Color3.fromRGB(40, 40, 40), thickness = 1, zindex = 1000 },
+				{ color = Color3.fromRGB(40, 40, 40), thickness = 1, zindex = 1000 },
+				{ color = Color3.fromRGB(60, 60, 60), thickness = 1, zindex = 1000 },
+				{ color = Color3.fromRGB(31, 31, 31), thickness = 1, zindex = 1000 }
 			});
 
 			local actual_colorpicker_frame = utility_t.new_instance("ImageLabel", {
@@ -457,7 +424,6 @@ local library_t = {
 					Position = UDim2.new(0, 5, 0, 188),
 					BackgroundColor3 = default
 				});
-
 				utility_t.new_instance("UIStroke", {
 					Parent = transparency_slider,
 					LineJoinMode = Enum.LineJoinMode.Miter,
@@ -465,11 +431,9 @@ local library_t = {
 					Color = Color3.fromRGB(14, 14, 14),
 					Thickness = 1
 				});
-
 				utility_t.create_outlines(transparency_slider, {
 					{ color = Color3.fromRGB(14, 14, 14), transparency = 0 },
 				});
-
 				transparency_slider_gradient = utility_t.new_instance("UIGradient", {
 					Parent = transparency_slider,
 					Color = ColorSequence.new({
@@ -477,14 +441,13 @@ local library_t = {
 						ColorSequenceKeypoint.new(1, utility_t.darken_color(default, 0.1))
 					})
 				});
-
 				transparency_slider_visualizer = utility_t.new_instance("Frame", {
 					Parent = transparency_slider,
 					BorderSizePixel = 1,
 					ZIndex = 1004,
 					BorderColor3 = Color3.fromRGB(14, 14, 14),
 					Size = UDim2.new(0, 2, 1, 0),
-					Position = UDim2.new(0, (math.clamp(default_transparency, 0, 1) * transparency_slider.AbsoluteSize.X) , 0, 0),
+					Position = UDim2.new(0, (math.clamp(default_transparency, 0, 1) * transparency_slider.AbsoluteSize.X), 0, 0),
 					BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 					BackgroundTransparency = 0,
 				});
@@ -494,18 +457,14 @@ local library_t = {
 
 			local change_open = function(state)
 				is_open = state;
-
 				colorpicker_content_holder.Visible = state;
-
 				if is_open then
 					if self.lib.base.current_colorpicker and self.lib.base.current_colorpicker ~= colorpicker_object then
 						self.lib.base.current_colorpicker.change_open(false);
 					end;
-
 					local absolute_position = colorpicker_frame.AbsolutePosition;
 					colorpicker_content_holder.Position = UDim2.new(0, absolute_position.X + 1, 0, absolute_position.Y + 25);
-
-					self.lib.base.current_colorpicker = colorpicker_object
+					self.lib.base.current_colorpicker = colorpicker_object;
 				else
 					self.lib.base.current_colorpicker = nil;
 				end;
@@ -529,19 +488,12 @@ local library_t = {
 
 			local set = function(color)
 				colorpicker_gradient.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, color), ColorSequenceKeypoint.new(1, utility_t.darken_color(color, 0.5))});
-
-				local _hue, saturation, value = color:ToHSV();
-				local colorpicker_size = actual_colorpicker_frame.AbsoluteSize;
-
-				local _x = saturation * colorpicker_size.X;
-				local _y = (1 - value) * colorpicker_size.Y;
 				library_t.flags[flag].color = color;
 				callback(library_t.flags[flag]);
 			end;
 
 			local set_transparency = function(transparency)
 				transparency_slider_visualizer.Position = UDim2.new(0, transparency * transparency_slider.AbsoluteSize.X, 0, 0);
-
 				library_t.flags[flag].transparency = transparency;
 				callback(library_t.flags[flag]);
 			end;
@@ -559,11 +511,8 @@ local library_t = {
 				local color_size = actual_colorpicker_frame.AbsoluteSize;
 				local x = math.clamp(mouse_pos.X - actual_colorpicker_frame.AbsolutePosition.X, 0, color_size.X);
 				local y = math.clamp(mouse_pos.Y - actual_colorpicker_frame.AbsolutePosition.Y, 0, color_size.Y);
-
 				local selected_color = Color3.fromHSV(current_hue, x / color_size.X, 1 - (y / color_size.Y));
-
 				set(selected_color);
-
 				if transparency_slider then
 					transparency_slider.BackgroundColor3 = selected_color;
 					transparency_slider_gradient.Color = ColorSequence.new({
@@ -598,23 +547,19 @@ local library_t = {
 				if is_dragging_main and input.UserInputType == Enum.UserInputType.MouseMovement then
 					update(input.Position);
 				elseif is_dragging_hue and input.UserInputType == Enum.UserInputType.MouseMovement then
-					local hue_height = colorpicker_hue.AbsoluteSize.Y
+					local hue_height = colorpicker_hue.AbsoluteSize.Y;
 					local y = math.clamp(input.Position.Y - colorpicker_hue.AbsolutePosition.Y, 0, hue_height);
-
 					current_hue = y / hue_height;
 					colorpicker_gradient.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromHSV(current_hue, 1, 1)), ColorSequenceKeypoint.new(1, utility_t.darken_color(Color3.fromHSV(current_hue, 1, 1), 0.5))});
 					library_t.flags[flag].color = Color3.fromHSV(current_hue, 1, 1);
 					actual_colorpicker_frame.BackgroundColor3 = Color3.fromHSV(current_hue, 1, 1);
 					callback(library_t.flags[flag]);
 				elseif is_dragging_transparency and input.UserInputType == Enum.UserInputType.MouseMovement then
-					local transparency_width = transparency_slider.AbsoluteSize.X;
-					local x = math.clamp(input.Position.X - transparency_slider.AbsolutePosition.X, 0, transparency_width);
-
-					local new_transparency = 1 - (x / transparency_width);
-
+					local tw = transparency_slider.AbsoluteSize.X;
+					local x = math.clamp(input.Position.X - transparency_slider.AbsolutePosition.X, 0, tw);
+					local nt = 1 - (x / tw);
 					transparency_slider_visualizer.Position = UDim2.new(0, x - (transparency_slider_visualizer.AbsoluteSize.X / 2), 0.5, -transparency_slider_visualizer.AbsoluteSize.Y / 2);
-
-					library_t.flags[flag].transparency = is_drawing and new_transparency or 1 - new_transparency;
+					library_t.flags[flag].transparency = is_drawing and nt or 1 - nt;
 					callback(library_t.flags[flag]);
 				end;
 			end);
@@ -678,33 +623,29 @@ local library_t = {
 			});
 
 			local update_pos = function()
-				local text_size = keybind_text.TextBounds;
-				keybind_frame.Size = UDim2.new(0, text_size.X + 9, 0, 10);
-				keybind_frame.Position = UDim2.new(1, -text_size.X - 4, 0, 0);
+				local ts = keybind_text.TextBounds;
+				keybind_frame.Size = UDim2.new(0, ts.X + 9, 0, 10);
+				keybind_frame.Position = UDim2.new(1, -ts.X - 4, 0, 0);
 			end;
 
 			local set_key = function(key)
 				if key then
 					local key_enum = nil;
-
 					if typeof(key) == "EnumItem" then
 						key_enum = key;
 					elseif type(key) == "string" then
 						key_enum = Enum.KeyCode[key] or Enum.UserInputType[key] or nil;
 					end;
-
 					if key_enum then
 						current_key = key_enum;
 						keybind_text.Text = key_enum.Name:lower();
 						shadow.Text = key_enum.Name:lower();
 						self.lib.base.key_flags[flag] = key_enum;
-
 						if index_mode then
 							library_t.flags[flag] = key_enum;
 						else
 							library_t.flags[flag] = false;
 						end;
-
 						update_pos();
 						callback(key_enum);
 					end;
@@ -713,20 +654,17 @@ local library_t = {
 					keybind_text.Text = "none";
 					shadow.Text = "none";
 					self.lib.base.key_flags[flag] = nil;
-
 					if index_mode then
 						library_t.flags[flag] = nil;
 					else
 						library_t.flags[flag] = false;
 					end;
-
 					update_pos();
 					callback(nil);
 				end;
 			end;
 
 			self.lib.base.save_flags[flag] = set_key;
-
 			update_pos();
 
 			utility_t.connect(pressed_signal, function()
@@ -746,32 +684,26 @@ local library_t = {
 					update_pos();
 					return;
 				end;
-
 				if is_selecting then
 					local key = nil;
-
 					if input.UserInputType == Enum.UserInputType.Keyboard then
 						key = input.KeyCode;
 					elseif input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.MouseButton2 then
 						key = input.UserInputType;
 					end;
-
 					if key then
 						is_selecting = false;
 						set_key(key);
 					end;
 					return;
 				end;
-
 				if not is_selecting and not index_mode and current_key then
 					local should_trigger = false;
-
 					if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == current_key then
 						should_trigger = true;
 					elseif input.UserInputType == current_key then
 						should_trigger = true;
 					end;
-
 					if should_trigger then
 						if mode == "toggle" then
 							state = not state;
@@ -789,13 +721,11 @@ local library_t = {
 			utility_t.connect(user_input_service.InputEnded, function(input)
 				if not index_mode and current_key and mode == "hold" then
 					local should_release = false;
-
 					if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == current_key then
 						should_release = true;
 					elseif input.UserInputType == current_key then
 						should_release = true;
 					end;
-
 					if should_release then
 						state = false;
 						library_t.flags[flag] = state;
@@ -812,7 +742,6 @@ local library_t = {
 				DisplayOrder = 1e5,
 				ResetOnSpawn = false
 			});
-
 			local is_dragging = false;
 			local initial_frame_pos;
 			local initial_mouse_pos;
@@ -824,47 +753,37 @@ local library_t = {
 				BackgroundColor3 = library_t.theme.background_color,
 				BorderSizePixel = 0
 			});
-
 			local _, drag_signal = utility_t.new_button({
 				Parent = watermark_holder,
 				Size = UDim2.new(1, 0, 1, 0),
 				BackgroundTransparency = 1,
 				TextTransparency = 1,
 			});
-
 			utility_t.connect(drag_signal, function()
 				is_dragging = true;
 				initial_frame_pos = watermark_holder.Position;
 				initial_mouse_pos = user_input_service:GetMouseLocation();
 			end);
-
-			utility_t.connect(user_input_service.InputChanged, function(input, is_typing)
+			utility_t.connect(user_input_service.InputChanged, function(input)
 				if input.UserInputType == Enum.UserInputType.MouseMovement and is_dragging then
-					local current_mouse_pos = user_input_service:GetMouseLocation();
-					local delta_x = current_mouse_pos.X - initial_mouse_pos.X;
-					local delta_y = current_mouse_pos.Y - initial_mouse_pos.Y;
-
-					watermark_holder.Position = UDim2.new(initial_frame_pos.X.Scale, initial_frame_pos.X.Offset + delta_x, initial_frame_pos.Y.Scale, initial_frame_pos.Y.Offset + delta_y);
+					local cmp = user_input_service:GetMouseLocation();
+					watermark_holder.Position = UDim2.new(initial_frame_pos.X.Scale, initial_frame_pos.X.Offset + cmp.X - initial_mouse_pos.X, initial_frame_pos.Y.Scale, initial_frame_pos.Y.Offset + cmp.Y - initial_mouse_pos.Y);
 				end;
 			end);
-
 			utility_t.connect(user_input_service.InputEnded, function(input)
 				if input.UserInputType == Enum.UserInputType.MouseButton1 then
 					is_dragging = false;
 				end;
 			end);
-
 			utility_t.new_instance("ImageLabel", {
 				Parent = watermark_holder,
 				Size = UDim2.new(1, 0, 1, 0),
-				Position = UDim2.new(0, 0, 0, 0),
 				BackgroundTransparency = 1,
 				ImageColor3 = library_t.theme.dots_color,
 				ScaleType = Enum.ScaleType.Tile,
 				TileSize = UDim2.new(0, 8, 0, 8),
 				Image = "rbxassetid://134950628747280"
 			});
-
 			local accent_line = utility_t.new_instance("Frame", {
 				Parent = watermark_holder,
 				Size = UDim2.new(1, -2, 0, 2),
@@ -872,7 +791,6 @@ local library_t = {
 				BackgroundColor3 = Color3.new(1, 1, 1),
 				BorderSizePixel = 0
 			});
-
 			utility_t.new_instance("UIGradient", {
 				Parent = accent_line,
 				Color = ColorSequence.new({
@@ -881,7 +799,6 @@ local library_t = {
 				}),
 				Rotation = 90
 			});
-
 			utility_t.create_outlines(watermark_holder, {
 				{ color = Color3.fromRGB(60, 60, 60), thickness = 1 },
 				{ color = Color3.fromRGB(40, 40, 40), thickness = 1 },
@@ -890,15 +807,11 @@ local library_t = {
 				{ color = Color3.fromRGB(60, 60, 60), thickness = 1 },
 				{ color = Color3.fromRGB(31, 31, 31), thickness = 1 }
 			});
-
 			local text_bounds = utility_t.get_textbounds(name, library_t.font_size);
-
 			watermark_holder.Size = UDim2.new(0, text_bounds.X + 8, 0, 20);
-
 			local main_text_label = utility_t.new_instance("TextLabel", {
 				Parent = watermark_holder,
 				Size = UDim2.new(1, 0, 1, 0),
-				Position = UDim2.new(0, 0, 0, 0),
 				BackgroundTransparency = 1,
 				ZIndex = 2,
 				FontFace = library_t.font,
@@ -907,7 +820,6 @@ local library_t = {
 				TextSize = library_t.font_size,
 				TextXAlignment = Enum.TextXAlignment.Center
 			});
-
 			utility_t.new_instance("TextLabel", {
 				Parent = main_text_label,
 				Size = UDim2.new(1, 0, 1, 0),
@@ -930,11 +842,9 @@ local library_t = {
 				local callback = properties and properties.callback or function(...) end;
 
 				local current_state = default;
-
 				library_t.flags[flag] = current_state;
 
 				local BASE_COLOR = Color3.fromRGB(44, 44, 44);
-
 				local ENABLED = ColorSequence.new({ColorSequenceKeypoint.new(0, library_t.theme.accent), ColorSequenceKeypoint.new(1, utility_t.darken_color(library_t.theme.accent, 0.8))});
 				local DISABLED = ColorSequence.new({ColorSequenceKeypoint.new(0, BASE_COLOR), ColorSequenceKeypoint.new(1, utility_t.darken_color(BASE_COLOR, 0.8))});
 
@@ -943,7 +853,7 @@ local library_t = {
 					Size = UDim2.new(1, 0, 0, 7),
 					BackgroundTransparency = 1,
 					BorderSizePixel = 0
-				})
+				});
 
 				local toggle_button, pressed_signal = utility_t.new_button({
 					Parent = toggle_holder,
@@ -998,7 +908,6 @@ local library_t = {
 				local change_state = function(state)
 					current_state = state;
 					callback(state);
-
 					library_t.flags[flag] = state;
 					ui_gradient.Color = state and ENABLED or DISABLED;
 				end;
@@ -1010,7 +919,6 @@ local library_t = {
 				end);
 
 				self.lib.base.save_flags[flag] = change_state;
-
 				self.update_size();
 
 				return {
@@ -1020,7 +928,7 @@ local library_t = {
 					keybind = function(_, properties)
 						create_keybind(self, properties, toggle_holder, true);
 					end
-				}
+				};
 			end;
 
 			section.slider = function(self, properties)
@@ -1037,23 +945,22 @@ local library_t = {
 
 				local slider_holder = utility_t.new_instance("Frame", {
 					Parent = self.content_frame,
-					Position = UDim2.new(0, 0, 0, 0),
-					Size = UDim2.new(1, -14, 0, 23),
+					Size = UDim2.new(1, 0, 0, 25),
 					BackgroundTransparency = 1,
 					BorderSizePixel = 0
 				});
 
 				local name_label = utility_t.new_instance("TextLabel", {
 					Parent = slider_holder,
-					Position = UDim2.new(0, 15, 0, -10),
-					Size = UDim2.new(1, -15, 1, 0),
+					Position = UDim2.new(0, ELEMENT_PAD_LEFT, 0, 0),
+					Size = UDim2.new(1, -ELEMENT_PAD_LEFT - ELEMENT_PAD_RIGHT, 0, 12),
 					BackgroundTransparency = 1,
 					BorderSizePixel = 0,
 					ZIndex = 2,
 					Text = name,
 					TextSize = library_t.font_size,
 					TextXAlignment = Enum.TextXAlignment.Left,
-					TextYAlignment = Enum.TextYAlignment.Center,
+					TextYAlignment = Enum.TextYAlignment.Top,
 					TextColor3 = library_t.theme.text_color,
 					FontFace = library_t.font
 				});
@@ -1067,7 +974,7 @@ local library_t = {
 					TextSize = library_t.font_size,
 					BackgroundTransparency = 1,
 					TextXAlignment = Enum.TextXAlignment.Left,
-					TextYAlignment = Enum.TextYAlignment.Center,
+					TextYAlignment = Enum.TextYAlignment.Top,
 					TextColor3 = Color3.fromRGB(0, 0, 0),
 					Text = name,
 					BorderSizePixel = 0
@@ -1075,8 +982,8 @@ local library_t = {
 
 				local slider_frame, pressed_signal = utility_t.new_button({
 					Parent = slider_holder,
-					Position = UDim2.new(0, 15, 0, 13),
-					Size = UDim2.new(1, -38, 0, 5),
+					Position = UDim2.new(0, ELEMENT_PAD_LEFT, 0, 14),
+					Size = UDim2.new(1, -ELEMENT_PAD_LEFT - ELEMENT_PAD_RIGHT, 0, 8),
 					BackgroundColor3 = Color3.new(1, 1, 1),
 					TextTransparency = 1,
 					BorderSizePixel = 0,
@@ -1100,9 +1007,9 @@ local library_t = {
 				local decimal_places = math.max(0, -math.floor(math.log10(decimals)));
 
 				local value_text = utility_t.new_instance("TextLabel", {
-					Parent = slider_holder,
+					Parent = slider_frame,
 					Name = "value",
-					Position = UDim2.new(0.5, 0, 0.3, 0),
+					Size = UDim2.new(1, 0, 1, 0),
 					BackgroundTransparency = 1,
 					ZIndex = 2,
 					BorderSizePixel = 0,
@@ -1125,10 +1032,6 @@ local library_t = {
 					BorderSizePixel = 0
 				});
 
-				local text_size = value_text.TextBounds;
-
-				value_text.Position = UDim2.new(0.5, -text_size.X / 2, 0.3, 0);
-
 				utility_t.new_instance("UIGradient", {
 					Parent = actual_slider,
 					Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, library_t.theme.accent), ColorSequenceKeypoint.new(1, utility_t.darken_color(library_t.theme.accent, 0.5)) }),
@@ -1144,32 +1047,24 @@ local library_t = {
 				local set = function(value)
 					local step = decimals;
 					value = math.floor(value / step + 0.5) * step;
-
 					value = math.clamp(value, min, max);
-
-					local decimal_places = math.max(0, -math.floor(math.log10(step)));
-					local format_string = "%." .. decimal_places .. "f";
-
+					local dp = math.max(0, -math.floor(math.log10(step)));
+					local fs = "%." .. dp .. "f";
 					library_t.flags[flag] = value;
 					actual_slider.Size = UDim2.new((value - min) / (max - min), 0, 1, 0);
-					value_text.Text = string.format(format_string, value) .. suffix;
+					value_text.Text = string.format(fs, value) .. suffix;
 					shadow_text.Text = value_text.Text;
-					value_text.Position = UDim2.new(math.clamp((value - min) / (max - min), 0.1, 0.9), 0, 0, 20);
 					callback(value);
 				end;
 
 				set(default);
-
 				self.lib.base.save_flags[flag] = set;
 
 				local update = function(mouse_position)
 					local x = math.clamp(mouse_position.X - slider_frame.AbsolutePosition.X, 0, slider_frame.AbsoluteSize.X);
 					local raw_value = (x / slider_frame.AbsoluteSize.X) * (max - min) + min;
-
 					local step = decimals;
-					local stepped_value = math.floor(raw_value / step + 0.5) * step;
-
-					set(stepped_value);
+					set(math.floor(raw_value / step + 0.5) * step);
 				end;
 
 				utility_t.connect(pressed_signal, function()
@@ -1204,7 +1099,7 @@ local library_t = {
 				local default = properties and properties.default or (multi and {options[1]} or options[1]);
 
 				local is_open = false;
-				local buttons = {};
+				local option_buttons = {};
 				local current_options = default;
 
 				if multi and type(current_options) ~= "table" then
@@ -1213,24 +1108,24 @@ local library_t = {
 
 				library_t.flags[flag] = current_options;
 
-				local actual_dropdown_holder = utility_t.new_instance("Frame", {
+				local dropdown_holder = utility_t.new_instance("Frame", {
 					Parent = self.content_frame,
-					Size = UDim2.new(1, -14, 0, 30),
+					Size = UDim2.new(1, 0, 0, 32),
 					BackgroundTransparency = 1,
 					BorderSizePixel = 0
 				});
 
 				local name_label = utility_t.new_instance("TextLabel", {
-					Parent = actual_dropdown_holder,
-					Position = UDim2.new(0, 15, 0, -10),
-					Size = UDim2.new(1, -15, 1, 0),
+					Parent = dropdown_holder,
+					Position = UDim2.new(0, ELEMENT_PAD_LEFT, 0, 0),
+					Size = UDim2.new(1, -ELEMENT_PAD_LEFT - ELEMENT_PAD_RIGHT, 0, 12),
 					BackgroundTransparency = 1,
 					BorderSizePixel = 0,
 					ZIndex = 2,
 					Text = name,
 					TextSize = library_t.font_size,
 					TextXAlignment = Enum.TextXAlignment.Left,
-					TextYAlignment = Enum.TextYAlignment.Center,
+					TextYAlignment = Enum.TextYAlignment.Top,
 					TextColor3 = library_t.theme.text_color,
 					FontFace = library_t.font
 				});
@@ -1244,16 +1139,16 @@ local library_t = {
 					TextSize = library_t.font_size,
 					BackgroundTransparency = 1,
 					TextXAlignment = Enum.TextXAlignment.Left,
-					TextYAlignment = Enum.TextYAlignment.Center,
+					TextYAlignment = Enum.TextYAlignment.Top,
 					TextColor3 = Color3.fromRGB(0, 0, 0),
 					Text = name,
 					BorderSizePixel = 0
 				});
 
 				local dropdown_button, pressed_signal = utility_t.new_button({
-					Parent = actual_dropdown_holder,
-					Position = UDim2.new(0, 15, 0, 15),
-					Size = UDim2.new(1, -38, 0, 18),
+					Parent = dropdown_holder,
+					Position = UDim2.new(0, ELEMENT_PAD_LEFT, 0, 14),
+					Size = UDim2.new(1, -ELEMENT_PAD_LEFT - ELEMENT_PAD_RIGHT, 0, 18),
 					BorderSizePixel = 0,
 					BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 					TextTransparency = 1,
@@ -1261,7 +1156,7 @@ local library_t = {
 					TextSize = library_t.font_size
 				});
 
-				local dropdown_frame = utility_t.new_instance("Frame", {
+				local dropdown_visual = utility_t.new_instance("Frame", {
 					Parent = dropdown_button,
 					Size = UDim2.new(1, 0, 1, 0),
 					BackgroundColor3 = Color3.fromRGB(255, 255, 255),
@@ -1271,32 +1166,26 @@ local library_t = {
 				local function get_display_text()
 					if multi then
 						if type(current_options) == "table" then
-							if #current_options == 0 then
-								return "none";
-							else
-								return table.concat(current_options, ", ");
-							end;
-						else
-							return tostring(current_options);
+							if #current_options == 0 then return "none"; end;
+							return table.concat(current_options, ", ");
 						end;
-					else
 						return tostring(current_options);
 					end;
+					return tostring(current_options);
 				end;
 
 				local selected_text = utility_t.new_instance("TextLabel", {
-					Parent = dropdown_frame,
+					Parent = dropdown_visual,
 					BackgroundTransparency = 1,
 					Text = get_display_text(),
 					TextColor3 = library_t.theme.text_color,
 					ZIndex = 2,
-					Position = UDim2.new(0, 7, 0, 7),
+					Size = UDim2.new(1, -10, 1, 0),
+					Position = UDim2.new(0, 5, 0, 0),
 					FontFace = library_t.font,
-					TextSize = library_t.font_size
+					TextSize = library_t.font_size,
+					TextXAlignment = Enum.TextXAlignment.Left
 				});
-
-				local text_bounds = selected_text.TextBounds;
-				selected_text.Position = UDim2.new(0, text_bounds.X / 2 + 5, 0, 7);
 
 				local shadow = utility_t.new_instance("TextLabel", {
 					Parent = selected_text,
@@ -1308,20 +1197,21 @@ local library_t = {
 					BackgroundTransparency = 1,
 					TextColor3 = Color3.fromRGB(0, 0, 0),
 					Text = selected_text.Text,
+					TextXAlignment = Enum.TextXAlignment.Left,
 					BorderSizePixel = 0
 				});
 
-				local dropdown_holder = utility_t.new_instance("Frame", {
+				local dropdown_list_holder = utility_t.new_instance("Frame", {
 					Parent = self.lib.screen_gui,
 					Visible = false,
 					ZIndex = 99,
 					BackgroundColor3 = Color3.new(1, 1, 1),
 					BorderSizePixel = 0,
-					Size = UDim2.new(0, dropdown_frame.AbsoluteSize.X, 0, dropdown_frame.AbsoluteSize.Y)
+					Size = UDim2.new(0, 100, 0, 20)
 				});
 
-				local dropdown_padding = utility_t.new_instance("Frame", {
-					Parent = dropdown_holder,
+				local dropdown_list_padding = utility_t.new_instance("Frame", {
+					Parent = dropdown_list_holder,
 					Position = UDim2.new(0, 5, 0, 2),
 					Size = UDim2.new(1, -5, 1, 0),
 					BackgroundTransparency = 1,
@@ -1329,13 +1219,13 @@ local library_t = {
 				});
 
 				local ui_list_layout = utility_t.new_instance("UIListLayout", {
-					Parent = dropdown_padding,
+					Parent = dropdown_list_padding,
 					SortOrder = Enum.SortOrder.LayoutOrder,
 					FillDirection = Enum.FillDirection.Vertical
 				});
 
-				local update_size = function()
-					dropdown_holder.Size = UDim2.new(0, 0, 0, ui_list_layout.AbsoluteContentSize.Y + 8);
+				local update_list_size = function()
+					dropdown_list_holder.Size = UDim2.new(0, 0, 0, ui_list_layout.AbsoluteContentSize.Y + 8);
 				end;
 
 				local dropdown_object = {};
@@ -1343,8 +1233,6 @@ local library_t = {
 				local update_display = function()
 					selected_text.Text = get_display_text();
 					shadow.Text = selected_text.Text;
-					local text_bounds = selected_text.TextBounds;
-					selected_text.Position = UDim2.new(0, text_bounds.X / 2 + 5, 0, 7);
 				end;
 
 				local set = function(new_options)
@@ -1357,25 +1245,14 @@ local library_t = {
 					else
 						current_options = new_options;
 					end;
-
 					update_display();
-
-					for option, button in pairs(buttons) do
+					for option, btn in pairs(option_buttons) do
 						if multi then
-							if type(current_options) == "table" and table.find(current_options, option) then
-								button.TextColor3 = library_t.theme.accent;
-							else
-								button.TextColor3 = library_t.theme.text_color;
-							end;
+							btn.TextColor3 = (type(current_options) == "table" and table.find(current_options, option)) and library_t.theme.accent or library_t.theme.text_color;
 						else
-							if option == current_options then
-								button.TextColor3 = library_t.theme.accent;
-							else
-								button.TextColor3 = library_t.theme.text_color;
-							end;
+							btn.TextColor3 = (option == current_options) and library_t.theme.accent or library_t.theme.text_color;
 						end;
 					end;
-
 					library_t.flags[flag] = current_options;
 					callback(current_options);
 				end;
@@ -1384,39 +1261,27 @@ local library_t = {
 
 				local change_open = function(state)
 					is_open = state;
-
 					if is_open then
 						if self.lib.base.current_dropdown and self.lib.base.current_dropdown ~= dropdown_object then
 							self.lib.base.current_dropdown.change_open(false);
 						end;
-
 						self.lib.base.current_dropdown = dropdown_object;
-
-						local absolute_size = dropdown_button.AbsoluteSize;
-
-						dropdown_holder.Visible = true;
-
-						dropdown_holder.Size = UDim2.new(dropdown_holder.Size.X.Scale, absolute_size.X, dropdown_holder.Size.Y.Scale, dropdown_holder.Size.Y.Offset);
-						dropdown_holder.Position = UDim2.new(0, dropdown_button.AbsolutePosition.X, 0, dropdown_button.AbsolutePosition.Y + 23);
+						dropdown_list_holder.Visible = true;
+						dropdown_list_holder.Size = UDim2.new(0, dropdown_button.AbsoluteSize.X, 0, dropdown_list_holder.Size.Y.Offset);
+						dropdown_list_holder.Position = UDim2.new(0, dropdown_button.AbsolutePosition.X, 0, dropdown_button.AbsolutePosition.Y + 23);
 					else
 						self.lib.base.current_dropdown = nil;
-						dropdown_holder.Visible = false;
+						dropdown_list_holder.Visible = false;
 					end;
 				end;
 
 				dropdown_object.change_open = change_open;
 
 				local create_option = function(option)
-					local is_selected = false;
-					if multi then
-						is_selected = type(current_options) == "table" and table.find(current_options, option) ~= nil;
-					else
-						is_selected = current_options == option;
-					end;
+					local is_selected = multi and (type(current_options) == "table" and table.find(current_options, option) ~= nil) or (current_options == option);
 
 					local option_button, pressed_option = utility_t.new_button({
-						Parent = dropdown_padding,
-						Position = UDim2.new(0, 0, 0, 4),
+						Parent = dropdown_list_padding,
 						Size = UDim2.new(1, 0, 0, 13),
 						BackgroundTransparency = 1,
 						BorderSizePixel = 0,
@@ -1444,15 +1309,12 @@ local library_t = {
 						BorderSizePixel = 0
 					});
 
-					buttons[option] = option_button;
+					option_buttons[option] = option_button;
 
 					utility_t.connect(pressed_option, function()
 						if self.lib.base.current_tab == self.tab and is_open then
 							if multi then
-								if type(current_options) ~= "table" then
-									current_options = {};
-								end;
-
+								if type(current_options) ~= "table" then current_options = {}; end;
 								local index = table.find(current_options, option);
 								if index then
 									if not (no_none and #current_options == 1) then
@@ -1463,54 +1325,46 @@ local library_t = {
 									table.insert(current_options, option);
 									option_button.TextColor3 = library_t.theme.accent;
 								end;
-
 								update_display();
 								library_t.flags[flag] = current_options;
 								callback(current_options);
 							else
-								for _, button in pairs(buttons) do
-									button.TextColor3 = library_t.theme.text_color;
+								for _, btn in pairs(option_buttons) do
+									btn.TextColor3 = library_t.theme.text_color;
 								end;
-
 								current_options = option;
 								library_t.flags[flag] = current_options;
 								callback(current_options);
 								option_button.TextColor3 = library_t.theme.accent;
 								update_display();
-
 								change_open(false);
 							end;
 						end;
 					end);
 
-					update_size();
+					update_list_size();
 				end;
 
-				for i, option in ipairs(options) do
+				for _, option in ipairs(options) do
 					create_option(option);
 				end;
 
 				dropdown_object.refresh = function(new_options)
-					for option, button in pairs(buttons) do
-						button:Destroy();
+					for option, btn in pairs(option_buttons) do
+						btn:Destroy();
 					end;
-					buttons = {};
-
+					option_buttons = {};
 					options = new_options;
-
-					for i, option in ipairs(new_options) do
+					for _, option in ipairs(new_options) do
 						create_option(option);
 					end;
-
 					if multi then
 						if type(current_options) == "table" then
-							local valid_options = {};
+							local valid = {};
 							for _, opt in ipairs(current_options) do
-								if table.find(new_options, opt) then
-									table.insert(valid_options, opt);
-								end;
+								if table.find(new_options, opt) then table.insert(valid, opt); end;
 							end;
-							current_options = valid_options;
+							current_options = valid;
 						else
 							current_options = {};
 						end;
@@ -1519,19 +1373,18 @@ local library_t = {
 							current_options = new_options[1] or "none";
 						end;
 					end;
-
 					update_display();
 					library_t.flags[flag] = current_options;
 				end;
 
 				utility_t.new_instance("UIGradient", {
-					Parent = dropdown_frame,
+					Parent = dropdown_visual,
 					Rotation = 90,
 					Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(44, 44, 44)), ColorSequenceKeypoint.new(1, utility_t.darken_color(Color3.fromRGB(44, 44, 44), 0.8))})
 				});
 
 				utility_t.new_instance("UIGradient", {
-					Parent = dropdown_holder,
+					Parent = dropdown_list_holder,
 					Rotation = 90,
 					Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(44, 44, 44)), ColorSequenceKeypoint.new(1, utility_t.darken_color(Color3.fromRGB(44, 44, 44), 0.8))})
 				});
@@ -1545,7 +1398,7 @@ local library_t = {
 				});
 
 				utility_t.new_instance("UIStroke", {
-					Parent = dropdown_holder,
+					Parent = dropdown_list_holder,
 					LineJoinMode = Enum.LineJoinMode.Miter,
 					ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 					Color = Color3.fromRGB(17, 17, 17),
@@ -1553,7 +1406,7 @@ local library_t = {
 				});
 
 				utility_t.connect(user_input_service.InputBegan, function(input)
-					if is_open and self.lib.base.is_open and input.UserInputType == Enum.UserInputType.MouseButton1 and not (utility_t.is_mouse_in_frame(dropdown_button) or utility_t.is_mouse_in_frame(dropdown_holder)) then
+					if is_open and self.lib.base.is_open and input.UserInputType == Enum.UserInputType.MouseButton1 and not (utility_t.is_mouse_in_frame(dropdown_button) or utility_t.is_mouse_in_frame(dropdown_list_holder)) then
 						change_open(false);
 					end;
 				end);
@@ -1565,7 +1418,6 @@ local library_t = {
 				end);
 
 				self.update_size();
-
 				return dropdown_object;
 			end;
 
@@ -1574,22 +1426,23 @@ local library_t = {
 
 				local colorpicker_frame_holder = utility_t.new_instance("Frame", {
 					Parent = self.content_frame,
-					Size = UDim2.new(1, 0, 0, 3),
+					Size = UDim2.new(1, 0, 0, 7),
 					BorderSizePixel = 0,
 					BackgroundTransparency = 1
 				});
 
 				local name_label = utility_t.new_instance("TextLabel", {
 					Parent = colorpicker_frame_holder,
-					Position = UDim2.new(0, 37, 0, -3),
-					Size = UDim2.new(0, 9, 0, 12),
+					Position = UDim2.new(0, ELEMENT_PAD_LEFT, 0, -2),
+					Size = UDim2.new(1, -ELEMENT_PAD_LEFT - ELEMENT_PAD_RIGHT, 0, 12),
 					Text = name,
 					ZIndex = 2,
 					BackgroundTransparency = 1,
 					BorderSizePixel = 0,
 					TextColor3 = library_t.theme.text_color,
 					FontFace = library_t.font,
-					TextSize = library_t.font_size
+					TextSize = library_t.font_size,
+					TextXAlignment = Enum.TextXAlignment.Left
 				});
 
 				utility_t.new_instance("TextLabel", {
@@ -1602,11 +1455,11 @@ local library_t = {
 					BackgroundTransparency = 1,
 					TextColor3 = Color3.fromRGB(0, 0, 0),
 					Text = name,
+					TextXAlignment = Enum.TextXAlignment.Left,
 					BorderSizePixel = 0
 				});
 
 				create_colorpicker(self, properties, colorpicker_frame_holder, false);
-
 				self.update_size();
 			end;
 
@@ -1615,26 +1468,24 @@ local library_t = {
 
 				local keybind_frame_holder = utility_t.new_instance("Frame", {
 					Parent = self.content_frame,
-					Size = UDim2.new(1, 0, 0, 5),
+					Size = UDim2.new(1, 0, 0, 7),
 					BorderSizePixel = 0,
 					BackgroundTransparency = 1
 				});
 
 				local name_label = utility_t.new_instance("TextLabel", {
 					Parent = keybind_frame_holder,
-					Position = UDim2.new(0, 30, 0, -3),
-					Size = UDim2.new(0, 9, 0, 12),
+					Position = UDim2.new(0, ELEMENT_PAD_LEFT, 0, -2),
+					Size = UDim2.new(1, -ELEMENT_PAD_LEFT - ELEMENT_PAD_RIGHT, 0, 12),
 					Text = name,
 					ZIndex = 2,
 					BackgroundTransparency = 1,
 					BorderSizePixel = 0,
 					TextColor3 = library_t.theme.text_color,
 					FontFace = library_t.font,
-					TextSize = library_t.font_size
+					TextSize = library_t.font_size,
+					TextXAlignment = Enum.TextXAlignment.Left
 				});
-
-				local text_bounds = name_label.TextBounds;
-				name_label.Position = UDim2.new(0, text_bounds.X / 2 + 10, 0, 0);
 
 				utility_t.new_instance("TextLabel", {
 					Parent = name_label,
@@ -1646,11 +1497,11 @@ local library_t = {
 					BackgroundTransparency = 1,
 					TextColor3 = Color3.fromRGB(0, 0, 0),
 					Text = name,
+					TextXAlignment = Enum.TextXAlignment.Left,
 					BorderSizePixel = 0
 				});
 
 				create_keybind(self, properties, keybind_frame_holder, false);
-
 				self.update_size();
 			end;
 
@@ -1663,27 +1514,25 @@ local library_t = {
 
 				local textbox_holder = utility_t.new_instance("Frame", {
 					Parent = self.content_frame,
-					Size = UDim2.new(1, 0, 0, 30),
+					Size = UDim2.new(1, 0, 0, 32),
 					BorderSizePixel = 0,
 					BackgroundTransparency = 1
 				});
 
 				local name_label = utility_t.new_instance("TextLabel", {
 					Parent = textbox_holder,
-					Position = UDim2.new(0, 33, 0, -3),
-					Size = UDim2.new(0, 9, 0, 12),
+					Position = UDim2.new(0, ELEMENT_PAD_LEFT, 0, 0),
+					Size = UDim2.new(1, -ELEMENT_PAD_LEFT - ELEMENT_PAD_RIGHT, 0, 12),
 					Text = name,
 					ZIndex = 2,
 					BackgroundTransparency = 1,
 					BorderSizePixel = 0,
 					TextColor3 = library_t.theme.text_color,
 					FontFace = library_t.font,
-					TextSize = library_t.font_size
+					TextSize = library_t.font_size,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					TextYAlignment = Enum.TextYAlignment.Top
 				});
-
-				local text_bounds = name_label.TextBounds;
-
-				name_label.Position = UDim2.new(0, text_bounds.X / 2 + 12, 0, 0);
 
 				library_t.flags[flag] = default;
 
@@ -1697,13 +1546,15 @@ local library_t = {
 					BackgroundTransparency = 1,
 					TextColor3 = Color3.fromRGB(0, 0, 0),
 					Text = name,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					TextYAlignment = Enum.TextYAlignment.Top,
 					BorderSizePixel = 0
 				});
 
 				local textbox_frame = utility_t.new_instance("Frame", {
 					Parent = textbox_holder,
-					Position = UDim2.new(0, 16, 0, 15),
-					Size = UDim2.new(1, -52, 0, 18),
+					Position = UDim2.new(0, ELEMENT_PAD_LEFT, 0, 14),
+					Size = UDim2.new(1, -ELEMENT_PAD_LEFT - ELEMENT_PAD_RIGHT, 0, 18),
 					BorderSizePixel = 0,
 					BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 				});
@@ -1724,8 +1575,8 @@ local library_t = {
 
 				local textbox = utility_t.new_instance("TextBox", {
 					Parent = textbox_frame,
-					Size = UDim2.new(1, -4, 1, -4),
-					Position = UDim2.new(0, 2, 0, 2),
+					Size = UDim2.new(1, -8, 1, -4),
+					Position = UDim2.new(0, 4, 0, 2),
 					BackgroundTransparency = 1,
 					Text = default or "",
 					TextColor3 = library_t.theme.text_color,
@@ -1733,7 +1584,8 @@ local library_t = {
 					TextSize = library_t.font_size,
 					PlaceholderText = placeholder,
 					BorderSizePixel = 0,
-					ClearTextOnFocus = false
+					ClearTextOnFocus = false,
+					TextXAlignment = Enum.TextXAlignment.Left
 				});
 
 				utility_t.connect(textbox:GetPropertyChangedSignal("Text"), function()
@@ -1756,7 +1608,7 @@ local library_t = {
 
 				local button_frame = utility_t.new_instance("Frame", {
 					Parent = self.content_frame,
-					Size = UDim2.new(1, -52, 0, 15),
+					Size = UDim2.new(1, -ELEMENT_PAD_LEFT - ELEMENT_PAD_RIGHT, 0, 18),
 					BorderSizePixel = 0,
 					BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 				});
@@ -1764,7 +1616,6 @@ local library_t = {
 				local actual_button, pressed = utility_t.new_button({
 					Parent = button_frame,
 					Size = UDim2.new(1, 0, 1, 0),
-					Position = UDim2.new(0, 0, 0, 0),
 					BackgroundTransparency = 1,
 					BorderSizePixel = 0,
 					Text = name,
@@ -1973,22 +1824,6 @@ local library_t = {
 					ScrollBarThickness = 0,
 				});
 
-				local upper_fade = utility_t.new_instance("Frame", {
-					Parent = section_frame,
-					Size = UDim2.new(1, 0, 0, 10),
-					ZIndex = 999,
-					BackgroundTransparency = 0.5,
-					Position = UDim2.new(0, 0, 0, -1),
-					BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-					BorderSizePixel = 0
-				});
-
-				utility_t.new_instance("UIGradient", {
-					Parent = upper_fade,
-					Rotation = 90,
-					Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(24, 24, 24)), ColorSequenceKeypoint.new(0.6, Color3.fromRGB(24, 24, 24)), ColorSequenceKeypoint.new(0.7, Color3.fromRGB(24, 24, 24)), ColorSequenceKeypoint.new(0.8, Color3.fromRGB(24, 24, 24)), ColorSequenceKeypoint.new(0.9, Color3.fromRGB(24, 24, 24)), ColorSequenceKeypoint.new(1, Color3.fromRGB(24, 24, 24))})
-				});
-
 				utility_t.connect(user_input_service.InputChanged, function(input)
 					if self.lib.base.current_tab == self and self.lib.base.is_open and input.UserInputType == Enum.UserInputType.MouseWheel and utility_t.is_mouse_in_frame(main_frame) then
 						local is_going_up = input.Position.Z < 0;
@@ -2000,13 +1835,13 @@ local library_t = {
 					Parent = main_frame,
 					BackgroundTransparency = 1,
 					BorderSizePixel = 0,
-					Size = UDim2.new(1, -32, 1, -20),
-					Position = UDim2.new(0, 16, 0, 13)
+					Size = UDim2.new(1, -8, 1, -20),
+					Position = UDim2.new(0, 4, 0, 13)
 				});
 
 				local ui_list_layout = utility_t.new_instance("UIListLayout", {
 					Parent = content_frame,
-					Padding = UDim.new(0, 10),
+					Padding = UDim.new(0, 4),
 					SortOrder = Enum.SortOrder.LayoutOrder,
 					FillDirection = Enum.FillDirection.Vertical
 				});
@@ -2106,7 +1941,7 @@ local library_t = {
 			});
 
 			local switch_tab = function(tab)
-				for i, v_tab in self.base.tabs do
+				for _, v_tab in self.base.tabs do
 					if v_tab == tab then
 						v_tab.tab_section.Visible = true;
 						v_tab.tab_button.TextColor3 = library_t.theme.accent;
@@ -2115,7 +1950,6 @@ local library_t = {
 						v_tab.tab_button.TextColor3 = library_t.theme.text_color;
 					end;
 				end;
-
 				self.base.current_tab = tab;
 			end;
 
@@ -2143,11 +1977,7 @@ local library_t = {
 			self.base.tab_lines[self.base.tab_index] = tab_line_frame;
 
 			for i, tab_line in self.base.tab_lines do
-				if i == #self.base.tabs then
-					tab_line.Visible = false;
-				else
-					tab_line.Visible = true;
-				end;
+				tab_line.Visible = (i ~= #self.base.tabs);
 			end;
 
 			return tab;
@@ -2167,29 +1997,19 @@ local library_t = {
 		end;
 
 		library_t.ensure_directories = function(self)
-			if not isfolder(self.assets_dir) then
-				makefolder(self.assets_dir);
-			end;
-			if not isfolder(self.assets_dir .. "/" .. self.project_name) then
-				makefolder(self.assets_dir .. "/" .. self.project_name);
-			end;
-			if not isfolder(self:get_config_path()) then
-				makefolder(self:get_config_path());
-			end;
+			if not isfolder(self.assets_dir) then makefolder(self.assets_dir); end;
+			if not isfolder(self.assets_dir .. "/" .. self.project_name) then makefolder(self.assets_dir .. "/" .. self.project_name); end;
+			if not isfolder(self:get_config_path()) then makefolder(self:get_config_path()); end;
 		end;
 
 		library_t.get_configs = function(self)
 			self:ensure_directories();
 			local configs = {};
-			local success, files = pcall(function()
-				return listfiles(self:get_config_path());
-			end);
+			local success, files = pcall(function() return listfiles(self:get_config_path()); end);
 			if success and files then
 				for _, file in ipairs(files) do
-					local name = file:match("([^/\\]+)%.json$");
-					if name then
-						table.insert(configs, name);
-					end;
+					local n = file:match("([^/\\]+)%.json$");
+					if n then table.insert(configs, n); end;
 				end;
 			end;
 			return configs;
@@ -2199,9 +2019,7 @@ local library_t = {
 			self:ensure_directories();
 			local settings = {};
 			if isfile(self:get_settings_path()) then
-				pcall(function()
-					settings = http_service:JSONDecode(readfile(self:get_settings_path()));
-				end);
+				pcall(function() settings = http_service:JSONDecode(readfile(self:get_settings_path())); end);
 			end;
 			settings.auto_load = config_name;
 			writefile(self:get_settings_path(), http_service:JSONEncode(settings));
@@ -2210,12 +2028,8 @@ local library_t = {
 		library_t.get_auto_load = function(self)
 			self:ensure_directories();
 			if isfile(self:get_settings_path()) then
-				local success, settings = pcall(function()
-					return http_service:JSONDecode(readfile(self:get_settings_path()));
-				end);
-				if success and settings and settings.auto_load then
-					return settings.auto_load;
-				end;
+				local s, st = pcall(function() return http_service:JSONDecode(readfile(self:get_settings_path())); end);
+				if s and st and st.auto_load then return st.auto_load; end;
 			end;
 			return nil;
 		end;
@@ -2224,9 +2038,7 @@ local library_t = {
 			self:ensure_directories();
 			local settings = {};
 			if isfile(self:get_settings_path()) then
-				pcall(function()
-					settings = http_service:JSONDecode(readfile(self:get_settings_path()));
-				end);
+				pcall(function() settings = http_service:JSONDecode(readfile(self:get_settings_path())); end);
 			end;
 			settings.auto_load = nil;
 			writefile(self:get_settings_path(), http_service:JSONEncode(settings));
@@ -2234,10 +2046,7 @@ local library_t = {
 
 		library_t.delete_config = function(self, config_name)
 			local path = self:get_config_path() .. "/" .. config_name .. ".json";
-			if isfile(path) then
-				delfile(path);
-				return true;
-			end;
+			if isfile(path) then delfile(path); return true; end;
 			return false;
 		end;
 
@@ -2248,10 +2057,8 @@ local library_t = {
 
 			local is_dragging = false;
 			local is_resizing = false;
-
 			local initial_mouse_pos = Vector2.zero;
 			local initial_frame_pos = Vector2.zero;
-
 			local initial_mouse_pos_resize = Vector2.zero;
 			local initial_size = Vector2.zero;
 
@@ -2267,7 +2074,7 @@ local library_t = {
 			local main_frame = utility_t.new_instance("Frame", {
 				Parent = screen_gui,
 				Size = actual_size,
-				Position = UDim2.new(0.5, -size.X / 2, 0.5, -size.Y/ 2),
+				Position = UDim2.new(0.5, -size.X / 2, 0.5, -size.Y / 2),
 				BorderSizePixel = 0,
 				BackgroundColor3 = library_t.theme.background_color
 			});
@@ -2275,7 +2082,6 @@ local library_t = {
 			utility_t.new_instance("ImageLabel", {
 				Parent = main_frame,
 				Size = UDim2.new(1, 0, 1, 0),
-				Position = UDim2.new(0, 0, 0, 0),
 				BackgroundTransparency = 1,
 				ImageColor3 = library_t.theme.dots_color,
 				ScaleType = Enum.ScaleType.Tile,
@@ -2301,7 +2107,6 @@ local library_t = {
 			});
 
 			local cursor_frame;
-
 			local mouse_location = user_input_service:GetMouseLocation();
 
 			if library_t.cursor then
@@ -2391,33 +2196,23 @@ local library_t = {
 
 			set_open(library_t.base.is_open);
 
-			utility_t.connect(user_input_service.InputChanged, function(input, is_typing)
+			utility_t.connect(user_input_service.InputChanged, function(input)
 				if input.UserInputType == Enum.UserInputType.MouseMovement then
 					if is_dragging then
-						local current_mouse_pos = user_input_service:GetMouseLocation();
-						local delta_x = current_mouse_pos.X - initial_mouse_pos.X;
-						local delta_y = current_mouse_pos.Y - initial_mouse_pos.Y;
-
-						main_frame.Position = UDim2.new(initial_frame_pos.X.Scale, initial_frame_pos.X.Offset + delta_x, initial_frame_pos.Y.Scale, initial_frame_pos.Y.Offset + delta_y);
+						local cmp = user_input_service:GetMouseLocation();
+						main_frame.Position = UDim2.new(initial_frame_pos.X.Scale, initial_frame_pos.X.Offset + cmp.X - initial_mouse_pos.X, initial_frame_pos.Y.Scale, initial_frame_pos.Y.Offset + cmp.Y - initial_mouse_pos.Y);
 					end;
-
 					if is_resizing then
-						local mouse_position = user_input_service:GetMouseLocation();
-
-						local delta_x = mouse_position.X - initial_mouse_pos_resize.X;
-						local delta_y = mouse_position.Y - initial_mouse_pos_resize.Y;
-
-						local new_size = Vector2.new(
-							math.max(initial_size.X.Offset + delta_x, size.X),
-							math.max(initial_size.Y.Offset + delta_y, size.Y)
+						local mp = user_input_service:GetMouseLocation();
+						local ns = Vector2.new(
+							math.max(initial_size.X.Offset + mp.X - initial_mouse_pos_resize.X, size.X),
+							math.max(initial_size.Y.Offset + mp.Y - initial_mouse_pos_resize.Y, size.Y)
 						);
-
-						main_frame.Size = UDim2.new(0, new_size.X, 0, new_size.Y);
+						main_frame.Size = UDim2.new(0, ns.X, 0, ns.Y);
 					end;
-
 					if cursor_frame then
-						local mouse_location = user_input_service:GetMouseLocation();
-						cursor_frame.Position = UDim2.new(0, mouse_location.X, 0, mouse_location.Y - 56);
+						local ml = user_input_service:GetMouseLocation();
+						cursor_frame.Position = UDim2.new(0, ml.X, 0, ml.Y - 56);
 					end;
 				end;
 			end);
@@ -2434,14 +2229,12 @@ local library_t = {
 			main_library.screen_gui = screen_gui;
 			main_library.tab_padding = tab_padding;
 			main_library.main_frame = main_frame;
-
 			main_library:set_project(project);
 
 			utility_t.connect(user_input_service.InputBegan, function(input)
 				if input.KeyCode == library_t.toggle_key then
 					main_library.base.is_open = not main_library.base.is_open;
 					screen_gui.Enabled = main_library.base.is_open;
-
 					set_open(library_t.base.is_open);
 				end;
 			end);
@@ -2450,14 +2243,11 @@ local library_t = {
 				if input.UserInputType == Enum.UserInputType.MouseButton1 and main_library.base.is_open then
 					for _, button_object in buttons do
 						if utility_t.is_mouse_in_frame(button_object.button) then
-							if not utility_t.is_parents_visible(button_object.button) then
-								continue;
-							end;
-
+							if not utility_t.is_parents_visible(button_object.button) then continue; end;
 							button_object.pressed:fire();
 							break;
 						end;
-					end
+					end;
 				end;
 			end);
 
@@ -2466,67 +2256,42 @@ local library_t = {
 
 		library_t.create_config = function(self)
 			local cfg = {};
-
 			for flag, value in pairs(library_t.flags) do
-				if library_t.config_ignore_flags[flag] then
-					continue;
-				end;
-
+				if library_t.config_ignore_flags[flag] then continue; end;
 				if not self.base.key_flags[flag] then
 					cfg[flag] = value;
-
 					if type(value) == "table" and value.color then
 						cfg[flag] = {color = {value.color.R, value.color.G, value.color.B}, transparency = value.transparency or nil};
 					end;
 				end;
 			end;
-
 			for flag, value in pairs(self.base.key_flags) do
-				if library_t.config_ignore_flags[flag] then
-					continue;
-				end;
-
-				if value then
-					cfg[flag] = value.Name;
-				end;
+				if library_t.config_ignore_flags[flag] then continue; end;
+				if value then cfg[flag] = value.Name; end;
 			end;
-
 			return http_service:JSONEncode(cfg);
 		end;
 
 		library_t.load_config = function(self, cfg)
-			local success, actual_cfg = pcall(function()
-				return http_service:JSONDecode(cfg);
-			end);
-
-			if not success then
-				return false;
-			end;
-
+			local success, actual_cfg = pcall(function() return http_service:JSONDecode(cfg); end);
+			if not success then return false; end;
 			for flag, value in pairs(actual_cfg) do
-				if library_t.config_ignore_flags[flag] then
-					continue;
-				end;
-
+				if library_t.config_ignore_flags[flag] then continue; end;
 				if self.base.save_flags[flag] then
 					self.base.save_flags[flag](value);
 				end;
 			end;
-
 			return true;
 		end;
 
 		library_t.save_config = function(self, config_name)
 			self:ensure_directories();
-			local path = self:get_config_path() .. "/" .. config_name .. ".json";
-			writefile(path, self:create_config());
+			writefile(self:get_config_path() .. "/" .. config_name .. ".json", self:create_config());
 		end;
 
 		library_t.load_config_by_name = function(self, config_name)
 			local path = self:get_config_path() .. "/" .. config_name .. ".json";
-			if isfile(path) then
-				return self:load_config(readfile(path));
-			end;
+			if isfile(path) then return self:load_config(readfile(path)); end;
 			return false;
 		end;
 	end;
