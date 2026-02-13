@@ -107,7 +107,7 @@ local library_t = {
 		utility_t.get_path = function()
 			return run_service:IsStudio() and local_player.PlayerGui or gethui();
 		end;
-		
+
 		utility_t.darken_color = function(color, factor)
 			return Color3.new(
 				math.clamp(color.R * factor, 0, 1),
@@ -184,12 +184,12 @@ local library_t = {
 		end;
 
 		utility_t.has_property = function(object, property_name)
-			local success, _ = pcall(function() 
+			local success, _ = pcall(function()
 				object[property_name] = object[property_name];
 			end);
 			return success;
 		end;
-		
+
 		utility_t.is_in_main_frame = function(frame, main_frame)
 			local frame_position = frame.AbsolutePosition;
 			local frame_size = frame.AbsoluteSize;
@@ -202,7 +202,7 @@ local library_t = {
 
 		utility_t.is_parents_visible = function(instance)
 			local parent = instance.Parent;
-			
+
 			local result = true;
 
 			while parent do
@@ -238,7 +238,7 @@ local library_t = {
 			if not isfolder(library_t.assets_dir) then
 				makefolder(library_t.assets_dir);
 			end;
-			
+
 			writefile(library_t.assets_dir.."/font.ttf", game:HttpGet(library_t.font_link));
 
 			local custom_font = {
@@ -262,7 +262,7 @@ local library_t = {
 				for i, connection in connections do
 					connection:Disconnect();
 				end;
-	
+
 				for i, instance in instances do
 					instance:Destroy();
 				end;
@@ -315,7 +315,7 @@ local library_t = {
 				BackgroundColor3 = library_t.theme.background_color_picker,
 				BorderSizePixel = 0,
 			});
-			
+
 			utility_t.new_instance("ImageLabel", {
 				Parent = colorpicker_content_holder,
 				Size = UDim2.new(1, 0, 1, 0),
@@ -326,7 +326,7 @@ local library_t = {
 				ZIndex = 1000,
 				TileSize = UDim2.new(0, 8, 0, 8),
 				Image = "rbxassetid://134950628747280"
-			});			
+			});
 
 			local top_line = utility_t.new_instance("Frame", {
 				Parent = colorpicker_content_holder,
@@ -349,7 +349,7 @@ local library_t = {
 				TextXAlignment = Enum.TextXAlignment.Left,
 				TextYAlignment = Enum.TextYAlignment.Top
 			});
-			
+
 			utility_t.new_instance("TextLabel", {
 				Parent = colorpicker_info,
 				Size = UDim2.new(1, 0, 1, 0),
@@ -387,7 +387,7 @@ local library_t = {
 				{ color = Color3.fromRGB(60, 60, 60), thickness = 1, zindex = 1000, },
 				{ color = Color3.fromRGB(31, 31, 31), thickness = 1, zindex = 1000, }
 			});
-			
+
 			local actual_colorpicker_frame = utility_t.new_instance("ImageLabel", {
 				Parent = colorpicker_content_holder,
 				ZIndex = 10005,
@@ -407,7 +407,7 @@ local library_t = {
 			});
 
 			utility_t.create_outlines(actual_colorpicker_frame, {
-				{ color = Color3.fromRGB(14, 14, 14), transparency = 0 },	
+				{ color = Color3.fromRGB(14, 14, 14), transparency = 0 },
 			});
 
 			local colorpicker_hue = utility_t.new_instance("Frame", {
@@ -686,25 +686,25 @@ local library_t = {
 			local set_key = function(key)
 				if key then
 					local key_enum = nil;
-					
+
 					if typeof(key) == "EnumItem" then
 						key_enum = key;
 					elseif type(key) == "string" then
 						key_enum = Enum.KeyCode[key] or Enum.UserInputType[key] or nil;
 					end;
-					
+
 					if key_enum then
 						current_key = key_enum;
 						keybind_text.Text = key_enum.Name:lower();
 						shadow.Text = key_enum.Name:lower();
 						self.lib.base.key_flags[flag] = key_enum;
-						
+
 						if index_mode then
 							library_t.flags[flag] = key_enum;
 						else
 							library_t.flags[flag] = false;
 						end;
-						
+
 						update_pos();
 						callback(key_enum);
 					end;
@@ -713,13 +713,13 @@ local library_t = {
 					keybind_text.Text = "none";
 					shadow.Text = "none";
 					self.lib.base.key_flags[flag] = nil;
-					
+
 					if index_mode then
 						library_t.flags[flag] = nil;
 					else
 						library_t.flags[flag] = false;
 					end;
-					
+
 					update_pos();
 					callback(nil);
 				end;
@@ -749,13 +749,13 @@ local library_t = {
 
 				if is_selecting then
 					local key = nil;
-					
+
 					if input.UserInputType == Enum.UserInputType.Keyboard then
 						key = input.KeyCode;
 					elseif input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.MouseButton2 then
 						key = input.UserInputType;
 					end;
-					
+
 					if key then
 						is_selecting = false;
 						set_key(key);
@@ -765,13 +765,13 @@ local library_t = {
 
 				if not is_selecting and not index_mode and current_key then
 					local should_trigger = false;
-					
+
 					if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == current_key then
 						should_trigger = true;
 					elseif input.UserInputType == current_key then
 						should_trigger = true;
 					end;
-					
+
 					if should_trigger then
 						if mode == "toggle" then
 							state = not state;
@@ -789,13 +789,13 @@ local library_t = {
 			utility_t.connect(user_input_service.InputEnded, function(input)
 				if not index_mode and current_key and mode == "hold" then
 					local should_release = false;
-					
+
 					if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == current_key then
 						should_release = true;
 					elseif input.UserInputType == current_key then
 						should_release = true;
 					end;
-					
+
 					if should_release then
 						state = false;
 						library_t.flags[flag] = state;
@@ -831,7 +831,7 @@ local library_t = {
 				BackgroundTransparency = 1,
 				TextTransparency = 1,
 			});
-			
+
 			utility_t.connect(drag_signal, function()
 				is_dragging = true;
 				initial_frame_pos = watermark_holder.Position;
@@ -937,7 +937,7 @@ local library_t = {
 
 				local ENABLED = ColorSequence.new({ColorSequenceKeypoint.new(0, library_t.theme.accent), ColorSequenceKeypoint.new(1, utility_t.darken_color(library_t.theme.accent, 0.8))});
 				local DISABLED = ColorSequence.new({ColorSequenceKeypoint.new(0, BASE_COLOR), ColorSequenceKeypoint.new(1, utility_t.darken_color(BASE_COLOR, 0.8))});
-				
+
 				local toggle_holder = utility_t.new_instance("Frame", {
 					Parent = self.content_frame,
 					Size = UDim2.new(1, 0, 0, 7),
@@ -1012,7 +1012,7 @@ local library_t = {
 				self.lib.base.save_flags[flag] = change_state;
 
 				self.update_size();
-				
+
 				return {
 					colorpicker = function(_, properties)
 						create_colorpicker(self, properties, toggle_holder, true);
@@ -1571,7 +1571,7 @@ local library_t = {
 
 			section.colorpicker = function(self, properties)
 				local name = properties and properties.name or "colorpicker";
-				
+
 				local colorpicker_frame_holder = utility_t.new_instance("Frame", {
 					Parent = self.content_frame,
 					Size = UDim2.new(1, 0, 0, 3),
@@ -1606,13 +1606,13 @@ local library_t = {
 				});
 
 				create_colorpicker(self, properties, colorpicker_frame_holder, false);
-				
+
 				self.update_size();
 			end;
 
 			section.keybind = function(self, properties)
 				local name = properties and properties.name or "keybind";
-				
+
 				local keybind_frame_holder = utility_t.new_instance("Frame", {
 					Parent = self.content_frame,
 					Size = UDim2.new(1, 0, 0, 5),
@@ -1650,7 +1650,7 @@ local library_t = {
 				});
 
 				create_keybind(self, properties, keybind_frame_holder, false);
-				
+
 				self.update_size();
 			end;
 
@@ -1746,7 +1746,7 @@ local library_t = {
 					library_t.flags[flag] = value;
 					callback(value);
 				end;
-				
+
 				self.update_size();
 			end;
 
@@ -1770,7 +1770,7 @@ local library_t = {
 					Text = name,
 					TextColor3 = library_t.theme.text_color,
 					FontFace = library_t.font,
-					TextSize = library_t.font_size	
+					TextSize = library_t.font_size
 				});
 
 				utility_t.new_instance("UIStroke", {
@@ -1792,7 +1792,7 @@ local library_t = {
 						callback();
 					end;
 				end);
-				
+
 				self.update_size();
 			end;
 
@@ -1801,18 +1801,15 @@ local library_t = {
 				local flag = properties and properties.flag or "__config_name_textbox";
 				local placeholder = properties and properties.placeholder or "config name...";
 
-				-- Mark config UI flags to be ignored during save/load
 				library_t.config_ignore_flags["__config_selector"] = true;
 				library_t.config_ignore_flags[flag] = true;
 
-				-- Config name textbox
 				self:textbox({
 					name = name,
 					placeholder = placeholder,
 					flag = flag,
 				});
 
-				-- Config dropdown selector
 				local configs = self.lib:get_configs();
 				local config_dropdown = self:dropdown({
 					name = "configs",
@@ -1829,7 +1826,6 @@ local library_t = {
 					end,
 				});
 
-				-- Store reference for refreshing
 				self.lib.config_dropdown_object = config_dropdown;
 
 				local refresh_configs = function()
@@ -1837,7 +1833,6 @@ local library_t = {
 					config_dropdown.refresh(#new_configs > 0 and new_configs or {"none"});
 				end;
 
-				-- Save button
 				self:button({
 					name = "save config",
 					callback = function()
@@ -1845,7 +1840,6 @@ local library_t = {
 						if config_name and config_name ~= "" and config_name ~= "none" then
 							self.lib:save_config(config_name);
 							refresh_configs();
-							-- Select the saved config
 							if self.lib.base.save_flags["__config_selector"] then
 								self.lib.base.save_flags["__config_selector"](config_name);
 							end;
@@ -1853,7 +1847,6 @@ local library_t = {
 					end,
 				});
 
-				-- Load button
 				self:button({
 					name = "load config",
 					callback = function()
@@ -1864,14 +1857,12 @@ local library_t = {
 					end,
 				});
 
-				-- Delete button
 				self:button({
 					name = "delete config",
 					callback = function()
 						local config_name = library_t.flags["__config_selector"];
 						if config_name and config_name ~= "" and config_name ~= "none" then
 							self.lib:delete_config(config_name);
-							-- Remove auto load if it was this config
 							local auto_load = self.lib:get_auto_load();
 							if auto_load == config_name then
 								self.lib:remove_auto_load();
@@ -1881,7 +1872,6 @@ local library_t = {
 					end,
 				});
 
-				-- Auto load button
 				self:button({
 					name = "set auto load",
 					callback = function()
@@ -1892,7 +1882,6 @@ local library_t = {
 					end,
 				});
 
-				-- Remove auto load button
 				self:button({
 					name = "remove auto load",
 					callback = function()
@@ -1900,14 +1889,12 @@ local library_t = {
 					end,
 				});
 
-				-- Try to auto load on creation
 				local auto_load_config = self.lib:get_auto_load();
 				if auto_load_config then
 					local config_list = self.lib:get_configs();
 					if table.find(config_list, auto_load_config) then
 						task.defer(function()
 							self.lib:load_config_by_name(auto_load_config);
-							-- Select the auto-loaded config in dropdown
 							if self.lib.base.save_flags["__config_selector"] then
 								self.lib.base.save_flags["__config_selector"](auto_load_config);
 							end;
@@ -1985,7 +1972,7 @@ local library_t = {
 					ScrollBarImageTransparency = 1,
 					ScrollBarThickness = 0,
 				});
-				
+
 				local upper_fade = utility_t.new_instance("Frame", {
 					Parent = section_frame,
 					Size = UDim2.new(1, 0, 0, 10),
@@ -2045,7 +2032,7 @@ local library_t = {
 				Parent = self.tab_padding,
 				Size = UDim2.new(0, 72, 1, 0),
 				FontFace = library_t.font,
-				TextSize = library_t.font_size, 
+				TextSize = library_t.font_size,
 				BackgroundTransparency = 1,
 				TextColor3 = library_t.theme.text_color,
 				Text = name,
@@ -2142,7 +2129,7 @@ local library_t = {
 
 			local tab = setmetatable(tab_object, { __index = tabs });
 
-			self.base.tabs[#self.base.tabs + 1] = tab; 
+			self.base.tabs[#self.base.tabs + 1] = tab;
 			self.base.tab_index += 1;
 
 			if self.base.tab_index == 1 then
@@ -2447,7 +2434,7 @@ local library_t = {
 			main_library.screen_gui = screen_gui;
 			main_library.tab_padding = tab_padding;
 			main_library.main_frame = main_frame;
-			
+
 			main_library:set_project(project);
 
 			utility_t.connect(user_input_service.InputBegan, function(input)
@@ -2473,7 +2460,7 @@ local library_t = {
 					end
 				end;
 			end);
-			
+
 			return main_library;
 		end;
 
@@ -2481,7 +2468,6 @@ local library_t = {
 			local cfg = {};
 
 			for flag, value in pairs(library_t.flags) do
-				-- Skip config UI flags
 				if library_t.config_ignore_flags[flag] then
 					continue;
 				end;
@@ -2496,7 +2482,6 @@ local library_t = {
 			end;
 
 			for flag, value in pairs(self.base.key_flags) do
-				-- Skip config UI flags
 				if library_t.config_ignore_flags[flag] then
 					continue;
 				end;
@@ -2508,18 +2493,17 @@ local library_t = {
 
 			return http_service:JSONEncode(cfg);
 		end;
-		
+
 		library_t.load_config = function(self, cfg)
 			local success, actual_cfg = pcall(function()
 				return http_service:JSONDecode(cfg);
 			end);
-			
+
 			if not success then
 				return false;
 			end;
 
 			for flag, value in pairs(actual_cfg) do
-				-- Skip config UI flags
 				if library_t.config_ignore_flags[flag] then
 					continue;
 				end;
@@ -2528,7 +2512,7 @@ local library_t = {
 					self.base.save_flags[flag](value);
 				end;
 			end;
-			
+
 			return true;
 		end;
 
