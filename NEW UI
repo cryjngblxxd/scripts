@@ -1,4 +1,3 @@
-
 if getgenv and getgenv().unload_ui then
 	getgenv().unload_ui();
 end;
@@ -16,11 +15,19 @@ local base = {
 
 local library_t = {
 	theme = {
-		accent = Color3.fromRGB(106,50,159),
+		accent = Color3.fromRGB(106, 50, 159),
 		background_color = Color3.fromRGB(0, 0, 0),
 		background_color_picker = Color3.fromRGB(0, 0, 0),
 		dots_color = Color3.fromRGB(14, 14, 14),
-		text_color = Color3.fromRGB(220, 220, 220)
+		text_color = Color3.fromRGB(220, 220, 220),
+		outline_color_1 = Color3.fromRGB(60, 60, 60),
+		outline_color_2 = Color3.fromRGB(40, 40, 40),
+		outline_color_3 = Color3.fromRGB(31, 31, 31),
+		section_color = Color3.fromRGB(24, 24, 24),
+		element_color = Color3.fromRGB(44, 44, 44),
+		border_color = Color3.fromRGB(17, 17, 17),
+		stroke_color = Color3.fromRGB(44, 44, 44),
+		tab_background = Color3.fromRGB(24, 24, 24),
 	},
 	cursor = nil,
 	toggle_key = Enum.KeyCode.Insert,
@@ -30,7 +37,47 @@ local library_t = {
 	font = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal),
 	assets_dir = "OsamaHub",
 	project_name = "default",
-	base = table.clone(base)
+	base = table.clone(base),
+	available_fonts = {
+		["Default (Proggy)"] = {
+			link = "https://github.com/bluescan/proggyfonts/blob/master/ProggyOriginal/ProggyClean.ttf?raw=true",
+			file = "font_proggy.ttf"
+		},
+		["Minecraft"] = {
+			link = "https://github.com/IdreesInc/Minecraft-Font/raw/master/Minecraft-Regular.otf",
+			file = "font_minecraft.otf"
+		},
+		["Roboto Mono"] = {
+			roblox = "rbxasset://fonts/families/RobotoMono.json",
+			file = nil
+		},
+		["Source Sans"] = {
+			roblox = "rbxasset://fonts/families/SourceSansPro.json",
+			file = nil
+		},
+		["Gotham"] = {
+			roblox = "rbxasset://fonts/families/GothamSSm.json",
+			file = nil
+		},
+		["Ubuntu"] = {
+			roblox = "rbxasset://fonts/families/Ubuntu.json",
+			file = nil
+		},
+		["Nunito"] = {
+			roblox = "rbxasset://fonts/families/Nunito.json",
+			file = nil
+		},
+		["Fredoka One"] = {
+			roblox = "rbxasset://fonts/families/FredokaOne.json",
+			file = nil
+		},
+		["Arial"] = {
+			roblox = "rbxasset://fonts/families/Arial.json",
+			file = nil
+		},
+	},
+	current_font_name = "Default (Proggy)",
+	_theme_update_connections = {},
 }; do
 	local cloneref = cloneref or function(...) return ... end;
 	local gethui = gethui or function() return cloneref(game:GetService("CoreGui")) end;
@@ -48,6 +95,7 @@ local library_t = {
 	local instances = {};
 	local buttons = {};
 	local connections = {};
+	local themed_instances = {};
 
 	local signal_t = {}; do
 		local connection_mt = {};
@@ -101,6 +149,14 @@ local library_t = {
 			end;
 
 			return instance;
+		end;
+
+		utility_t.register_themed = function(instance, theme_key, property)
+			themed_instances[#themed_instances + 1] = {
+				instance = instance,
+				theme_key = theme_key,
+				property = property or "BackgroundColor3"
+			};
 		end;
 
 		utility_t.get_path = function()
@@ -266,6 +322,75 @@ local library_t = {
 					instance:Destroy();
 				end;
 			end;
+		end;
+	end;
+
+	library_t.change_font = function(self, font_name)
+		local font_data = self.available_fonts[font_name];
+		if not font_data then return false; end;
+
+		self.current_font_name = font_name;
+
+		if font_data.roblox then
+			self.font = Font.new(font_data.roblox, Enum.FontWeight.Regular, Enum.FontStyle.Normal);
+		elseif font_data.link and not run_service:IsStudio() then
+			local file_path = self.assets_dir .. "/" .. font_data.file;
+			if not isfile(file_path) then
+				local success, data = pcall(function()
+					return game:HttpGet(font_data.link);
+				end);
+				if not success then return false; end;
+				writefile(file_path, data);
+			end;
+
+			local custom_font = {
+				name = "FONT_" .. font_name:gsub("%s", "_"),
+				faces = {
+					{
+						name = "Regular",
+						weight = 400,
+						style = "normal",
+						assetId = getcustomasset(file_path)
+					}
+				}
+			};
+
+			local font_json_path = self.assets_dir .. "/" .. font_data.file:gsub("%.[^.]+$", "") .. ".font";
+			writefile(font_json_path, http_service:JSONEncode(custom_font));
+			self.font = Font.new(getcustomasset(font_json_path), Enum.FontWeight.Regular, Enum.FontStyle.Normal);
+		end;
+
+		for _, inst in ipairs(instances) do
+			if inst and inst.Parent then
+				local success = pcall(function()
+					if inst:IsA("TextLabel") or inst:IsA("TextBox") or inst:IsA("TextButton") then
+						inst.FontFace = self.font;
+					end;
+				end);
+			end;
+		end;
+
+		return true;
+	end;
+
+	library_t.update_theme = function(self)
+		for _, data in ipairs(themed_instances) do
+			if data.instance and data.instance.Parent then
+				pcall(function()
+					data.instance[data.property] = self.theme[data.theme_key];
+				end);
+			end;
+		end;
+
+		for _, conn_func in ipairs(self._theme_update_connections) do
+			pcall(conn_func);
+		end;
+	end;
+
+	library_t.set_theme_value = function(self, key, color)
+		if self.theme[key] ~= nil then
+			self.theme[key] = color;
+			self:update_theme();
 		end;
 	end;
 
@@ -999,7 +1124,10 @@ local library_t = {
 					callback(state);
 
 					library_t.flags[flag] = state;
-					ui_gradient.Color = state and ENABLED or DISABLED;
+					
+					local accent = library_t.theme.accent;
+					local enabled_seq = ColorSequence.new({ColorSequenceKeypoint.new(0, accent), ColorSequenceKeypoint.new(1, utility_t.darken_color(accent, 0.8))});
+					ui_gradient.Color = state and enabled_seq or DISABLED;
 				end;
 
 				utility_t.connect(pressed_signal, function()
@@ -1085,7 +1213,7 @@ local library_t = {
 					Parent = slider_frame,
 					LineJoinMode = Enum.LineJoinMode.Miter,
 					ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-					Color = Color3.fromRGB(17, 17, 17),
+					Color = library_t.theme.border_color,
 					Thickness = 1
 				});
 
@@ -1137,7 +1265,7 @@ local library_t = {
 				utility_t.new_instance("UIGradient", {
 					Parent = slider_frame,
 					Rotation = 90,
-					Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(44, 44, 44)), ColorSequenceKeypoint.new(1, utility_t.darken_color(Color3.fromRGB(44, 44, 44), 0.8))})
+					Color = ColorSequence.new({ColorSequenceKeypoint.new(0, library_t.theme.element_color), ColorSequenceKeypoint.new(1, utility_t.darken_color(library_t.theme.element_color, 0.8))})
 				});
 
 				local set = function(value)
@@ -1526,20 +1654,20 @@ local library_t = {
 				utility_t.new_instance("UIGradient", {
 					Parent = dropdown_frame,
 					Rotation = 90,
-					Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(44, 44, 44)), ColorSequenceKeypoint.new(1, utility_t.darken_color(Color3.fromRGB(44, 44, 44), 0.8))})
+					Color = ColorSequence.new({ColorSequenceKeypoint.new(0, library_t.theme.element_color), ColorSequenceKeypoint.new(1, utility_t.darken_color(library_t.theme.element_color, 0.8))})
 				});
 
 				utility_t.new_instance("UIGradient", {
 					Parent = dropdown_holder,
 					Rotation = 90,
-					Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(44, 44, 44)), ColorSequenceKeypoint.new(1, utility_t.darken_color(Color3.fromRGB(44, 44, 44), 0.8))})
+					Color = ColorSequence.new({ColorSequenceKeypoint.new(0, library_t.theme.element_color), ColorSequenceKeypoint.new(1, utility_t.darken_color(library_t.theme.element_color, 0.8))})
 				});
 
 				utility_t.new_instance("UIStroke", {
 					Parent = dropdown_button,
 					LineJoinMode = Enum.LineJoinMode.Miter,
 					ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-					Color = Color3.fromRGB(17, 17, 17),
+					Color = library_t.theme.border_color,
 					Thickness = 1
 				});
 
@@ -1547,11 +1675,11 @@ local library_t = {
 					Parent = dropdown_holder,
 					LineJoinMode = Enum.LineJoinMode.Miter,
 					ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-					Color = Color3.fromRGB(17, 17, 17),
+					Color = library_t.theme.border_color,
 					Thickness = 1
 				});
 
-								utility_t.connect(user_input_service.InputBegan, function(input)
+				utility_t.connect(user_input_service.InputBegan, function(input)
 					if is_open and self.lib.base.is_open and input.UserInputType == Enum.UserInputType.MouseButton1 and not (utility_t.is_mouse_in_frame(dropdown_button) or utility_t.is_mouse_in_frame(dropdown_holder)) then
 						change_open(false);
 					end;
@@ -1711,14 +1839,14 @@ local library_t = {
 					Parent = textbox_frame,
 					LineJoinMode = Enum.LineJoinMode.Miter,
 					ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-					Color = Color3.fromRGB(17, 17, 17),
+					Color = library_t.theme.border_color,
 					Thickness = 1
 				});
 
 				utility_t.new_instance("UIGradient", {
 					Parent = textbox_frame,
 					Rotation = 90,
-					Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(44, 44, 44)), ColorSequenceKeypoint.new(1, utility_t.darken_color(Color3.fromRGB(44, 44, 44), 0.8))})
+					Color = ColorSequence.new({ColorSequenceKeypoint.new(0, library_t.theme.element_color), ColorSequenceKeypoint.new(1, utility_t.darken_color(library_t.theme.element_color, 0.8))})
 				});
 
 				local textbox = utility_t.new_instance("TextBox", {
@@ -1776,14 +1904,14 @@ local library_t = {
 					Parent = button_frame,
 					LineJoinMode = Enum.LineJoinMode.Miter,
 					ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-					Color = Color3.fromRGB(17, 17, 17),
+					Color = library_t.theme.border_color,
 					Thickness = 1
 				});
 
 				utility_t.new_instance("UIGradient", {
 					Parent = button_frame,
 					Rotation = 90,
-					Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(44, 44, 44)), ColorSequenceKeypoint.new(1, utility_t.darken_color(Color3.fromRGB(44, 44, 44), 0.8))})
+					Color = ColorSequence.new({ColorSequenceKeypoint.new(0, library_t.theme.element_color), ColorSequenceKeypoint.new(1, utility_t.darken_color(library_t.theme.element_color, 0.8))})
 				});
 
 				utility_t.connect(pressed, function()
@@ -1793,6 +1921,59 @@ local library_t = {
 				end);
 				
 				self.update_size();
+			end;
+
+			section.label = function(self, properties)
+				local name = properties and properties.name or "label";
+
+				local label_holder = utility_t.new_instance("Frame", {
+					Parent = self.content_frame,
+					Size = UDim2.new(1, 0, 0, 5),
+					BackgroundTransparency = 1,
+					BorderSizePixel = 0
+				});
+
+				local label_text = utility_t.new_instance("TextLabel", {
+					Parent = label_holder,
+					Position = UDim2.new(0, 15, 0, -3),
+					Size = UDim2.new(1, -15, 0, 12),
+					BackgroundTransparency = 1,
+					BorderSizePixel = 0,
+					ZIndex = 2,
+					Text = name,
+					TextSize = library_t.font_size,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					TextColor3 = library_t.theme.text_color,
+					FontFace = library_t.font
+				});
+
+				utility_t.new_instance("TextLabel", {
+					Parent = label_text,
+					Size = UDim2.new(1, 0, 1, 0),
+					Position = UDim2.new(0, 1, 0, 1),
+					ZIndex = 1,
+					FontFace = library_t.font,
+					TextSize = library_t.font_size,
+					BackgroundTransparency = 1,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					TextColor3 = Color3.fromRGB(0, 0, 0),
+					Text = name,
+					BorderSizePixel = 0
+				});
+
+				self.update_size();
+
+				return {
+					set_text = function(_, new_text)
+						label_text.Text = new_text;
+						local children = label_text:GetChildren();
+						for _, child in ipairs(children) do
+							if child:IsA("TextLabel") then
+								child.Text = new_text;
+							end;
+						end;
+					end
+				};
 			end;
 		end;
 
@@ -1805,7 +1986,7 @@ local library_t = {
 				local section_frame = utility_t.new_instance("Frame", {
 					Parent = side == "left" and self.left_side or self.right_side,
 					Size = UDim2.new(1, 0, 0, size),
-					BackgroundColor3 = Color3.fromRGB(24, 24, 24),
+					BackgroundColor3 = library_t.theme.section_color,
 					BorderSizePixel = 0
 				});
 
@@ -1814,7 +1995,7 @@ local library_t = {
 				utility_t.new_instance("Frame", {
 					Parent = section_frame,
 					Size = UDim2.new(0, text_bounds.X + 2, 0, 1),
-					BackgroundColor3 = Color3.fromRGB(24, 24, 24),
+					BackgroundColor3 = library_t.theme.section_color,
 					Position = UDim2.new(0, 6, 0, -1),
 					BorderSizePixel = 0
 				});
@@ -1847,7 +2028,7 @@ local library_t = {
 					Parent = section_frame,
 					LineJoinMode = Enum.LineJoinMode.Miter,
 					ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-					Color = Color3.fromRGB(44, 44, 44)
+					Color = library_t.theme.stroke_color
 				});
 
 				local main_frame = utility_t.new_instance("ScrollingFrame", {
@@ -1873,7 +2054,7 @@ local library_t = {
 				utility_t.new_instance("UIGradient", {
 					Parent = upper_fade,
 					Rotation = 90,
-					Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(24, 24, 24)), ColorSequenceKeypoint.new(0.6, Color3.fromRGB(24, 24, 24)), ColorSequenceKeypoint.new(0.7, Color3.fromRGB(24, 24, 24)), ColorSequenceKeypoint.new(0.8, Color3.fromRGB(24, 24, 24)), ColorSequenceKeypoint.new(0.9, Color3.fromRGB(24, 24, 24)), ColorSequenceKeypoint.new(1, Color3.fromRGB(24, 24, 24))})
+					Color = ColorSequence.new({ColorSequenceKeypoint.new(0, library_t.theme.section_color), ColorSequenceKeypoint.new(0.6, library_t.theme.section_color), ColorSequenceKeypoint.new(0.7, library_t.theme.section_color), ColorSequenceKeypoint.new(0.8, library_t.theme.section_color), ColorSequenceKeypoint.new(0.9, library_t.theme.section_color), ColorSequenceKeypoint.new(1, library_t.theme.section_color)})
 				});
 
 				utility_t.connect(user_input_service.InputChanged, function(input)
@@ -1916,8 +2097,8 @@ local library_t = {
 			local name = properties and properties.name or "legit";
 
 			local tab_button, pressed_signal = utility_t.new_button({
-				Parent = self.tab_padding,
-				Size = UDim2.new(0, 72, 1, 0),
+				Parent = self.tab_content_frame,
+				Size = UDim2.new(0, 72, 0, 25),
 				FontFace = library_t.font,
 				TextSize = library_t.font_size, 
 				BackgroundTransparency = 1,
@@ -1940,16 +2121,10 @@ local library_t = {
 				BorderSizePixel = 0
 			});
 
-			utility_t.new_instance("UIFlexItem", {
-				Parent = tab_button,
-				FlexMode = Enum.UIFlexMode.Fill,
-				ItemLineAlignment = Enum.ItemLineAlignment.Stretch
-			});
-
 			local tab_line_frame = utility_t.new_instance("Frame", {
-				Parent = self.tab_padding,
-				Size = UDim2.new(0, 1, 1, 0),
-				BackgroundColor3 = Color3.fromRGB(44, 44, 44),
+				Parent = self.tab_content_frame,
+				Size = UDim2.new(0, 1, 0, 25),
+				BackgroundColor3 = library_t.theme.stroke_color,
 				BorderSizePixel = 0
 			});
 
@@ -2037,6 +2212,14 @@ local library_t = {
 				end;
 			end;
 
+			-- Update tab scroll canvas size
+			if self.tab_content_frame then
+				local tab_layout = self.tab_content_frame:FindFirstChildOfClass("UIListLayout");
+				if tab_layout then
+					self.tab_scroll_frame.CanvasSize = UDim2.new(0, tab_layout.AbsoluteContentSize.X + 10, 0, 0);
+				end;
+			end;
+
 			return tab;
 		end;
 
@@ -2054,6 +2237,7 @@ local library_t = {
 		end;
 
 		library_t.ensure_directories = function(self)
+			if run_service:IsStudio() then return; end;
 			if not isfolder(self.assets_dir) then
 				makefolder(self.assets_dir);
 			end;
@@ -2066,6 +2250,7 @@ local library_t = {
 		end;
 
 		library_t.get_configs = function(self)
+			if run_service:IsStudio() then return {}; end;
 			self:ensure_directories();
 			local configs = {};
 			local success, files = pcall(function()
@@ -2083,6 +2268,7 @@ local library_t = {
 		end;
 
 		library_t.set_auto_load = function(self, config_name)
+			if run_service:IsStudio() then return; end;
 			self:ensure_directories();
 			local settings = {};
 			if isfile(self:get_settings_path()) then
@@ -2095,6 +2281,7 @@ local library_t = {
 		end;
 
 		library_t.get_auto_load = function(self)
+			if run_service:IsStudio() then return nil; end;
 			self:ensure_directories();
 			if isfile(self:get_settings_path()) then
 				local success, settings = pcall(function()
@@ -2108,6 +2295,7 @@ local library_t = {
 		end;
 
 		library_t.remove_auto_load = function(self)
+			if run_service:IsStudio() then return; end;
 			self:ensure_directories();
 			local settings = {};
 			if isfile(self:get_settings_path()) then
@@ -2120,6 +2308,7 @@ local library_t = {
 		end;
 
 		library_t.delete_config = function(self, config_name)
+			if run_service:IsStudio() then return false; end;
 			local path = self:get_config_path() .. "/" .. config_name .. ".json";
 			if isfile(path) then
 				delfile(path);
@@ -2204,28 +2393,123 @@ local library_t = {
 			end;
 
 			utility_t.create_outlines(main_frame, {
-				{ color = Color3.fromRGB(60, 60, 60), thickness = 1 },
-				{ color = Color3.fromRGB(40, 40, 40), thickness = 1 },
-				{ color = Color3.fromRGB(40, 40, 40), thickness = 1 },
-				{ color = Color3.fromRGB(40, 40, 40), thickness = 1 },
-				{ color = Color3.fromRGB(60, 60, 60), thickness = 1 },
-				{ color = Color3.fromRGB(31, 31, 31), thickness = 1 }
+				{ color = library_t.theme.outline_color_1, thickness = 1 },
+				{ color = library_t.theme.outline_color_2, thickness = 1 },
+				{ color = library_t.theme.outline_color_2, thickness = 1 },
+				{ color = library_t.theme.outline_color_2, thickness = 1 },
+				{ color = library_t.theme.outline_color_1, thickness = 1 },
+				{ color = library_t.theme.outline_color_3, thickness = 1 }
 			});
 
+			-- Tab frame with scrolling support
 			local tab_frame = utility_t.new_instance("Frame", {
 				Parent = main_frame,
 				Position = UDim2.new(0, 18, 0, 19),
 				Size = UDim2.new(1, -36, 0, 25),
-				BackgroundColor3 = Color3.fromRGB(24, 24, 24),
-				BorderSizePixel = 0
+				BackgroundColor3 = library_t.theme.tab_background,
+				BorderSizePixel = 0,
+				ClipsDescendants = true
 			});
 
 			utility_t.new_instance("UIStroke", {
 				Parent = tab_frame,
 				LineJoinMode = Enum.LineJoinMode.Miter,
 				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-				Color = Color3.fromRGB(44, 44, 44)
+				Color = library_t.theme.stroke_color
 			});
+
+			-- Scrollable tab container
+			local tab_scroll_frame = utility_t.new_instance("ScrollingFrame", {
+				Parent = tab_frame,
+				Size = UDim2.new(1, 0, 1, 0),
+				Position = UDim2.new(0, 0, 0, 0),
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				ScrollBarThickness = 0,
+				ScrollBarImageTransparency = 1,
+				ScrollingDirection = Enum.ScrollingDirection.X,
+				CanvasSize = UDim2.new(0, 0, 0, 0),
+				ElasticBehavior = Enum.ElasticBehavior.Never,
+				ScrollingEnabled = true,
+				AutomaticCanvasSize = Enum.AutomaticSize.None,
+			});
+
+			local tab_content_frame = utility_t.new_instance("Frame", {
+				Parent = tab_scroll_frame,
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				Size = UDim2.new(0, 0, 1, 0),
+				Position = UDim2.new(0, 0, 0, 0),
+				AutomaticSize = Enum.AutomaticSize.X
+			});
+
+			local tab_list_layout = utility_t.new_instance("UIListLayout", {
+				Parent = tab_content_frame,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				FillDirection = Enum.FillDirection.Horizontal,
+				VerticalAlignment = Enum.VerticalAlignment.Center
+			});
+
+			-- Auto-update canvas size when tabs are added
+			utility_t.connect(tab_list_layout:GetPropertyChangedSignal("AbsoluteContentSize"), function()
+				tab_scroll_frame.CanvasSize = UDim2.new(0, tab_list_layout.AbsoluteContentSize.X + 10, 0, 0);
+			end);
+
+			-- Tab scroll with mouse wheel when hovering tabs
+			utility_t.connect(user_input_service.InputChanged, function(input)
+				if library_t.base.is_open and input.UserInputType == Enum.UserInputType.MouseWheel and utility_t.is_mouse_in_frame(tab_frame) then
+					local scroll_amount = input.Position.Z < 0 and 50 or -50;
+					tween_service:Create(tab_scroll_frame, TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {
+						CanvasPosition = Vector2.new(math.clamp(tab_scroll_frame.CanvasPosition.X + scroll_amount, 0, math.max(0, tab_scroll_frame.CanvasSize.X.Offset - tab_scroll_frame.AbsoluteSize.X)), 0)
+					}):Play();
+				end;
+			end);
+
+			-- Left/right scroll arrows (visual indicators)
+			local left_arrow = utility_t.new_instance("TextLabel", {
+				Parent = tab_frame,
+				Size = UDim2.new(0, 12, 1, 0),
+				Position = UDim2.new(0, 0, 0, 0),
+				BackgroundTransparency = 0.5,
+				BackgroundColor3 = library_t.theme.tab_background,
+				Text = "<",
+				TextColor3 = library_t.theme.text_color,
+				FontFace = library_t.font,
+				TextSize = library_t.font_size,
+				ZIndex = 10,
+				Visible = false,
+				BorderSizePixel = 0
+			});
+
+			local right_arrow = utility_t.new_instance("TextLabel", {
+				Parent = tab_frame,
+				Size = UDim2.new(0, 12, 1, 0),
+				Position = UDim2.new(1, -12, 0, 0),
+				BackgroundTransparency = 0.5,
+				BackgroundColor3 = library_t.theme.tab_background,
+				Text = ">",
+				TextColor3 = library_t.theme.text_color,
+				FontFace = library_t.font,
+				TextSize = library_t.font_size,
+				ZIndex = 10,
+				Visible = false,
+				BorderSizePixel = 0
+			});
+
+			-- Update arrow visibility based on scroll position
+			local update_scroll_arrows = function()
+				local canvas_width = tab_scroll_frame.CanvasSize.X.Offset;
+				local frame_width = tab_scroll_frame.AbsoluteSize.X;
+				local scroll_pos = tab_scroll_frame.CanvasPosition.X;
+
+				local needs_scroll = canvas_width > frame_width;
+				left_arrow.Visible = needs_scroll and scroll_pos > 2;
+				right_arrow.Visible = needs_scroll and scroll_pos < (canvas_width - frame_width - 2);
+			end;
+
+			utility_t.connect(tab_scroll_frame:GetPropertyChangedSignal("CanvasPosition"), update_scroll_arrows);
+			utility_t.connect(tab_scroll_frame:GetPropertyChangedSignal("CanvasSize"), update_scroll_arrows);
+			utility_t.connect(tab_scroll_frame:GetPropertyChangedSignal("AbsoluteSize"), update_scroll_arrows);
 
 			local _, drag_signal = utility_t.new_button({
 				Parent = main_frame,
@@ -2240,20 +2524,6 @@ local library_t = {
 				Position = UDim2.new(1, -10, 1, -10),
 				BackgroundTransparency = 1,
 				TextTransparency = 1,
-			});
-
-			local tab_padding = utility_t.new_instance("Frame", {
-				Parent = tab_frame,
-				BackgroundTransparency = 1,
-				BorderSizePixel = 0,
-				Size = UDim2.new(1, 0, 1, -16),
-				Position = UDim2.new(0, 0, 0, 8)
-			});
-
-			utility_t.new_instance("UIListLayout", {
-				Parent = tab_padding,
-				SortOrder = Enum.SortOrder.LayoutOrder,
-				FillDirection = Enum.FillDirection.Horizontal
 			});
 
 			utility_t.connect(resize_signal, function()
@@ -2319,7 +2589,9 @@ local library_t = {
 			local main_library = setmetatable(library_t, {});
 
 			main_library.screen_gui = screen_gui;
-			main_library.tab_padding = tab_padding;
+			main_library.tab_content_frame = tab_content_frame;
+			main_library.tab_scroll_frame = tab_scroll_frame;
+			main_library.tab_padding = tab_content_frame; -- backward compat
 			main_library.main_frame = main_frame;
 			
 			main_library:set_project(project);
@@ -2351,10 +2623,167 @@ local library_t = {
 			return main_library;
 		end;
 
+		-- Settings tab helper: creates a full settings tab with font, theme, and config management
+		library_t.create_settings_tab = function(self)
+			local settings_tab = self:tab({ name = "settings" });
+
+			-- Font section
+			local font_section = settings_tab:section({ name = "font", side = "left", size = 80 });
+
+			local font_names = {};
+			for name, _ in pairs(self.available_fonts) do
+				table.insert(font_names, name);
+			end;
+			table.sort(font_names);
+
+			font_section:dropdown({
+				name = "font family",
+				options = font_names,
+				default = self.current_font_name,
+				flag = "__settings_font",
+				callback = function(selected)
+					self:change_font(selected);
+				end
+			});
+
+			-- Theme section
+			local theme_section = settings_tab:section({ name = "theme colors", side = "left", size = 220 });
+
+			local theme_keys = {
+				{ key = "accent", name = "accent" },
+				{ key = "background_color", name = "background" },
+				{ key = "background_color_picker", name = "colorpicker bg" },
+				{ key = "dots_color", name = "dots pattern" },
+				{ key = "text_color", name = "text" },
+				{ key = "section_color", name = "section" },
+				{ key = "element_color", name = "elements" },
+				{ key = "border_color", name = "borders" },
+				{ key = "stroke_color", name = "strokes" },
+				{ key = "tab_background", name = "tab background" },
+				{ key = "outline_color_1", name = "outline 1" },
+				{ key = "outline_color_2", name = "outline 2" },
+				{ key = "outline_color_3", name = "outline 3" },
+			};
+
+			for _, theme_info in ipairs(theme_keys) do
+				theme_section:colorpicker({
+					name = theme_info.name,
+					default = self.theme[theme_info.key],
+					flag = "__theme_" .. theme_info.key,
+					info = theme_info.name,
+					callback = function(data)
+						self.theme[theme_info.key] = data.color;
+					end
+				});
+			end;
+
+			-- Config section
+			local config_section = settings_tab:section({ name = "configs", side = "right", size = 200 });
+
+			local config_list = self:get_configs();
+
+			local config_dropdown = config_section:dropdown({
+				name = "config",
+				options = #config_list > 0 and config_list or {"none"},
+				default = #config_list > 0 and config_list[1] or "none",
+				flag = "__settings_config_select"
+			});
+
+			config_section:textbox({
+				name = "config name",
+				placeholder = "enter name...",
+				flag = "__settings_config_name"
+			});
+
+			config_section:button({
+				name = "save config",
+				callback = function()
+					local config_name = self.flags["__settings_config_name"];
+					if config_name and config_name ~= "" then
+						self:save_config(config_name);
+						local configs = self:get_configs();
+						config_dropdown.refresh(#configs > 0 and configs or {"none"});
+					end;
+				end
+			});
+
+			config_section:button({
+				name = "load config",
+				callback = function()
+					local selected = self.flags["__settings_config_select"];
+					if selected and selected ~= "none" then
+						self:load_config_by_name(selected);
+					end;
+				end
+			});
+
+			config_section:button({
+				name = "delete config",
+				callback = function()
+					local selected = self.flags["__settings_config_select"];
+					if selected and selected ~= "none" then
+						self:delete_config(selected);
+						local configs = self:get_configs();
+						config_dropdown.refresh(#configs > 0 and configs or {"none"});
+					end;
+				end
+			});
+
+			config_section:button({
+				name = "refresh configs",
+				callback = function()
+					local configs = self:get_configs();
+					config_dropdown.refresh(#configs > 0 and configs or {"none"});
+				end
+			});
+
+			-- Auto load section
+			local autoload_section = settings_tab:section({ name = "auto load", side = "right", size = 100 });
+
+			autoload_section:button({
+				name = "set auto load",
+				callback = function()
+					local selected = self.flags["__settings_config_select"];
+					if selected and selected ~= "none" then
+						self:set_auto_load(selected);
+					end;
+				end
+			});
+
+			autoload_section:button({
+				name = "remove auto load",
+				callback = function()
+					self:remove_auto_load();
+				end
+			});
+
+			-- UI section
+			local ui_section = settings_tab:section({ name = "ui settings", side = "right", size = 80 });
+
+			ui_section:keybind({
+				name = "toggle key",
+				default = self.toggle_key,
+				flag = "__settings_toggle_key",
+				index_mode = true,
+				callback = function(key)
+					if key then
+						self.toggle_key = key;
+					end;
+				end
+			});
+
+			return settings_tab;
+		end;
+
 		library_t.create_config = function(self)
 			local cfg = {};
 
 			for flag, value in pairs(library_t.flags) do
+				-- Skip internal settings flags
+				if string.sub(flag, 1, 2) == "__" then
+					continue;
+				end;
+
 				if not self.base.key_flags[flag] then
 					cfg[flag] = value;
 
@@ -2365,6 +2794,10 @@ local library_t = {
 			end;
 
 			for flag, value in pairs(self.base.key_flags) do
+				if string.sub(flag, 1, 2) == "__" then
+					continue;
+				end;
+
 				if value then
 					cfg[flag] = value.Name;
 				end;
@@ -2392,12 +2825,14 @@ local library_t = {
 		end;
 
 		library_t.save_config = function(self, config_name)
+			if run_service:IsStudio() then return; end;
 			self:ensure_directories();
 			local path = self:get_config_path() .. "/" .. config_name .. ".json";
 			writefile(path, self:create_config());
 		end;
 
 		library_t.load_config_by_name = function(self, config_name)
+			if run_service:IsStudio() then return false; end;
 			local path = self:get_config_path() .. "/" .. config_name .. ".json";
 			if isfile(path) then
 				return self:load_config(readfile(path));
