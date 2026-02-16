@@ -1,3 +1,4 @@
+
 if getgenv and getgenv().unload_ui then
 	getgenv().unload_ui();
 end;
@@ -10,7 +11,8 @@ local base = {
 	is_open = true,
 	save_flags = {},
 	current_dropdown = nil,
-	current_colorpicker = nil
+	current_colorpicker = nil,
+	current_keybind_menu = nil,
 };
 
 local library_t = {
@@ -32,14 +34,18 @@ local library_t = {
 	cursor = nil,
 	toggle_key = Enum.KeyCode.Insert,
 	font_size = 12,
-	font_link = "https://github.com/bluescan/proggyfonts/blob/master/ProggyOriginal/ProggyClean.ttf?raw=true",
 	flags = {},
-	font = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal),
+	-- FIX #3: Default font is Gotham
+	font = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal),
 	assets_dir = "OsamaHub",
 	project_name = "default",
 	base = table.clone(base),
 	available_fonts = {
-		["Default (Proggy)"] = {
+		["Gotham"] = {
+			roblox = "rbxasset://fonts/families/GothamSSm.json",
+			file = nil
+		},
+		["Proggy"] = {
 			link = "https://github.com/bluescan/proggyfonts/blob/master/ProggyOriginal/ProggyClean.ttf?raw=true",
 			file = "font_proggy.ttf"
 		},
@@ -53,10 +59,6 @@ local library_t = {
 		},
 		["Source Sans"] = {
 			roblox = "rbxasset://fonts/families/SourceSansPro.json",
-			file = nil
-		},
-		["Gotham"] = {
-			roblox = "rbxasset://fonts/families/GothamSSm.json",
 			file = nil
 		},
 		["Ubuntu"] = {
@@ -76,8 +78,9 @@ local library_t = {
 			file = nil
 		},
 	},
-	current_font_name = "Default (Proggy)",
+	current_font_name = "Gotham",
 	_theme_update_connections = {},
+	_accent_objects = {}, -- FIX #1: Track objects that use accent color
 }; do
 	local cloneref = cloneref or function(...) return ... end;
 	local gethui = gethui or function() return cloneref(game:GetService("CoreGui")) end;
@@ -241,37 +244,23 @@ local library_t = {
 			return result;
 		end;
 
+		-- FIX #4: new_button now returns a third signal for right-click
 		utility_t.new_button = function(properties)
 			local button = utility_t.new_instance("TextLabel", properties);
 			local button_object = {
-				pressed = signal_t.new();
+				pressed = signal_t.new(),
+				right_pressed = signal_t.new(),
 				button = button
 			}
 			buttons[#buttons + 1] = button_object;
-			return button_object.button, button_object.pressed;
+			return button_object.button, button_object.pressed, button_object.right_pressed;
 		end;
 
+		-- FIX #3: No custom font download on startup - using built-in Gotham
 		if not run_service:IsStudio() then
 			if not isfolder(library_t.assets_dir) then
 				makefolder(library_t.assets_dir);
 			end;
-
-			writefile(library_t.assets_dir.."/font.ttf", game:HttpGet(library_t.font_link));
-
-			local custom_font = {
-				name = "FONT",
-				faces = {
-					{
-						name = "Regular",
-						weight = 400,
-						style = "normal",
-						assetId = getcustomasset(library_t.assets_dir.."/font.ttf")
-					}
-				}
-			};
-
-			writefile(library_t.assets_dir.."/menu_font.font", http_service:JSONEncode(custom_font));
-			library_t.font = Font.new(getcustomasset(library_t.assets_dir.."/menu_font.font"), Enum.FontWeight.Regular, Enum.FontStyle.Normal);
 		end;
 
 		if getgenv then
@@ -297,6 +286,7 @@ local library_t = {
 				end;
 
 				library_t.flags = {};
+				library_t._accent_objects = {};
 				library_t.base = table.clone(base);
 
 				pcall(function()
@@ -304,6 +294,49 @@ local library_t = {
 				end);
 			end;
 		end;
+	end;
+
+	-- FIX #1: Function to update all accent-colored objects
+	library_t.update_accent = function(self, new_accent)
+		self.theme.accent = new_accent;
+		for _, obj in ipairs(self._accent_objects) do
+			pcall(function()
+				if obj.type == "gradient" then
+					obj.instance.Color = ColorSequence.new({
+						ColorSequenceKeypoint.new(0, new_accent),
+						ColorSequenceKeypoint.new(1, utility_t.darken_color(new_accent, obj.darken or 0.5))
+					});
+				elseif obj.type == "color" then
+					obj.instance[obj.property] = new_accent;
+				elseif obj.type == "toggle_gradient" then
+					-- Only update if the toggle is currently enabled
+					if obj.get_state and obj.get_state() then
+						obj.instance.Color = ColorSequence.new({
+							ColorSequenceKeypoint.new(0, new_accent),
+							ColorSequenceKeypoint.new(1, utility_t.darken_color(new_accent, 0.8))
+						});
+					end;
+				elseif obj.type == "slider_gradient" then
+					obj.instance.Color = ColorSequence.new({
+						ColorSequenceKeypoint.new(0, new_accent),
+						ColorSequenceKeypoint.new(1, utility_t.darken_color(new_accent, 0.5))
+					});
+				end;
+			end);
+		end;
+		-- Update active tab button color
+		if self.base and self.base.tabs then
+			for _, tab in ipairs(self.base.tabs) do
+				if self.base.current_tab == tab then
+					pcall(function() tab.tab_button.TextColor3 = new_accent; end);
+				end;
+			end;
+		end;
+	end;
+
+	-- Helper to register an accent-tracked object
+	local function track_accent(obj_data)
+		library_t._accent_objects[#library_t._accent_objects + 1] = obj_data;
 	end;
 
 	library_t.change_font = function(self, font_name)
@@ -449,11 +482,14 @@ local library_t = {
 				TextYAlignment = Enum.TextYAlignment.Top
 			});
 
-			utility_t.new_instance("UIGradient", {
+			local cp_top_gradient = utility_t.new_instance("UIGradient", {
 				Parent = top_line,
 				Color = ColorSequence.new({ColorSequenceKeypoint.new(0, library_t.theme.accent), ColorSequenceKeypoint.new(1, utility_t.darken_color(library_t.theme.accent, 0.9))}),
 				Rotation = 90
 			});
+
+			-- Track accent for colorpicker top line
+			track_accent({ type = "gradient", instance = cp_top_gradient, darken = 0.9 });
 
 			utility_t.new_instance("UIStroke", {
 				Parent = colorpicker_content_holder,
@@ -697,6 +733,7 @@ local library_t = {
 			end);
 		end;
 
+		-- FIX #4: Keybind with right-click mode menu (toggle/hold/always)
 		local create_keybind = function(self, properties, label, is_toggle)
 			local name = properties and properties.name or "keybind";
 			local default = properties and properties.default or nil;
@@ -728,7 +765,7 @@ local library_t = {
 				ZIndex = 2,
 				TextColor3 = library_t.theme.text_color,
 				TextSize = library_t.font_size,
-				Text = default and default.Name:lower() or "none",
+				Text = default and ("[" .. default.Name:lower() .. "]") or "[none]",
 				FontFace = library_t.font,
 			});
 
@@ -741,11 +778,11 @@ local library_t = {
 				TextSize = library_t.font_size,
 				BackgroundTransparency = 1,
 				TextColor3 = Color3.fromRGB(0, 0, 0),
-				Text = default and default.Name:lower() or "none",
+				Text = default and ("[" .. default.Name:lower() .. "]") or "[none]",
 				BorderSizePixel = 0
 			});
 
-			local keybind_button, pressed_signal = utility_t.new_button({
+			local keybind_button, pressed_signal, right_pressed_signal = utility_t.new_button({
 				Parent = keybind_frame,
 				Position = UDim2.new(0, 0, 0, 0),
 				Size = UDim2.new(1, 0, 1, 0),
@@ -753,6 +790,95 @@ local library_t = {
 				BorderSizePixel = 0,
 				TextTransparency = 1
 			});
+
+			-- Right-click mode popup
+			local mode_popup = utility_t.new_instance("Frame", {
+				Parent = self.lib.screen_gui,
+				Size = UDim2.new(0, 80, 0, 52),
+				Visible = false,
+				ZIndex = 2000,
+				BackgroundColor3 = library_t.theme.element_color,
+				BorderSizePixel = 0,
+			});
+
+			utility_t.new_instance("UIStroke", {
+				Parent = mode_popup,
+				LineJoinMode = Enum.LineJoinMode.Miter,
+				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+				Color = library_t.theme.border_color,
+				Thickness = 1
+			});
+
+			local mode_layout = utility_t.new_instance("UIListLayout", {
+				Parent = mode_popup,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				FillDirection = Enum.FillDirection.Vertical,
+				Padding = UDim.new(0, 2),
+			});
+
+			utility_t.new_instance("UIPadding", {
+				Parent = mode_popup,
+				PaddingTop = UDim.new(0, 3),
+				PaddingLeft = UDim.new(0, 4),
+			});
+
+			local mode_options = {"always", "toggle", "hold"};
+			local mode_labels = {};
+
+			for _, mode_name in ipairs(mode_options) do
+				local mode_btn, mode_pressed = utility_t.new_button({
+					Parent = mode_popup,
+					Size = UDim2.new(1, -8, 0, 14),
+					BackgroundTransparency = 1,
+					BorderSizePixel = 0,
+					ZIndex = 2001,
+					FontFace = library_t.font,
+					TextSize = library_t.font_size,
+					TextColor3 = mode == mode_name and library_t.theme.accent or library_t.theme.text_color,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					Text = mode_name,
+				});
+
+				utility_t.new_instance("TextLabel", {
+					Parent = mode_btn,
+					Size = UDim2.new(1, 0, 1, 0),
+					Position = UDim2.new(0, 1, 0, 1),
+					ZIndex = 2000,
+					FontFace = library_t.font,
+					TextSize = library_t.font_size,
+					BackgroundTransparency = 1,
+					TextColor3 = Color3.fromRGB(0, 0, 0),
+					TextXAlignment = Enum.TextXAlignment.Left,
+					Text = mode_name,
+					BorderSizePixel = 0
+				});
+
+				mode_labels[mode_name] = mode_btn;
+
+				utility_t.connect(mode_pressed, function()
+					-- Update mode
+					mode = mode_name;
+					-- Update label colors
+					for mn, ml in pairs(mode_labels) do
+						ml.TextColor3 = mn == mode and library_t.theme.accent or library_t.theme.text_color;
+					end;
+					-- Handle "always" mode
+					if mode == "always" then
+						state = true;
+						library_t.flags[flag] = true;
+						callback(true);
+					else
+						if not index_mode then
+							state = false;
+							library_t.flags[flag] = false;
+							callback(false);
+						end;
+					end;
+					-- Close popup
+					mode_popup.Visible = false;
+					self.lib.base.current_keybind_menu = nil;
+				end);
+			end;
 
 			local update_pos = function()
 				local text_size = keybind_text.TextBounds;
@@ -772,21 +898,25 @@ local library_t = {
 					end;
 					if key_enum then
 						current_key = key_enum;
-						keybind_text.Text = key_enum.Name:lower();
-						shadow.Text = key_enum.Name:lower();
+						keybind_text.Text = "[" .. key_enum.Name:lower() .. "]";
+						shadow.Text = "[" .. key_enum.Name:lower() .. "]";
 						self.lib.base.key_flags[flag] = key_enum;
 						if index_mode then
 							library_t.flags[flag] = key_enum;
 						else
-							library_t.flags[flag] = false;
+							if mode == "always" then
+								library_t.flags[flag] = true;
+							else
+								library_t.flags[flag] = false;
+							end;
 						end;
 						update_pos();
 						callback(key_enum);
 					end;
 				else
 					current_key = nil;
-					keybind_text.Text = "none";
-					shadow.Text = "none";
+					keybind_text.Text = "[none]";
+					shadow.Text = "[none]";
 					self.lib.base.key_flags[flag] = nil;
 					if index_mode then
 						library_t.flags[flag] = nil;
@@ -801,20 +931,53 @@ local library_t = {
 			self.lib.base.save_flags[flag] = set_key;
 			update_pos();
 
+			-- Left-click: select key
 			utility_t.connect(pressed_signal, function()
 				if not is_selecting and self.lib.base.current_tab == self.tab and utility_t.is_in_main_frame(keybind_button, self.main_frame) then
 					is_selecting = true;
-					keybind_text.Text = "...";
-					shadow.Text = "...";
+					keybind_text.Text = "[...]";
+					shadow.Text = "[...]";
 					update_pos();
+				end;
+			end);
+
+			-- Right-click: open mode menu
+			utility_t.connect(right_pressed_signal, function()
+				if not index_mode and not is_selecting and self.lib.base.current_tab == self.tab and utility_t.is_in_main_frame(keybind_button, self.main_frame) then
+					-- Close any other open keybind menu
+					if self.lib.base.current_keybind_menu and self.lib.base.current_keybind_menu ~= mode_popup then
+						self.lib.base.current_keybind_menu.Visible = false;
+					end;
+					local abs_pos = keybind_button.AbsolutePosition;
+					mode_popup.Position = UDim2.new(0, abs_pos.X, 0, abs_pos.Y + 15);
+					mode_popup.Visible = not mode_popup.Visible;
+					if mode_popup.Visible then
+						self.lib.base.current_keybind_menu = mode_popup;
+						-- Update highlight
+						for mn, ml in pairs(mode_labels) do
+							ml.TextColor3 = mn == mode and library_t.theme.accent or library_t.theme.text_color;
+						end;
+					else
+						self.lib.base.current_keybind_menu = nil;
+					end;
+				end;
+			end);
+
+			-- Close mode popup on click outside
+			utility_t.connect(user_input_service.InputBegan, function(input)
+				if mode_popup.Visible and input.UserInputType == Enum.UserInputType.MouseButton1 then
+					if not utility_t.is_mouse_in_frame(mode_popup) and not utility_t.is_mouse_in_frame(keybind_button) then
+						mode_popup.Visible = false;
+						self.lib.base.current_keybind_menu = nil;
+					end;
 				end;
 			end);
 
 			utility_t.connect(user_input_service.InputBegan, function(input)
 				if is_selecting and input.KeyCode == Enum.KeyCode.Escape then
 					is_selecting = false;
-					keybind_text.Text = current_key and current_key.Name:lower() or "none";
-					shadow.Text = current_key and current_key.Name:lower() or "none";
+					keybind_text.Text = current_key and ("[" .. current_key.Name:lower() .. "]") or "[none]";
+					shadow.Text = current_key and ("[" .. current_key.Name:lower() .. "]") or "[none]";
 					update_pos();
 					return;
 				end;
@@ -823,7 +986,8 @@ local library_t = {
 					if input.UserInputType == Enum.UserInputType.Keyboard then
 						key = input.KeyCode;
 					elseif input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.MouseButton2 then
-						key = input.UserInputType;
+						-- Don't capture mouse clicks during selection to avoid conflicts
+						return;
 					end;
 					if key then
 						is_selecting = false;
@@ -848,6 +1012,7 @@ local library_t = {
 							library_t.flags[flag] = state;
 							callback(state);
 						end;
+						-- "always" mode doesn't need input handling, it's always true
 					end;
 				end;
 			end);
@@ -936,7 +1101,7 @@ local library_t = {
 				BorderSizePixel = 0
 			});
 
-			utility_t.new_instance("UIGradient", {
+			local wm_accent_gradient = utility_t.new_instance("UIGradient", {
 				Parent = wm_accent_line,
 				Color = ColorSequence.new({
 					ColorSequenceKeypoint.new(0, library_t.theme.accent),
@@ -944,6 +1109,9 @@ local library_t = {
 				}),
 				Rotation = 90
 			});
+
+			-- Track accent for watermark
+			track_accent({ type = "gradient", instance = wm_accent_gradient, darken = 0.5 });
 
 			utility_t.create_outlines(watermark_holder, {
 				{ color = Color3.fromRGB(60, 60, 60), thickness = 1 },
@@ -1034,7 +1202,6 @@ local library_t = {
 
 				label_object.SetText = label_object.set_text;
 
-				-- Live update support: connect a function that gets called every frame
 				label_object.set_update = function(_, update_fn)
 					if update_fn and type(update_fn) == "function" then
 						utility_t.connect(run_service.Heartbeat, function()
@@ -1178,6 +1345,13 @@ local library_t = {
 					Rotation = 90
 				});
 
+				-- Track accent for toggle
+				track_accent({
+					type = "toggle_gradient",
+					instance = ui_gradient,
+					get_state = function() return current_state; end
+				});
+
 				local change_state = function(state)
 					current_state = state;
 					callback(state);
@@ -1311,11 +1485,14 @@ local library_t = {
 				local text_size = value_text.TextBounds;
 				value_text.Position = UDim2.new(0.5, -text_size.X / 2, 0.3, 0);
 
-				utility_t.new_instance("UIGradient", {
+				local slider_accent_gradient = utility_t.new_instance("UIGradient", {
 					Parent = actual_slider,
 					Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, library_t.theme.accent), ColorSequenceKeypoint.new(1, utility_t.darken_color(library_t.theme.accent, 0.5)) }),
 					Rotation = 90
 				});
+
+				-- Track accent for slider fill
+				track_accent({ type = "slider_gradient", instance = slider_accent_gradient });
 
 				utility_t.new_instance("UIGradient", {
 					Parent = slider_frame,
@@ -1957,16 +2134,28 @@ local library_t = {
 		end;
 
 		local tabs = {}; do
+			-- FIX #2: Sections now use UIFlexItem to share column space proportionally
 			tabs.section = function(self, properties)
 				local size = properties and properties.size or 120;
 				local name = properties and properties.name or "aimbot";
 				local side = properties and (properties.side and properties.side:lower()) or "left";
 
+				local parent_column = side == "left" and self.left_side or self.right_side;
+
 				local section_frame = utility_t.new_instance("Frame", {
-					Parent = side == "left" and self.left_side or self.right_side,
+					Parent = parent_column,
 					Size = UDim2.new(1, 0, 0, size),
 					BackgroundColor3 = library_t.theme.section_color,
-					BorderSizePixel = 0
+					BorderSizePixel = 0,
+					ClipsDescendants = true, -- FIX: Prevent visual overflow
+				});
+
+				-- FIX #2: Use UIFlexItem so sections share column space proportionally
+				utility_t.new_instance("UIFlexItem", {
+					Parent = section_frame,
+					FlexMode = Enum.UIFlexMode.Fill,
+					GrowRatio = size / 100,
+					ShrinkRatio = 1,
 				});
 
 				local text_bounds = utility_t.get_textbounds(name, library_t.font_size);
@@ -2136,18 +2325,21 @@ local library_t = {
 				BorderSizePixel = 0
 			});
 
+			-- FIX #2: UIListLayout with Flex wrapping for columns
 			utility_t.new_instance("UIListLayout", {
 				Parent = left_side,
 				Padding = UDim.new(0, 16),
 				SortOrder = Enum.SortOrder.LayoutOrder,
-				FillDirection = Enum.FillDirection.Vertical
+				FillDirection = Enum.FillDirection.Vertical,
+				Wraps = false,
 			});
 
 			utility_t.new_instance("UIListLayout", {
 				Parent = right_side,
 				Padding = UDim.new(0, 16),
 				SortOrder = Enum.SortOrder.LayoutOrder,
-				FillDirection = Enum.FillDirection.Vertical
+				FillDirection = Enum.FillDirection.Vertical,
+				Wraps = false,
 			});
 
 			local switch_tab = function(tab)
@@ -2350,7 +2542,7 @@ local library_t = {
 				BorderSizePixel = 0
 			});
 
-			utility_t.new_instance("UIGradient", {
+			local main_accent_gradient = utility_t.new_instance("UIGradient", {
 				Parent = accent_line,
 				Color = ColorSequence.new({
 					ColorSequenceKeypoint.new(0, library_t.theme.accent),
@@ -2358,6 +2550,9 @@ local library_t = {
 				}),
 				Rotation = 90
 			});
+
+			-- Track accent for main window accent line
+			track_accent({ type = "gradient", instance = main_accent_gradient, darken = 0.5 });
 
 			local cursor_frame;
 			local mouse_location = user_input_service:GetMouseLocation();
@@ -2534,14 +2729,19 @@ local library_t = {
 				end;
 			end);
 
+			-- FIX #4: Handle both left-click and right-click for buttons
 			utility_t.connect(user_input_service.InputBegan, function(input)
-				if input.UserInputType == Enum.UserInputType.MouseButton1 and main_library.base.is_open then
+				if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.MouseButton2) and main_library.base.is_open then
 					for _, button_object in buttons do
 						if utility_t.is_mouse_in_frame(button_object.button) then
 							if not utility_t.is_parents_visible(button_object.button) then
 								continue;
 							end;
-							button_object.pressed:fire();
+							if input.UserInputType == Enum.UserInputType.MouseButton1 then
+								button_object.pressed:fire();
+							elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+								button_object.right_pressed:fire();
+							end;
 							break;
 						end;
 					end
@@ -2599,10 +2799,18 @@ local library_t = {
 					flag = "__theme_" .. theme_info.key,
 					info = theme_info.name,
 					callback = function(data)
+						local color = nil;
 						if type(data) == "table" and data.color then
-							self.theme[theme_info.key] = data.color;
+							color = data.color;
 						elseif typeof(data) == "Color3" then
-							self.theme[theme_info.key] = data;
+							color = data;
+						end;
+						if color then
+							self.theme[theme_info.key] = color;
+							-- FIX #1: If accent changed, propagate to all tracked objects
+							if theme_info.key == "accent" then
+								self:update_accent(color);
+							end;
 						end;
 					end
 				});
