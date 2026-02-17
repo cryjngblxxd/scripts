@@ -733,305 +733,479 @@ local library_t = {
 		end;
 
 		-- FIX #4: Keybind with right-click mode menu (toggle/hold/always)
-		local create_keybind = function(self, properties, label, is_toggle)
-			local name = properties and properties.name or "keybind";
-			local default = properties and properties.default or nil;
-			local flag = properties and properties.flag or name;
-			local callback = properties and properties.callback or function(...) end;
-			local index_mode = properties and properties.index_mode or false;
-			local mode = properties and properties.mode or "toggle";
+local create_keybind = function(self, properties, label, is_toggle)
+    local name = properties and properties.name or "keybind";
+    local default = properties and properties.default or nil;
+    local flag = properties and properties.flag or name;
+    local callback = properties and properties.callback or function(...) end;
+    local index_mode = properties and properties.index_mode or false;
+    local mode = properties and properties.mode or "toggle";
 
-			library_t.flags[flag] = index_mode and default or false;
-			local current_key = default;
-			self.lib.base.key_flags[flag] = default;
-			local is_selecting = false;
-			local state = false;
+    library_t.flags[flag] = index_mode and default or false;
+    local current_key = default;
+    self.lib.base.key_flags[flag] = default;
+    local is_selecting = false;
+    local state = false;
 
-			local keybind_frame = utility_t.new_instance("Frame", {
-				Parent = label,
-				Position = UDim2.new(1, -10, 0, 0),
-				Size = UDim2.new(0, 0, 0, 0),
-				BackgroundTransparency = 1,
-				BorderSizePixel = 0,
-			});
+    local keybind_frame = utility_t.new_instance("Frame", {
+        Parent = label,
+        Position = UDim2.new(1, -10, 0, 0),
+        Size = UDim2.new(0, 0, 0, 0),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+    });
 
-			local keybind_text = utility_t.new_instance("TextLabel", {
-				Parent = keybind_frame,
-				Position = UDim2.new(0, 1, 0, 0),
-				Size = UDim2.new(1, 0, 1, 0),
-				BackgroundTransparency = 1,
-				BorderSizePixel = 0,
-				ZIndex = 2,
-				TextColor3 = library_t.theme.text_color,
-				TextSize = library_t.font_size,
-				Text = default and ("[" .. default.Name:lower() .. "]") or "[none]",
-				FontFace = library_t.font,
-			});
+    local keybind_text = utility_t.new_instance("TextLabel", {
+        Parent = keybind_frame,
+        Position = UDim2.new(0, 1, 0, 0),
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ZIndex = 2,
+        TextColor3 = library_t.theme.text_color,
+        TextSize = library_t.font_size,
+        Text = default and ("[" .. default.Name:lower() .. "]") or "[none]",
+        FontFace = library_t.font,
+    });
 
-			local shadow = utility_t.new_instance("TextLabel", {
-				Parent = keybind_text,
-				Size = UDim2.new(1, 0, 1, 0),
-				Position = UDim2.new(0, 1, 0, 1),
-				ZIndex = 1,
-				FontFace = library_t.font,
-				TextSize = library_t.font_size,
-				BackgroundTransparency = 1,
-				TextColor3 = Color3.fromRGB(0, 0, 0),
-				Text = default and ("[" .. default.Name:lower() .. "]") or "[none]",
-				BorderSizePixel = 0
-			});
+    local shadow = utility_t.new_instance("TextLabel", {
+        Parent = keybind_text,
+        Size = UDim2.new(1, 0, 1, 0),
+        Position = UDim2.new(0, 1, 0, 1),
+        ZIndex = 1,
+        FontFace = library_t.font,
+        TextSize = library_t.font_size,
+        BackgroundTransparency = 1,
+        TextColor3 = Color3.fromRGB(0, 0, 0),
+        Text = default and ("[" .. default.Name:lower() .. "]") or "[none]",
+        BorderSizePixel = 0
+    });
 
-			local keybind_button, pressed_signal, right_pressed_signal = utility_t.new_button({
-				Parent = keybind_frame,
-				Position = UDim2.new(0, 0, 0, 0),
-				Size = UDim2.new(1, 0, 1, 0),
-				BackgroundTransparency = 1,
-				BorderSizePixel = 0,
-				TextTransparency = 1
-			});
+    local keybind_button, pressed_signal, right_pressed_signal = utility_t.new_button({
+        Parent = keybind_frame,
+        Position = UDim2.new(0, 0, 0, 0),
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        TextTransparency = 1
+    });
 
-			-- Right-click mode popup
-			local mode_popup = utility_t.new_instance("Frame", {
-				Parent = self.lib.screen_gui,
-				Size = UDim2.new(0, 80, 0, 52),
-				Visible = false,
-				ZIndex = 2000,
-				BackgroundColor3 = library_t.theme.element_color,
-				BorderSizePixel = 0,
-			});
+    -- Right-click mode popup with enhanced styling
+    local mode_popup = utility_t.new_instance("Frame", {
+        Parent = self.lib.screen_gui,
+        Size = UDim2.new(0, 90, 0, 62),
+        Visible = false,
+        ZIndex = 2000,
+        BackgroundColor3 = library_t.theme.background_color,
+        BorderSizePixel = 0,
+    });
 
-			utility_t.new_instance("UIStroke", {
-				Parent = mode_popup,
-				LineJoinMode = Enum.LineJoinMode.Miter,
-				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-				Color = library_t.theme.border_color,
-				Thickness = 1
-			});
+    -- Accent-colored top bar
+    local popup_accent_line = utility_t.new_instance("Frame", {
+        Parent = mode_popup,
+        Size = UDim2.new(1, 0, 0, 2),
+        Position = UDim2.new(0, 0, 0, 0),
+        BackgroundColor3 = Color3.new(1, 1, 1),
+        BorderSizePixel = 0,
+        ZIndex = 2001
+    });
 
-			local mode_layout = utility_t.new_instance("UIListLayout", {
-				Parent = mode_popup,
-				SortOrder = Enum.SortOrder.LayoutOrder,
-				FillDirection = Enum.FillDirection.Vertical,
-				Padding = UDim.new(0, 2),
-			});
+    local popup_accent_gradient = utility_t.new_instance("UIGradient", {
+        Parent = popup_accent_line,
+        Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, library_t.theme.accent),
+            ColorSequenceKeypoint.new(1, utility_t.darken_color(library_t.theme.accent, 0.7))
+        }),
+        Rotation = 0
+    });
 
-			utility_t.new_instance("UIPadding", {
-				Parent = mode_popup,
-				PaddingTop = UDim.new(0, 3),
-				PaddingLeft = UDim.new(0, 4),
-			});
+    -- Track accent for popup
+    track_accent({ type = "gradient", instance = popup_accent_gradient, darken = 0.7 });
 
-			local mode_options = {"always", "toggle", "hold"};
-			local mode_labels = {};
+    utility_t.new_instance("UIStroke", {
+        Parent = mode_popup,
+        LineJoinMode = Enum.LineJoinMode.Miter,
+        ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+        Color = library_t.theme.border_color,
+        Thickness = 1
+    });
 
-			for _, mode_name in ipairs(mode_options) do
-				local mode_btn, mode_pressed = utility_t.new_button({
-					Parent = mode_popup,
-					Size = UDim2.new(1, -8, 0, 14),
-					BackgroundTransparency = 1,
-					BorderSizePixel = 0,
-					ZIndex = 2001,
-					FontFace = library_t.font,
-					TextSize = library_t.font_size,
-					TextColor3 = mode == mode_name and library_t.theme.accent or library_t.theme.text_color,
-					TextXAlignment = Enum.TextXAlignment.Left,
-					Text = mode_name,
-				});
+    -- Dots pattern background
+    utility_t.new_instance("ImageLabel", {
+        Parent = mode_popup,
+        Size = UDim2.new(1, 0, 1, 0),
+        Position = UDim2.new(0, 0, 0, 0),
+        BackgroundTransparency = 1,
+        ImageColor3 = library_t.theme.dots_color,
+        ScaleType = Enum.ScaleType.Tile,
+        ZIndex = 2000,
+        TileSize = UDim2.new(0, 8, 0, 8),
+        Image = "rbxassetid://134950628747280"
+    });
 
-				utility_t.new_instance("TextLabel", {
-					Parent = mode_btn,
-					Size = UDim2.new(1, 0, 1, 0),
-					Position = UDim2.new(0, 1, 0, 1),
-					ZIndex = 2000,
-					FontFace = library_t.font,
-					TextSize = library_t.font_size,
-					BackgroundTransparency = 1,
-					TextColor3 = Color3.fromRGB(0, 0, 0),
-					TextXAlignment = Enum.TextXAlignment.Left,
-					Text = mode_name,
-					BorderSizePixel = 0
-				});
+    local mode_content = utility_t.new_instance("Frame", {
+        Parent = mode_popup,
+        Position = UDim2.new(0, 0, 0, 5),
+        Size = UDim2.new(1, 0, 1, -5),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ZIndex = 2001
+    });
 
-				mode_labels[mode_name] = mode_btn;
+    local mode_layout = utility_t.new_instance("UIListLayout", {
+        Parent = mode_content,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        FillDirection = Enum.FillDirection.Vertical,
+        Padding = UDim.new(0, 2),
+        HorizontalAlignment = Enum.HorizontalAlignment.Left,
+    });
 
-				utility_t.connect(mode_pressed, function()
-					-- Update mode
-					mode = mode_name;
-					-- Update label colors
-					for mn, ml in pairs(mode_labels) do
-						ml.TextColor3 = mn == mode and library_t.theme.accent or library_t.theme.text_color;
-					end;
-					-- Handle "always" mode
-					if mode == "always" then
-						state = true;
-						library_t.flags[flag] = true;
-						callback(true);
-					else
-						if not index_mode then
-							state = false;
-							library_t.flags[flag] = false;
-							callback(false);
-						end;
-					end;
-					-- Close popup
-					mode_popup.Visible = false;
-					self.lib.base.current_keybind_menu = nil;
-				end);
-			end;
+    utility_t.new_instance("UIPadding", {
+        Parent = mode_content,
+        PaddingTop = UDim.new(0, 2),
+        PaddingLeft = UDim.new(0, 6),
+    });
 
-			local update_pos = function()
-				local text_size = keybind_text.TextBounds;
-				keybind_frame.Size = UDim2.new(0, text_size.X + 9, 0, 10);
-				keybind_frame.Position = UDim2.new(1, -text_size.X - 4, 0, 0);
-			end;
+    local mode_options = {"always", "toggle", "hold"};
+    local mode_buttons = {};
+    local mode_dots = {};
+    local mode_labels = {};
 
-			local set_key = function(key)
-				if key then
-					local key_enum = nil;
-					if typeof(key) == "EnumItem" then
-						key_enum = key;
-					elseif type(key) == "string" then
-						local ok1, v1 = pcall(function() return Enum.KeyCode[key] end);
-						local ok2, v2 = pcall(function() return Enum.UserInputType[key] end);
-						key_enum = (ok1 and v1) or (ok2 and v2) or nil;
-					end;
-					if key_enum then
-						current_key = key_enum;
-						keybind_text.Text = "[" .. key_enum.Name:lower() .. "]";
-						shadow.Text = "[" .. key_enum.Name:lower() .. "]";
-						self.lib.base.key_flags[flag] = key_enum;
-						if index_mode then
-							library_t.flags[flag] = key_enum;
-						else
-							if mode == "always" then
-								library_t.flags[flag] = true;
-							else
-								library_t.flags[flag] = false;
-							end;
-						end;
-						update_pos();
-						callback(key_enum);
-					end;
-				else
-					current_key = nil;
-					keybind_text.Text = "[none]";
-					shadow.Text = "[none]";
-					self.lib.base.key_flags[flag] = nil;
-					if index_mode then
-						library_t.flags[flag] = nil;
-					else
-						library_t.flags[flag] = false;
-					end;
-					update_pos();
-					callback(nil);
-				end;
-			end;
+    -- Mode colors
+    local mode_colors = {
+        always = Color3.fromRGB(255, 100, 100),  -- Red for always
+        toggle = Color3.fromRGB(100, 255, 100),  -- Green for toggle
+        hold = Color3.fromRGB(100, 150, 255),    -- Blue for hold
+    };
 
-			self.lib.base.save_flags[flag] = set_key;
-			update_pos();
+    for _, mode_name in ipairs(mode_options) do
+        local mode_row = utility_t.new_instance("Frame", {
+            Parent = mode_content,
+            Size = UDim2.new(1, -12, 0, 16),
+            BackgroundTransparency = 1,
+            BorderSizePixel = 0,
+            ZIndex = 2002,
+        });
 
-			-- Left-click: select key
-			utility_t.connect(pressed_signal, function()
-				if not is_selecting and self.lib.base.current_tab == self.tab and utility_t.is_in_main_frame(keybind_button, self.main_frame) then
-					is_selecting = true;
-					keybind_text.Text = "[...]";
-					shadow.Text = "[...]";
-					update_pos();
-				end;
-			end);
+        -- Hover background
+        local hover_bg = utility_t.new_instance("Frame", {
+            Parent = mode_row,
+            Size = UDim2.new(1, 4, 1, 2),
+            Position = UDim2.new(0, -2, 0, -1),
+            BackgroundColor3 = library_t.theme.element_color,
+            BackgroundTransparency = 1,
+            BorderSizePixel = 0,
+            ZIndex = 2001,
+        });
 
-			-- Right-click: open mode menu
-			utility_t.connect(right_pressed_signal, function()
-				if not index_mode and not is_selecting and self.lib.base.current_tab == self.tab and utility_t.is_in_main_frame(keybind_button, self.main_frame) then
-					-- Close any other open keybind menu
-					if self.lib.base.current_keybind_menu and self.lib.base.current_keybind_menu ~= mode_popup then
-						self.lib.base.current_keybind_menu.Visible = false;
-					end;
-					local abs_pos = keybind_button.AbsolutePosition;
-					mode_popup.Position = UDim2.new(0, abs_pos.X, 0, abs_pos.Y + 15);
-					mode_popup.Visible = not mode_popup.Visible;
-					if mode_popup.Visible then
-						self.lib.base.current_keybind_menu = mode_popup;
-						-- Update highlight
-						for mn, ml in pairs(mode_labels) do
-							ml.TextColor3 = mn == mode and library_t.theme.accent or library_t.theme.text_color;
-						end;
-					else
-						self.lib.base.current_keybind_menu = nil;
-					end;
-				end;
-			end);
+        utility_t.new_instance("UICorner", {
+            Parent = hover_bg,
+            CornerRadius = UDim.new(0, 3)
+        });
 
-			-- Close mode popup on click outside
-			utility_t.connect(user_input_service.InputBegan, function(input)
-				if mode_popup.Visible and input.UserInputType == Enum.UserInputType.MouseButton1 then
-					if not utility_t.is_mouse_in_frame(mode_popup) and not utility_t.is_mouse_in_frame(keybind_button) then
-						mode_popup.Visible = false;
-						self.lib.base.current_keybind_menu = nil;
-					end;
-				end;
-			end);
+        -- Colored dot indicator
+        local dot = utility_t.new_instance("Frame", {
+            Parent = mode_row,
+            Size = UDim2.new(0, 6, 0, 6),
+            Position = UDim2.new(0, 2, 0.5, -3),
+            BackgroundColor3 = mode == mode_name and mode_colors[mode_name] or Color3.fromRGB(60, 60, 60),
+            BorderSizePixel = 0,
+            ZIndex = 2003,
+        });
 
-			utility_t.connect(user_input_service.InputBegan, function(input)
-				if is_selecting and input.KeyCode == Enum.KeyCode.Escape then
-					is_selecting = false;
-					keybind_text.Text = current_key and ("[" .. current_key.Name:lower() .. "]") or "[none]";
-					shadow.Text = current_key and ("[" .. current_key.Name:lower() .. "]") or "[none]";
-					update_pos();
-					return;
-				end;
-				if is_selecting then
-					local key = nil;
-					if input.UserInputType == Enum.UserInputType.Keyboard then
-						key = input.KeyCode;
-					elseif input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.MouseButton2 then
-						-- Don't capture mouse clicks during selection to avoid conflicts
-						return;
-					end;
-					if key then
-						is_selecting = false;
-						set_key(key);
-					end;
-					return;
-				end;
-				if not is_selecting and not index_mode and current_key then
-					local should_trigger = false;
-					if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == current_key then
-						should_trigger = true;
-					elseif input.UserInputType == current_key then
-						should_trigger = true;
-					end;
-					if should_trigger then
-						if mode == "toggle" then
-							state = not state;
-							library_t.flags[flag] = state;
-							callback(state);
-						elseif mode == "hold" then
-							state = true;
-							library_t.flags[flag] = state;
-							callback(state);
-						end;
-						-- "always" mode doesn't need input handling, it's always true
-					end;
-				end;
-			end);
+        utility_t.new_instance("UICorner", {
+            Parent = dot,
+            CornerRadius = UDim.new(1, 0)
+        });
 
-			utility_t.connect(user_input_service.InputEnded, function(input)
-				if not index_mode and current_key and mode == "hold" then
-					local should_release = false;
-					if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == current_key then
-						should_release = true;
-					elseif input.UserInputType == current_key then
-						should_release = true;
-					end;
-					if should_release then
-						state = false;
-						library_t.flags[flag] = state;
-						callback(state);
-					end;
-				end;
-			end);
-		end;
+        -- Glow effect for active dot
+        local dot_glow = utility_t.new_instance("ImageLabel", {
+            Parent = dot,
+            Size = UDim2.new(3, 0, 3, 0),
+            Position = UDim2.new(0.5, 0, 0.5, 0),
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            BackgroundTransparency = 1,
+            ImageColor3 = mode_colors[mode_name],
+            ImageTransparency = mode == mode_name and 0.7 or 1,
+            Image = "rbxassetid://5028857084", -- Radial gradient/glow
+            ZIndex = 2002,
+        });
+
+        mode_dots[mode_name] = { dot = dot, glow = dot_glow };
+
+        local mode_btn, mode_pressed = utility_t.new_button({
+            Parent = mode_row,
+            Position = UDim2.new(0, 14, 0, 0),
+            Size = UDim2.new(1, -14, 1, 0),
+            BackgroundTransparency = 1,
+            BorderSizePixel = 0,
+            ZIndex = 2003,
+            FontFace = library_t.font,
+            TextSize = library_t.font_size,
+            TextColor3 = mode == mode_name and library_t.theme.accent or library_t.theme.text_color,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            Text = mode_name,
+        });
+
+        -- Shadow for text
+        utility_t.new_instance("TextLabel", {
+            Parent = mode_btn,
+            Size = UDim2.new(1, 0, 1, 0),
+            Position = UDim2.new(0, 1, 0, 1),
+            ZIndex = 2002,
+            FontFace = library_t.font,
+            TextSize = library_t.font_size,
+            BackgroundTransparency = 1,
+            TextColor3 = Color3.fromRGB(0, 0, 0),
+            TextXAlignment = Enum.TextXAlignment.Left,
+            Text = mode_name,
+            BorderSizePixel = 0
+        });
+
+        mode_labels[mode_name] = mode_btn;
+        mode_buttons[mode_name] = { row = mode_row, hover_bg = hover_bg, btn = mode_btn };
+
+        -- Hover effects
+        utility_t.connect(mode_row.MouseEnter, function()
+            tween_service:Create(hover_bg, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                BackgroundTransparency = 0.5
+            }):Play();
+        end);
+
+        utility_t.connect(mode_row.MouseLeave, function()
+            tween_service:Create(hover_bg, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                BackgroundTransparency = 1
+            }):Play();
+        end);
+
+        utility_t.connect(mode_pressed, function()
+            -- Update mode
+            mode = mode_name;
+
+            -- Update all dots and labels
+            for mn, data in pairs(mode_dots) do
+                local is_active = mn == mode;
+                tween_service:Create(data.dot, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                    BackgroundColor3 = is_active and mode_colors[mn] or Color3.fromRGB(60, 60, 60)
+                }):Play();
+                tween_service:Create(data.glow, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                    ImageTransparency = is_active and 0.7 or 1
+                }):Play();
+            end;
+
+            for mn, ml in pairs(mode_labels) do
+                tween_service:Create(ml, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                    TextColor3 = mn == mode and library_t.theme.accent or library_t.theme.text_color
+                }):Play();
+            end;
+
+            -- Handle "always" mode - permanently on
+            if mode == "always" then
+                state = true;
+                library_t.flags[flag] = true;
+                callback(true);
+            else
+                if not index_mode then
+                    state = false;
+                    library_t.flags[flag] = false;
+                    callback(false);
+                end;
+            end;
+
+            -- Smooth close animation
+            tween_service:Create(mode_popup, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Size = UDim2.new(0, 90, 0, 0)
+            }):Play();
+
+            task.delay(0.15, function()
+                mode_popup.Visible = false;
+                mode_popup.Size = UDim2.new(0, 90, 0, 62);
+                self.lib.base.current_keybind_menu = nil;
+            end);
+        end);
+    end;
+
+    local update_pos = function()
+        local text_size = keybind_text.TextBounds;
+        keybind_frame.Size = UDim2.new(0, text_size.X + 9, 0, 10);
+        keybind_frame.Position = UDim2.new(1, -text_size.X - 4, 0, 0);
+    end;
+
+    local set_key = function(key)
+        if key then
+            local key_enum = nil;
+            if typeof(key) == "EnumItem" then
+                key_enum = key;
+            elseif type(key) == "string" then
+                local ok1, v1 = pcall(function() return Enum.KeyCode[key] end);
+                local ok2, v2 = pcall(function() return Enum.UserInputType[key] end);
+                key_enum = (ok1 and v1) or (ok2 and v2) or nil;
+            end;
+            if key_enum then
+                current_key = key_enum;
+                keybind_text.Text = "[" .. key_enum.Name:lower() .. "]";
+                shadow.Text = "[" .. key_enum.Name:lower() .. "]";
+                self.lib.base.key_flags[flag] = key_enum;
+                if index_mode then
+                    library_t.flags[flag] = key_enum;
+                else
+                    if mode == "always" then
+                        library_t.flags[flag] = true;
+                    else
+                        library_t.flags[flag] = false;
+                    end;
+                end;
+                update_pos();
+                callback(key_enum);
+            end;
+        else
+            current_key = nil;
+            keybind_text.Text = "[none]";
+            shadow.Text = "[none]";
+            self.lib.base.key_flags[flag] = nil;
+            if index_mode then
+                library_t.flags[flag] = nil;
+            else
+                library_t.flags[flag] = false;
+            end;
+            update_pos();
+            callback(nil);
+        end;
+    end;
+
+    self.lib.base.save_flags[flag] = set_key;
+    update_pos();
+
+    -- Left-click: select key
+    utility_t.connect(pressed_signal, function()
+        if not is_selecting and self.lib.base.current_tab == self.tab and utility_t.is_in_main_frame(keybind_button, self.main_frame) then
+            is_selecting = true;
+            keybind_text.Text = "[...]";
+            shadow.Text = "[...]";
+            update_pos();
+        end;
+    end);
+
+    -- Right-click: open mode menu with animation
+    utility_t.connect(right_pressed_signal, function()
+        if not index_mode and not is_selecting and self.lib.base.current_tab == self.tab and utility_t.is_in_main_frame(keybind_button, self.main_frame) then
+            -- Close any other open keybind menu
+            if self.lib.base.current_keybind_menu and self.lib.base.current_keybind_menu ~= mode_popup then
+                self.lib.base.current_keybind_menu.Visible = false;
+            end;
+
+            if mode_popup.Visible then
+                -- Close with animation
+                tween_service:Create(mode_popup, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                    Size = UDim2.new(0, 90, 0, 0)
+                }):Play();
+                task.delay(0.15, function()
+                    mode_popup.Visible = false;
+                    mode_popup.Size = UDim2.new(0, 90, 0, 62);
+                    self.lib.base.current_keybind_menu = nil;
+                end);
+            else
+                -- Position and open with animation
+                local abs_pos = keybind_button.AbsolutePosition;
+                mode_popup.Position = UDim2.new(0, abs_pos.X - 70, 0, abs_pos.Y + 15);
+                mode_popup.Size = UDim2.new(0, 90, 0, 0);
+                mode_popup.Visible = true;
+
+                tween_service:Create(mode_popup, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                    Size = UDim2.new(0, 90, 0, 62)
+                }):Play();
+
+                self.lib.base.current_keybind_menu = mode_popup;
+
+                -- Update highlight for current mode
+                for mn, data in pairs(mode_dots) do
+                    local is_active = mn == mode;
+                    data.dot.BackgroundColor3 = is_active and mode_colors[mn] or Color3.fromRGB(60, 60, 60);
+                    data.glow.ImageTransparency = is_active and 0.7 or 1;
+                end;
+                for mn, ml in pairs(mode_labels) do
+                    ml.TextColor3 = mn == mode and library_t.theme.accent or library_t.theme.text_color;
+                end;
+            end;
+        end;
+    end);
+
+    -- Close mode popup on click outside
+    utility_t.connect(user_input_service.InputBegan, function(input)
+        if mode_popup.Visible and input.UserInputType == Enum.UserInputType.MouseButton1 then
+            if not utility_t.is_mouse_in_frame(mode_popup) and not utility_t.is_mouse_in_frame(keybind_button) then
+                tween_service:Create(mode_popup, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                    Size = UDim2.new(0, 90, 0, 0)
+                }):Play();
+                task.delay(0.15, function()
+                    mode_popup.Visible = false;
+                    mode_popup.Size = UDim2.new(0, 90, 0, 62);
+                    self.lib.base.current_keybind_menu = nil;
+                end);
+            end;
+        end;
+    end);
+
+    utility_t.connect(user_input_service.InputBegan, function(input)
+        if is_selecting and input.KeyCode == Enum.KeyCode.Escape then
+            is_selecting = false;
+            keybind_text.Text = current_key and ("[" .. current_key.Name:lower() .. "]") or "[none]";
+            shadow.Text = current_key and ("[" .. current_key.Name:lower() .. "]") or "[none]";
+            update_pos();
+            return;
+        end;
+        if is_selecting then
+            local key = nil;
+            if input.UserInputType == Enum.UserInputType.Keyboard then
+                key = input.KeyCode;
+            elseif input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.MouseButton2 then
+                -- Don't capture mouse clicks during selection to avoid conflicts
+                return;
+            end;
+            if key then
+                is_selecting = false;
+                set_key(key);
+            end;
+            return;
+        end;
+        if not is_selecting and not index_mode and current_key then
+            local should_trigger = false;
+            if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == current_key then
+                should_trigger = true;
+            elseif input.UserInputType == current_key then
+                should_trigger = true;
+            end;
+            if should_trigger then
+                if mode == "toggle" then
+                    state = not state;
+                    library_t.flags[flag] = state;
+                    callback(state);
+                elseif mode == "hold" then
+                    state = true;
+                    library_t.flags[flag] = state;
+                    callback(state);
+                end;
+                -- "always" mode doesn't need input handling, it's always true
+            end;
+        end;
+    end);
+
+    utility_t.connect(user_input_service.InputEnded, function(input)
+        if not index_mode and current_key and mode == "hold" then
+            local should_release = false;
+            if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == current_key then
+                should_release = true;
+            elseif input.UserInputType == current_key then
+                should_release = true;
+            end;
+            if should_release then
+                state = false;
+                library_t.flags[flag] = state;
+                callback(state);
+            end;
+        end;
+    end);
+end;
 
 		library_t.watermark = function(self, name)
 			local screen_gui = utility_t.new_instance("ScreenGui", {
