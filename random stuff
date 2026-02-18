@@ -1,6 +1,5 @@
--- ★ Nebula Hub UI Library ★
--- Completely custom-built UI system
--- By request - unique design, not based on any existing library
+local Nebula = {}
+Nebula.__index = Nebula
 
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -8,104 +7,36 @@ local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
-local GuiService = game:GetService("GuiService")
 
-local icons = loadstring(game:HttpGet('https://github.com/Footagesus/Icons/raw/refs/heads/main/solar/dist/Icons.lua'))()
+Nebula.Directory = "OsamaHub"
+Nebula.Flags = {}
+Nebula.ConfigFlags = {}
+Nebula.Connections = {}
 
--- ═══════════════════════════════════════════
--- Core Library Setup
--- ═══════════════════════════════════════════
-local Nebula = {
-    Directory = "NebulaHub",
-    Folders = {"/configs", "/themes"},
-    Flags = {},
-    ConfigFlags = {},
-    Connections = {},
-    Notifications = {},
-    ActiveDropdown = nil,
-    Windows = {},
-}
+if not isfolder(Nebula.Directory) then makefolder(Nebula.Directory) end
+if not isfolder(Nebula.Directory .. "/configs") then makefolder(Nebula.Directory .. "/configs") end
 
-Nebula.__index = Nebula
-
--- Create folders
-for _, path in next, Nebula.Folders do
-    if not isfolder(Nebula.Directory .. path) then
-        makefolder(Nebula.Directory .. path)
-    end
-end
-
--- ═══════════════════════════════════════════
--- Theme System
--- ═══════════════════════════════════════════
 local Theme = {
-    Primary = Color3.fromRGB(12, 12, 16),
-    Secondary = Color3.fromRGB(18, 18, 24),
-    Tertiary = Color3.fromRGB(24, 24, 32),
-    Accent = Color3.fromRGB(120, 80, 255),
-    AccentDark = Color3.fromRGB(90, 55, 200),
-    AccentGlow = Color3.fromRGB(150, 110, 255),
-    Text = Color3.fromRGB(240, 240, 245),
-    SubText = Color3.fromRGB(140, 140, 155),
-    Dim = Color3.fromRGB(80, 80, 95),
-    Border = Color3.fromRGB(32, 32, 42),
-    BorderLight = Color3.fromRGB(45, 45, 58),
-    Hover = Color3.fromRGB(28, 28, 38),
+    Primary = Color3.fromRGB(10, 10, 10),
+    Secondary = Color3.fromRGB(18, 18, 18),
+    Tertiary = Color3.fromRGB(26, 26, 26),
+    Accent = Color3.fromRGB(200, 200, 200),
+    Text = Color3.fromRGB(255, 255, 255),
+    SubText = Color3.fromRGB(180, 180, 180),
+    Dim = Color3.fromRGB(100, 100, 100),
+    Border = Color3.fromRGB(40, 40, 40),
+    Hover = Color3.fromRGB(35, 35, 35),
     Success = Color3.fromRGB(80, 200, 120),
     Error = Color3.fromRGB(220, 60, 60),
     Warning = Color3.fromRGB(240, 180, 40),
-    Glow = Color3.fromRGB(120, 80, 255),
 }
 
 local AccentBinds = {
     BackgroundColor3 = {},
     TextColor3 = {},
     ImageColor3 = {},
-    ScrollBarImageColor3 = {},
 }
 
--- ═══════════════════════════════════════════
--- Font Registration
--- ═══════════════════════════════════════════
-local Fonts = {}
-do
-    local function RegisterFont(name, weight, style, asset)
-        if not isfile(asset.Id) then
-            writefile(asset.Id, asset.Font)
-        end
-        if isfile(name .. ".font") then
-            delfile(name .. ".font")
-        end
-        local data = {
-            name = name,
-            faces = {{
-                name = "Normal",
-                weight = weight,
-                style = style,
-                assetId = getcustomasset(asset.Id),
-            }},
-        }
-        writefile(name .. ".font", HttpService:JSONEncode(data))
-        return getcustomasset(name .. ".font")
-    end
-
-    local Regular = RegisterFont("NebulaRegular", 200, "Normal", {
-        Id = "NebulaRegular.ttf",
-        Font = game:HttpGet("https://github.com/i77lhm/storage/raw/refs/heads/main/fonts/Inter_28pt-Medium.ttf"),
-    })
-
-    local Bold = RegisterFont("NebulaBold", 200, "Normal", {
-        Id = "NebulaBold.ttf",
-        Font = game:HttpGet("https://github.com/i77lhm/storage/raw/refs/heads/main/fonts/Inter_28pt-SemiBold.ttf"),
-    })
-
-    Fonts.Regular = Font.new(Regular, Enum.FontWeight.Regular, Enum.FontStyle.Normal)
-    Fonts.Bold = Font.new(Bold, Enum.FontWeight.Regular, Enum.FontStyle.Normal)
-end
-
--- ═══════════════════════════════════════════
--- Utility Functions
--- ═══════════════════════════════════════════
 local function Create(class, props)
     local inst = Instance.new(class)
     for k, v in pairs(props) do
@@ -115,11 +46,7 @@ local function Create(class, props)
 end
 
 local function Tween(obj, props, duration, style)
-    return TweenService:Create(obj, TweenInfo.new(
-        duration or 0.25,
-        style or Enum.EasingStyle.Quint,
-        Enum.EasingDirection.Out
-    ), props):Play()
+    TweenService:Create(obj, TweenInfo.new(duration or 0.25, style or Enum.EasingStyle.Quint, Enum.EasingDirection.Out), props):Play()
 end
 
 local function Connect(signal, callback)
@@ -133,20 +60,12 @@ local function BindAccent(obj, property)
 end
 
 local function NextFlag()
-    return string.format("__flag_%d", #Nebula.Flags + 1)
+    return string.format("__flag_%d_%d", #Nebula.Flags + 1, math.random(10000, 99999))
 end
 
 local function Round(num, decimals)
     local mult = 1 / (decimals or 1)
     return math.floor(num * mult + 0.5) / mult
-end
-
-local function MouseInFrame(frame)
-    local mouse = UserInputService:GetMouseLocation()
-    local pos = frame.AbsolutePosition
-    local size = frame.AbsoluteSize
-    return mouse.X >= pos.X and mouse.X <= pos.X + size.X and
-           mouse.Y >= pos.Y and mouse.Y <= pos.Y + size.Y
 end
 
 local KeyNames = {
@@ -169,9 +88,6 @@ local KeyNames = {
     [Enum.UserInputType.MouseButton3] = "MB3",
 }
 
--- ═══════════════════════════════════════════
--- Dragging System
--- ═══════════════════════════════════════════
 local function MakeDraggable(frame, handle)
     local dragging = false
     local dragStart, startPos
@@ -205,9 +121,6 @@ local function MakeDraggable(frame, handle)
     end)
 end
 
--- ═══════════════════════════════════════════
--- Notification System
--- ═══════════════════════════════════════════
 local NotificationHolder
 
 function Nebula:Notify(config)
@@ -244,35 +157,34 @@ function Nebula:Notify(config)
         AutomaticSize = Enum.AutomaticSize.Y,
         ClipsDescendants = true,
     })
-    Create("UICorner", { Parent = NotifFrame, CornerRadius = UDim.new(0, 8) })
+    Create("UICorner", { Parent = NotifFrame, CornerRadius = UDim.new(0, 6) })
     Create("UIStroke", { Parent = NotifFrame, Color = Theme.Border, Thickness = 1 })
 
-    local AccentBar = Create("Frame", {
+    Create("Frame", {
         Parent = NotifFrame,
         BackgroundColor3 = accentColor,
         Size = UDim2.new(0, 3, 1, 0),
     })
 
-    local NotifTitle = Create("TextLabel", {
+    Create("TextLabel", {
         Parent = NotifFrame,
         BackgroundTransparency = 1,
         Position = UDim2.new(0, 16, 0, 10),
         Size = UDim2.new(1, -26, 0, 0),
         AutomaticSize = Enum.AutomaticSize.Y,
-        FontFace = Fonts.Bold,
+        Font = Enum.Font.GothamBold,
         Text = title,
         TextColor3 = Theme.Text,
         TextSize = 14,
-        TextXAlignment = Enum.TextXAlignment.Left,
     })
 
-    local NotifMessage = Create("TextLabel", {
+    Create("TextLabel", {
         Parent = NotifFrame,
         BackgroundTransparency = 1,
         Position = UDim2.new(0, 16, 0, 30),
         Size = UDim2.new(1, -26, 0, 0),
         AutomaticSize = Enum.AutomaticSize.Y,
-        FontFace = Fonts.Regular,
+        Font = Enum.Font.Gotham,
         Text = message,
         TextColor3 = Theme.SubText,
         TextSize = 13,
@@ -290,39 +202,35 @@ function Nebula:Notify(config)
         Size = UDim2.new(1, 0, 0, 2),
     })
 
-    -- Animate in
     NotifFrame.BackgroundTransparency = 1
-    NotifTitle.TextTransparency = 1
-    NotifMessage.TextTransparency = 1
-    AccentBar.BackgroundTransparency = 1
-    ProgressBar.BackgroundTransparency = 1
+    for _, d in ipairs(NotifFrame:GetDescendants()) do
+        if d:IsA("TextLabel") then d.TextTransparency = 1 end
+        if d:IsA("Frame") then d.BackgroundTransparency = 1 end
+    end
 
     Tween(NotifFrame, {BackgroundTransparency = 0}, 0.3)
-    Tween(NotifTitle, {TextTransparency = 0}, 0.3)
-    Tween(NotifMessage, {TextTransparency = 0}, 0.3)
-    Tween(AccentBar, {BackgroundTransparency = 0}, 0.3)
-    Tween(ProgressBar, {BackgroundTransparency = 0}, 0.3)
+    for _, d in ipairs(NotifFrame:GetDescendants()) do
+        if d:IsA("TextLabel") then Tween(d, {TextTransparency = 0}, 0.3) end
+        if d:IsA("Frame") and d ~= NotifFrame then Tween(d, {BackgroundTransparency = 0}, 0.3) end
+    end
 
     Tween(ProgressBar, {Size = UDim2.new(0, 0, 0, 2)}, duration, Enum.EasingStyle.Linear)
 
     task.delay(duration, function()
         Tween(NotifFrame, {BackgroundTransparency = 1}, 0.4)
-        Tween(NotifTitle, {TextTransparency = 1}, 0.4)
-        Tween(NotifMessage, {TextTransparency = 1}, 0.4)
-        Tween(AccentBar, {BackgroundTransparency = 1}, 0.4)
-        Tween(ProgressBar, {BackgroundTransparency = 1}, 0.4)
+        for _, d in ipairs(NotifFrame:GetDescendants()) do
+            if d:IsA("TextLabel") then Tween(d, {TextTransparency = 1}, 0.4) end
+            if d:IsA("Frame") then Tween(d, {BackgroundTransparency = 1}, 0.4) end
+        end
         task.wait(0.5)
         NotifFrame:Destroy()
     end)
 end
 
--- ═══════════════════════════════════════════
--- Window Creation
--- ═══════════════════════════════════════════
 function Nebula:CreateWindow(config)
     local Window = {
-        Name = config.Name or "Nebula Hub",
-        Size = config.Size or UDim2.new(0, 720, 0, 520),
+        Name = config.Name or "OsamaHub",
+        Size = config.Size or UDim2.new(0, 720, 0, 500),
         Tabs = {},
         CurrentTab = nil,
         Visible = true,
@@ -331,7 +239,7 @@ function Nebula:CreateWindow(config)
 
     self.ScreenGui = Create("ScreenGui", {
         Parent = CoreGui,
-        Name = "NebulaHub_" .. tostring(math.random(100000, 999999)),
+        Name = "OsamaHub_" .. tostring(math.random(100000, 999999)),
         ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
         ResetOnSpawn = false,
         IgnoreGuiInset = true,
@@ -339,16 +247,14 @@ function Nebula:CreateWindow(config)
 
     local DropdownHolder = Create("ScreenGui", {
         Parent = CoreGui,
-        Name = "NebulaDropdowns",
+        Name = "OsamaDropdowns_" .. tostring(math.random(100000, 999999)),
         ZIndexBehavior = Enum.ZIndexBehavior.Global,
         ResetOnSpawn = false,
         IgnoreGuiInset = true,
     })
 
-    -- Main Container
     local Main = Create("Frame", {
         Parent = self.ScreenGui,
-        Name = "Main",
         BackgroundColor3 = Theme.Primary,
         Size = Window.Size,
         Position = UDim2.new(0.5, -Window.Size.X.Offset / 2, 0.5, -Window.Size.Y.Offset / 2),
@@ -356,40 +262,22 @@ function Nebula:CreateWindow(config)
     })
     Main.Position = UDim2.fromOffset(Main.AbsolutePosition.X, Main.AbsolutePosition.Y)
 
-    Create("UICorner", { Parent = Main, CornerRadius = UDim.new(0, 12) })
+    Create("UICorner", { Parent = Main, CornerRadius = UDim.new(0, 10) })
     Create("UIStroke", { Parent = Main, Color = Theme.Border, Thickness = 1 })
 
-    -- Shadow
-    Create("ImageLabel", {
-        Parent = Main,
-        BackgroundTransparency = 1,
-        Position = UDim2.new(0, -30, 0, -30),
-        Size = UDim2.new(1, 60, 1, 60),
-        ZIndex = 0,
-        Image = "rbxassetid://6015897843",
-        ImageColor3 = Color3.fromRGB(0, 0, 0),
-        ImageTransparency = 0.4,
-        ScaleType = Enum.ScaleType.Slice,
-        SliceCenter = Rect.new(49, 49, 450, 450),
-    })
-
-    -- ═══ Sidebar ═══
     local Sidebar = Create("Frame", {
         Parent = Main,
         BackgroundColor3 = Theme.Secondary,
-        Size = UDim2.new(0, 180, 1, 0),
+        Size = UDim2.new(0, 170, 1, 0),
     })
-    Create("UICorner", { Parent = Sidebar, CornerRadius = UDim.new(0, 12) })
 
-    -- Cover right side corners of sidebar
     Create("Frame", {
         Parent = Sidebar,
         BackgroundColor3 = Theme.Secondary,
-        Position = UDim2.new(1, -12, 0, 0),
-        Size = UDim2.new(0, 12, 1, 0),
+        Position = UDim2.new(1, -10, 0, 0),
+        Size = UDim2.new(0, 10, 1, 0),
     })
 
-    -- Sidebar divider
     Create("Frame", {
         Parent = Sidebar,
         BackgroundColor3 = Theme.Border,
@@ -398,49 +286,36 @@ function Nebula:CreateWindow(config)
         Size = UDim2.new(0, 1, 1, 0),
     })
 
-    -- Logo/Title Area
     local LogoArea = Create("Frame", {
         Parent = Sidebar,
         BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 0, 70),
+        Size = UDim2.new(1, 0, 0, 60),
     })
 
-    -- Accent dot
-    local AccentDot = Create("Frame", {
-        Parent = LogoArea,
-        BackgroundColor3 = Theme.Accent,
-        Position = UDim2.new(0, 20, 0.5, -4),
-        Size = UDim2.new(0, 8, 0, 8),
-    })
-    Create("UICorner", { Parent = AccentDot, CornerRadius = UDim.new(1, 0) })
-    BindAccent(AccentDot, "BackgroundColor3")
-
-    local TitleLabel = Create("TextLabel", {
+    Create("TextLabel", {
         Parent = LogoArea,
         BackgroundTransparency = 1,
-        Position = UDim2.new(0, 36, 0, 0),
-        Size = UDim2.new(1, -46, 1, 0),
-        FontFace = Fonts.Bold,
+        Position = UDim2.new(0, 18, 0, 0),
+        Size = UDim2.new(1, -28, 1, 0),
+        Font = Enum.Font.GothamBold,
         Text = Window.Name,
         TextColor3 = Theme.Text,
-        TextSize = 20,
+        TextSize = 18,
         TextXAlignment = Enum.TextXAlignment.Left,
     })
 
-    -- Divider under logo
     Create("Frame", {
         Parent = Sidebar,
         BackgroundColor3 = Theme.Border,
-        Position = UDim2.new(0, 15, 0, 70),
-        Size = UDim2.new(1, -30, 0, 1),
+        Position = UDim2.new(0, 12, 0, 60),
+        Size = UDim2.new(1, -24, 0, 1),
     })
 
-    -- Tab Buttons Container
     local TabButtonsHolder = Create("ScrollingFrame", {
         Parent = Sidebar,
         BackgroundTransparency = 1,
-        Position = UDim2.new(0, 0, 0, 80),
-        Size = UDim2.new(1, 0, 1, -130),
+        Position = UDim2.new(0, 0, 0, 68),
+        Size = UDim2.new(1, 0, 1, -108),
         ScrollBarThickness = 0,
         AutomaticCanvasSize = Enum.AutomaticSize.Y,
         CanvasSize = UDim2.new(0, 0, 0, 0),
@@ -449,122 +324,93 @@ function Nebula:CreateWindow(config)
     Create("UIListLayout", {
         Parent = TabButtonsHolder,
         SortOrder = Enum.SortOrder.LayoutOrder,
-        Padding = UDim.new(0, 4),
+        Padding = UDim.new(0, 3),
     })
 
     Create("UIPadding", {
         Parent = TabButtonsHolder,
-        PaddingLeft = UDim.new(0, 10),
-        PaddingRight = UDim.new(0, 10),
-        PaddingTop = UDim.new(0, 5),
+        PaddingLeft = UDim.new(0, 8),
+        PaddingRight = UDim.new(0, 8),
+        PaddingTop = UDim.new(0, 4),
     })
 
-    -- User Info at bottom of sidebar
     local UserArea = Create("Frame", {
         Parent = Sidebar,
         BackgroundTransparency = 1,
         AnchorPoint = Vector2.new(0, 1),
         Position = UDim2.new(0, 0, 1, 0),
-        Size = UDim2.new(1, 0, 0, 50),
+        Size = UDim2.new(1, 0, 0, 40),
     })
 
     Create("Frame", {
         Parent = UserArea,
         BackgroundColor3 = Theme.Border,
-        Position = UDim2.new(0, 15, 0, 0),
-        Size = UDim2.new(1, -30, 0, 1),
+        Position = UDim2.new(0, 12, 0, 0),
+        Size = UDim2.new(1, -24, 0, 1),
     })
 
-    local PlayerName = Create("TextLabel", {
+    Create("TextLabel", {
         Parent = UserArea,
         BackgroundTransparency = 1,
-        Position = UDim2.new(0, 15, 0, 8),
-        Size = UDim2.new(1, -30, 1, -8),
-        FontFace = Fonts.Regular,
+        Position = UDim2.new(0, 14, 0, 6),
+        Size = UDim2.new(1, -28, 1, -6),
+        Font = Enum.Font.Gotham,
         Text = Players.LocalPlayer.DisplayName,
         TextColor3 = Theme.Dim,
-        TextSize = 13,
+        TextSize = 12,
         TextXAlignment = Enum.TextXAlignment.Left,
     })
 
-    -- ═══ Content Area ═══
     local ContentArea = Create("Frame", {
         Parent = Main,
         BackgroundTransparency = 1,
-        Position = UDim2.new(0, 181, 0, 0),
-        Size = UDim2.new(1, -181, 1, 0),
+        Position = UDim2.new(0, 171, 0, 0),
+        Size = UDim2.new(1, -171, 1, 0),
     })
 
-    -- Top bar in content area
     local ContentTopBar = Create("Frame", {
         Parent = ContentArea,
         BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 0, 50),
+        Size = UDim2.new(1, 0, 0, 45),
     })
 
     local TabTitle = Create("TextLabel", {
         Parent = ContentTopBar,
         BackgroundTransparency = 1,
-        Position = UDim2.new(0, 20, 0, 0),
+        Position = UDim2.new(0, 18, 0, 0),
         Size = UDim2.new(0.5, 0, 1, 0),
-        FontFace = Fonts.Bold,
+        Font = Enum.Font.GothamBold,
         Text = "",
         TextColor3 = Theme.Text,
-        TextSize = 16,
+        TextSize = 15,
         TextXAlignment = Enum.TextXAlignment.Left,
-    })
-
-    -- Search/status indicator
-    local StatusDot = Create("Frame", {
-        Parent = ContentTopBar,
-        BackgroundColor3 = Theme.Success,
-        AnchorPoint = Vector2.new(1, 0.5),
-        Position = UDim2.new(1, -20, 0.5, 0),
-        Size = UDim2.new(0, 8, 0, 8),
-    })
-    Create("UICorner", { Parent = StatusDot, CornerRadius = UDim.new(1, 0) })
-
-    Create("TextLabel", {
-        Parent = ContentTopBar,
-        BackgroundTransparency = 1,
-        AnchorPoint = Vector2.new(1, 0.5),
-        Position = UDim2.new(1, -34, 0.5, 0),
-        Size = UDim2.new(0, 0, 0, 0),
-        AutomaticSize = Enum.AutomaticSize.XY,
-        FontFace = Fonts.Regular,
-        Text = "Active",
-        TextColor3 = Theme.Dim,
-        TextSize = 12,
     })
 
     Create("Frame", {
         Parent = ContentArea,
         BackgroundColor3 = Theme.Border,
-        Position = UDim2.new(0, 15, 0, 50),
-        Size = UDim2.new(1, -30, 0, 1),
+        Position = UDim2.new(0, 12, 0, 45),
+        Size = UDim2.new(1, -24, 0, 1),
     })
 
-    -- Tab Content Holder
     local TabContentHolder = Create("Frame", {
         Parent = ContentArea,
         BackgroundTransparency = 1,
-        Position = UDim2.new(0, 0, 0, 55),
-        Size = UDim2.new(1, 0, 1, -55),
+        Position = UDim2.new(0, 0, 0, 50),
+        Size = UDim2.new(1, 0, 1, -50),
     })
 
-    -- Fade overlay for transitions
     local FadeOverlay = Create("Frame", {
         Parent = ContentArea,
         BackgroundColor3 = Theme.Primary,
         BackgroundTransparency = 1,
-        Position = UDim2.new(0, 0, 0, 55),
-        Size = UDim2.new(1, 0, 1, -55),
+        Position = UDim2.new(0, 0, 0, 50),
+        Size = UDim2.new(1, 0, 1, -50),
         ZIndex = 50,
     })
 
     MakeDraggable(Main, LogoArea)
 
-    -- Toggle key
     Connect(UserInputService.InputBegan, function(input, gpe)
         if gpe then return end
         if input.KeyCode == Window.ToggleKey then
@@ -573,12 +419,8 @@ function Nebula:CreateWindow(config)
         end
     end)
 
-    -- ═══════════════════════════════════════════
-    -- Section Creator (inside tabs)
-    -- ═══════════════════════════════════════════
     local function CreateSection(parent, config)
-        local Section = { Elements = {} }
-        local sectionName = config.Name or "Section"
+        local Section = {}
 
         local SectionFrame = Create("Frame", {
             Parent = parent,
@@ -587,49 +429,47 @@ function Nebula:CreateWindow(config)
             AutomaticSize = Enum.AutomaticSize.Y,
             LayoutOrder = config.Order or 0,
         })
-        Create("UICorner", { Parent = SectionFrame, CornerRadius = UDim.new(0, 10) })
+        Create("UICorner", { Parent = SectionFrame, CornerRadius = UDim.new(0, 8) })
         Create("UIStroke", { Parent = SectionFrame, Color = Theme.Border, Thickness = 1 })
 
-        -- Section Header
         local Header = Create("Frame", {
             Parent = SectionFrame,
             BackgroundTransparency = 1,
-            Size = UDim2.new(1, 0, 0, 38),
+            Size = UDim2.new(1, 0, 0, 34),
         })
 
-        local HeaderAccent = Create("Frame", {
+        local HeaderBar = Create("Frame", {
             Parent = Header,
             BackgroundColor3 = Theme.Accent,
-            Position = UDim2.new(0, 12, 0.5, -6),
-            Size = UDim2.new(0, 3, 0, 12),
+            Position = UDim2.new(0, 10, 0.5, -5),
+            Size = UDim2.new(0, 3, 0, 10),
         })
-        Create("UICorner", { Parent = HeaderAccent, CornerRadius = UDim.new(0, 2) })
-        BindAccent(HeaderAccent, "BackgroundColor3")
+        Create("UICorner", { Parent = HeaderBar, CornerRadius = UDim.new(0, 2) })
+        BindAccent(HeaderBar, "BackgroundColor3")
 
         Create("TextLabel", {
             Parent = Header,
             BackgroundTransparency = 1,
-            Position = UDim2.new(0, 24, 0, 0),
-            Size = UDim2.new(1, -34, 1, 0),
-            FontFace = Fonts.Bold,
-            Text = sectionName,
+            Position = UDim2.new(0, 22, 0, 0),
+            Size = UDim2.new(1, -32, 1, 0),
+            Font = Enum.Font.GothamBold,
+            Text = config.Name or "Section",
             TextColor3 = Theme.Text,
-            TextSize = 14,
+            TextSize = 13,
             TextXAlignment = Enum.TextXAlignment.Left,
         })
 
         Create("Frame", {
             Parent = SectionFrame,
             BackgroundColor3 = Theme.Border,
-            Position = UDim2.new(0, 10, 0, 38),
-            Size = UDim2.new(1, -20, 0, 1),
+            Position = UDim2.new(0, 8, 0, 34),
+            Size = UDim2.new(1, -16, 0, 1),
         })
 
-        -- Elements Container
         local ElementsHolder = Create("Frame", {
             Parent = SectionFrame,
             BackgroundTransparency = 1,
-            Position = UDim2.new(0, 0, 0, 42),
+            Position = UDim2.new(0, 0, 0, 38),
             Size = UDim2.new(1, 0, 0, 0),
             AutomaticSize = Enum.AutomaticSize.Y,
         })
@@ -637,117 +477,98 @@ function Nebula:CreateWindow(config)
         Create("UIListLayout", {
             Parent = ElementsHolder,
             SortOrder = Enum.SortOrder.LayoutOrder,
-            Padding = UDim.new(0, 2),
+            Padding = UDim.new(0, 1),
         })
 
         Create("UIPadding", {
             Parent = ElementsHolder,
-            PaddingBottom = UDim.new(0, 10),
-            PaddingLeft = UDim.new(0, 12),
-            PaddingRight = UDim.new(0, 12),
+            PaddingBottom = UDim.new(0, 8),
+            PaddingLeft = UDim.new(0, 10),
+            PaddingRight = UDim.new(0, 10),
         })
 
-        -- ═══ Toggle ═══
+        local function AddSeparator()
+            Create("Frame", {
+                Parent = ElementsHolder,
+                BackgroundColor3 = Theme.Border,
+                Size = UDim2.new(1, 0, 0, 1),
+                BackgroundTransparency = 0.5,
+            })
+        end
+
         function Section:AddToggle(cfg)
             local flag = cfg.Flag or NextFlag()
             local enabled = cfg.Default or false
             Nebula.Flags[flag] = enabled
 
-            local ToggleFrame = Create("Frame", {
+            local Frame = Create("Frame", {
                 Parent = ElementsHolder,
                 BackgroundTransparency = 1,
-                Size = UDim2.new(1, 0, 0, 36),
+                Size = UDim2.new(1, 0, 0, 32),
             })
 
             Create("TextLabel", {
-                Parent = ToggleFrame,
+                Parent = Frame,
                 BackgroundTransparency = 1,
-                Position = UDim2.new(0, 4, 0, 0),
-                Size = UDim2.new(1, -50, 1, 0),
-                FontFace = Fonts.Regular,
+                Position = UDim2.new(0, 2, 0, 0),
+                Size = UDim2.new(1, -48, 1, 0),
+                Font = Enum.Font.Gotham,
                 Text = cfg.Name or "Toggle",
                 TextColor3 = Theme.Text,
-                TextSize = 14,
+                TextSize = 13,
                 TextXAlignment = Enum.TextXAlignment.Left,
             })
 
-            local ToggleTrack = Create("Frame", {
-                Parent = ToggleFrame,
+            local Track = Create("Frame", {
+                Parent = Frame,
                 BackgroundColor3 = Theme.Tertiary,
                 AnchorPoint = Vector2.new(1, 0.5),
-                Position = UDim2.new(1, -4, 0.5, 0),
-                Size = UDim2.new(0, 38, 0, 20),
+                Position = UDim2.new(1, -2, 0.5, 0),
+                Size = UDim2.new(0, 36, 0, 18),
             })
-            Create("UICorner", { Parent = ToggleTrack, CornerRadius = UDim.new(1, 0) })
-            Create("UIStroke", { Parent = ToggleTrack, Color = Theme.Border, Thickness = 1 })
+            Create("UICorner", { Parent = Track, CornerRadius = UDim.new(1, 0) })
+            Create("UIStroke", { Parent = Track, Color = Theme.Border, Thickness = 1 })
 
-            local ToggleKnob = Create("Frame", {
-                Parent = ToggleTrack,
+            local Knob = Create("Frame", {
+                Parent = Track,
                 BackgroundColor3 = Theme.Dim,
-                Position = UDim2.new(0, 3, 0.5, -7),
+                Position = UDim2.new(0, 2, 0.5, -7),
                 Size = UDim2.new(0, 14, 0, 14),
             })
-            Create("UICorner", { Parent = ToggleKnob, CornerRadius = UDim.new(1, 0) })
+            Create("UICorner", { Parent = Knob, CornerRadius = UDim.new(1, 0) })
 
-            local function UpdateToggle()
+            local function Update()
                 if enabled then
-                    Tween(ToggleTrack, {BackgroundColor3 = Theme.Accent}, 0.2)
-                    Tween(ToggleKnob, {
-                        Position = UDim2.new(1, -17, 0.5, -7),
-                        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-                    }, 0.2)
+                    Tween(Track, {BackgroundColor3 = Theme.Accent}, 0.2)
+                    Tween(Knob, {Position = UDim2.new(1, -16, 0.5, -7), BackgroundColor3 = Theme.Text}, 0.2)
                 else
-                    Tween(ToggleTrack, {BackgroundColor3 = Theme.Tertiary}, 0.2)
-                    Tween(ToggleKnob, {
-                        Position = UDim2.new(0, 3, 0.5, -7),
-                        BackgroundColor3 = Theme.Dim,
-                    }, 0.2)
+                    Tween(Track, {BackgroundColor3 = Theme.Tertiary}, 0.2)
+                    Tween(Knob, {Position = UDim2.new(0, 2, 0.5, -7), BackgroundColor3 = Theme.Dim}, 0.2)
                 end
                 Nebula.Flags[flag] = enabled
                 if cfg.Callback then cfg.Callback(enabled) end
             end
 
-            local ToggleBtn = Create("TextButton", {
-                Parent = ToggleFrame,
+            Create("TextButton", {
+                Parent = Frame,
                 BackgroundTransparency = 1,
                 Size = UDim2.new(1, 0, 1, 0),
                 Text = "",
-            })
-
-            ToggleBtn.MouseButton1Click:Connect(function()
+            }).MouseButton1Click:Connect(function()
                 enabled = not enabled
-                UpdateToggle()
+                Update()
             end)
 
-            UpdateToggle()
-
-            Nebula.ConfigFlags[flag] = function(val)
-                enabled = val
-                UpdateToggle()
-            end
-
-            -- Separator
-            if cfg.Separator ~= false then
-                Create("Frame", {
-                    Parent = ElementsHolder,
-                    BackgroundColor3 = Theme.Border,
-                    Size = UDim2.new(1, 0, 0, 1),
-                    BackgroundTransparency = 0.5,
-                })
-            end
+            Update()
+            Nebula.ConfigFlags[flag] = function(val) enabled = val; Update() end
+            if cfg.Separator ~= false then AddSeparator() end
 
             return {
-                Set = function(val)
-                    enabled = val
-                    UpdateToggle()
-                end,
-                Get = function()
-                    return enabled
-                end,
+                Set = function(val) enabled = val; Update() end,
+                Get = function() return enabled end,
             }
         end
 
-        -- ═══ Slider ═══
         function Section:AddSlider(cfg)
             local flag = cfg.Flag or NextFlag()
             local min = cfg.Min or 0
@@ -757,59 +578,59 @@ function Nebula:CreateWindow(config)
             local suffix = cfg.Suffix or ""
             Nebula.Flags[flag] = value
 
-            local SliderFrame = Create("Frame", {
+            local Frame = Create("Frame", {
                 Parent = ElementsHolder,
                 BackgroundTransparency = 1,
-                Size = UDim2.new(1, 0, 0, 50),
+                Size = UDim2.new(1, 0, 0, 44),
             })
 
             Create("TextLabel", {
-                Parent = SliderFrame,
+                Parent = Frame,
                 BackgroundTransparency = 1,
-                Position = UDim2.new(0, 4, 0, 2),
-                Size = UDim2.new(0.7, 0, 0, 20),
-                FontFace = Fonts.Regular,
+                Position = UDim2.new(0, 2, 0, 0),
+                Size = UDim2.new(0.65, 0, 0, 20),
+                Font = Enum.Font.Gotham,
                 Text = cfg.Name or "Slider",
                 TextColor3 = Theme.Text,
-                TextSize = 14,
+                TextSize = 13,
                 TextXAlignment = Enum.TextXAlignment.Left,
             })
 
             local ValueLabel = Create("TextLabel", {
-                Parent = SliderFrame,
+                Parent = Frame,
                 BackgroundTransparency = 1,
-                Position = UDim2.new(0.7, 0, 0, 2),
-                Size = UDim2.new(0.3, -4, 0, 20),
-                FontFace = Fonts.Regular,
+                Position = UDim2.new(0.65, 0, 0, 0),
+                Size = UDim2.new(0.35, -2, 0, 20),
+                Font = Enum.Font.Gotham,
                 Text = tostring(value) .. suffix,
                 TextColor3 = Theme.Accent,
-                TextSize = 13,
+                TextSize = 12,
                 TextXAlignment = Enum.TextXAlignment.Right,
             })
             BindAccent(ValueLabel, "TextColor3")
 
             local SliderBG = Create("Frame", {
-                Parent = SliderFrame,
+                Parent = Frame,
                 BackgroundColor3 = Theme.Tertiary,
-                Position = UDim2.new(0, 4, 0, 28),
-                Size = UDim2.new(1, -8, 0, 6),
+                Position = UDim2.new(0, 2, 0, 26),
+                Size = UDim2.new(1, -4, 0, 5),
             })
             Create("UICorner", { Parent = SliderBG, CornerRadius = UDim.new(1, 0) })
 
-            local SliderFill = Create("Frame", {
+            local Fill = Create("Frame", {
                 Parent = SliderBG,
                 BackgroundColor3 = Theme.Accent,
                 Size = UDim2.new(0, 0, 1, 0),
             })
-            Create("UICorner", { Parent = SliderFill, CornerRadius = UDim.new(1, 0) })
-            BindAccent(SliderFill, "BackgroundColor3")
+            Create("UICorner", { Parent = Fill, CornerRadius = UDim.new(1, 0) })
+            BindAccent(Fill, "BackgroundColor3")
 
             local SliderKnob = Create("Frame", {
-                Parent = SliderFill,
-                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                Parent = Fill,
+                BackgroundColor3 = Theme.Text,
                 AnchorPoint = Vector2.new(1, 0.5),
                 Position = UDim2.new(1, 0, 0.5, 0),
-                Size = UDim2.new(0, 14, 0, 14),
+                Size = UDim2.new(0, 12, 0, 12),
             })
             Create("UICorner", { Parent = SliderKnob, CornerRadius = UDim.new(1, 0) })
 
@@ -818,22 +639,20 @@ function Nebula:CreateWindow(config)
             local function SetValue(val)
                 value = math.clamp(Round(val, increment), min, max)
                 local pct = (value - min) / (max - min)
-                Tween(SliderFill, {Size = UDim2.new(pct, 0, 1, 0)}, 0.08, Enum.EasingStyle.Linear)
+                Tween(Fill, {Size = UDim2.new(pct, 0, 1, 0)}, 0.06, Enum.EasingStyle.Linear)
                 ValueLabel.Text = tostring(value) .. suffix
                 Nebula.Flags[flag] = value
                 if cfg.Callback then cfg.Callback(value) end
             end
 
-            local SliderBtn = Create("TextButton", {
+            Create("TextButton", {
                 Parent = SliderBG,
                 BackgroundTransparency = 1,
-                Size = UDim2.new(1, 0, 1, 20),
-                Position = UDim2.new(0, 0, 0.5, -10),
+                Size = UDim2.new(1, 0, 1, 16),
+                Position = UDim2.new(0, 0, 0.5, -8),
                 Text = "",
                 ZIndex = 2,
-            })
-
-            SliderBtn.MouseButton1Down:Connect(function()
+            }).MouseButton1Down:Connect(function()
                 dragging = true
             end)
 
@@ -851,22 +670,12 @@ function Nebula:CreateWindow(config)
             end)
 
             SetValue(value)
-
             Nebula.ConfigFlags[flag] = SetValue
-
-            if cfg.Separator ~= false then
-                Create("Frame", {
-                    Parent = ElementsHolder,
-                    BackgroundColor3 = Theme.Border,
-                    Size = UDim2.new(1, 0, 0, 1),
-                    BackgroundTransparency = 0.5,
-                })
-            end
+            if cfg.Separator ~= false then AddSeparator() end
 
             return { Set = SetValue, Get = function() return value end }
         end
 
-        -- ═══ Dropdown ═══
         function Section:AddDropdown(cfg)
             local flag = cfg.Flag or NextFlag()
             local multi = cfg.Multi or false
@@ -875,45 +684,45 @@ function Nebula:CreateWindow(config)
             local open = false
             Nebula.Flags[flag] = selected
 
-            local DropFrame = Create("Frame", {
+            local Frame = Create("Frame", {
                 Parent = ElementsHolder,
                 BackgroundTransparency = 1,
-                Size = UDim2.new(1, 0, 0, 36),
+                Size = UDim2.new(1, 0, 0, 32),
             })
 
             Create("TextLabel", {
-                Parent = DropFrame,
+                Parent = Frame,
                 BackgroundTransparency = 1,
-                Position = UDim2.new(0, 4, 0, 0),
-                Size = UDim2.new(0.45, 0, 1, 0),
-                FontFace = Fonts.Regular,
+                Position = UDim2.new(0, 2, 0, 0),
+                Size = UDim2.new(0.4, 0, 1, 0),
+                Font = Enum.Font.Gotham,
                 Text = cfg.Name or "Dropdown",
                 TextColor3 = Theme.Text,
-                TextSize = 14,
+                TextSize = 13,
                 TextXAlignment = Enum.TextXAlignment.Left,
             })
 
             local DropBtn = Create("TextButton", {
-                Parent = DropFrame,
+                Parent = Frame,
                 BackgroundColor3 = Theme.Tertiary,
                 AnchorPoint = Vector2.new(1, 0.5),
-                Position = UDim2.new(1, -4, 0.5, 0),
-                Size = UDim2.new(0.5, 0, 0, 24),
+                Position = UDim2.new(1, -2, 0.5, 0),
+                Size = UDim2.new(0.55, 0, 0, 22),
                 Text = "",
                 AutoButtonColor = false,
             })
-            Create("UICorner", { Parent = DropBtn, CornerRadius = UDim.new(0, 6) })
+            Create("UICorner", { Parent = DropBtn, CornerRadius = UDim.new(0, 5) })
             Create("UIStroke", { Parent = DropBtn, Color = Theme.Border, Thickness = 1 })
 
             local SelectedText = Create("TextLabel", {
                 Parent = DropBtn,
                 BackgroundTransparency = 1,
-                Position = UDim2.new(0, 8, 0, 0),
-                Size = UDim2.new(1, -28, 1, 0),
-                FontFace = Fonts.Regular,
-                Text = multi and table.concat(selected, ", ") or tostring(selected),
+                Position = UDim2.new(0, 7, 0, 0),
+                Size = UDim2.new(1, -24, 1, 0),
+                Font = Enum.Font.Gotham,
+                Text = multi and table.concat(selected, ", ") or tostring(selected or ""),
                 TextColor3 = Theme.SubText,
-                TextSize = 12,
+                TextSize = 11,
                 TextXAlignment = Enum.TextXAlignment.Left,
                 TextTruncate = Enum.TextTruncate.AtEnd,
             })
@@ -922,337 +731,236 @@ function Nebula:CreateWindow(config)
                 Parent = DropBtn,
                 BackgroundTransparency = 1,
                 AnchorPoint = Vector2.new(1, 0.5),
-                Position = UDim2.new(1, -6, 0.5, 0),
-                Size = UDim2.new(0, 14, 0, 14),
-                FontFace = Fonts.Bold,
-                Text = "▾",
+                Position = UDim2.new(1, -5, 0.5, 0),
+                Size = UDim2.new(0, 12, 0, 12),
+                Font = Enum.Font.GothamBold,
+                Text = "v",
                 TextColor3 = Theme.Dim,
-                TextSize = 14,
+                TextSize = 11,
             })
 
-            -- Dropdown popup
-            local DropPopup = Create("Frame", {
+            local Popup = Create("Frame", {
                 Parent = DropdownHolder,
                 BackgroundColor3 = Theme.Secondary,
                 Size = UDim2.new(0, 0, 0, 0),
                 ClipsDescendants = true,
                 ZIndex = 100,
-                Visible = true,
             })
-            Create("UICorner", { Parent = DropPopup, CornerRadius = UDim.new(0, 8) })
-            Create("UIStroke", { Parent = DropPopup, Color = Theme.Border, Thickness = 1, })
+            Create("UICorner", { Parent = Popup, CornerRadius = UDim.new(0, 6) })
+            Create("UIStroke", { Parent = Popup, Color = Theme.Border, Thickness = 1 })
 
-            local PopupLayout = Create("UIListLayout", {
-                Parent = DropPopup,
+            Create("UIListLayout", {
+                Parent = Popup,
                 SortOrder = Enum.SortOrder.LayoutOrder,
-                Padding = UDim.new(0, 2),
+                Padding = UDim.new(0, 1),
             })
 
             Create("UIPadding", {
-                Parent = DropPopup,
-                PaddingTop = UDim.new(0, 4),
-                PaddingBottom = UDim.new(0, 4),
-                PaddingLeft = UDim.new(0, 4),
-                PaddingRight = UDim.new(0, 4),
+                Parent = Popup,
+                PaddingTop = UDim.new(0, 3),
+                PaddingBottom = UDim.new(0, 3),
+                PaddingLeft = UDim.new(0, 3),
+                PaddingRight = UDim.new(0, 3),
             })
 
             local optionButtons = {}
-            local totalHeight = 8
+            local totalHeight = 6
 
             local function UpdateDisplay()
                 if multi then
                     SelectedText.Text = #selected > 0 and table.concat(selected, ", ") or "None"
                 else
-                    SelectedText.Text = tostring(selected)
+                    SelectedText.Text = tostring(selected or "")
                 end
                 Nebula.Flags[flag] = selected
                 if cfg.Callback then cfg.Callback(selected) end
             end
 
-            for _, option in ipairs(options) do
-                local OptBtn = Create("TextButton", {
-                    Parent = DropPopup,
-                    BackgroundColor3 = Theme.Tertiary,
-                    BackgroundTransparency = 1,
-                    Size = UDim2.new(1, 0, 0, 26),
-                    FontFace = Fonts.Regular,
-                    Text = "  " .. option,
-                    TextColor3 = Theme.SubText,
-                    TextSize = 13,
-                    TextXAlignment = Enum.TextXAlignment.Left,
-                    AutoButtonColor = false,
-                    ZIndex = 101,
-                })
-                Create("UICorner", { Parent = OptBtn, CornerRadius = UDim.new(0, 5) })
-                totalHeight = totalHeight + 28
+            local function BuildOptions(opts)
+                for _, btn in pairs(optionButtons) do btn:Destroy() end
+                optionButtons = {}
+                totalHeight = 6
 
-                optionButtons[option] = OptBtn
+                for _, option in ipairs(opts) do
+                    local OptBtn = Create("TextButton", {
+                        Parent = Popup,
+                        BackgroundColor3 = Theme.Tertiary,
+                        BackgroundTransparency = 1,
+                        Size = UDim2.new(1, 0, 0, 24),
+                        Font = Enum.Font.Gotham,
+                        Text = "  " .. option,
+                        TextColor3 = Theme.SubText,
+                        TextSize = 12,
+                        TextXAlignment = Enum.TextXAlignment.Left,
+                        AutoButtonColor = false,
+                        ZIndex = 101,
+                    })
+                    Create("UICorner", { Parent = OptBtn, CornerRadius = UDim.new(0, 4) })
+                    totalHeight = totalHeight + 25
+                    optionButtons[option] = OptBtn
 
-                OptBtn.MouseEnter:Connect(function()
-                    Tween(OptBtn, {BackgroundTransparency = 0}, 0.15)
-                end)
-                OptBtn.MouseLeave:Connect(function()
-                    local isSelected = multi and table.find(selected, option) or selected == option
-                    if not isSelected then
-                        Tween(OptBtn, {BackgroundTransparency = 1}, 0.15)
-                    end
-                end)
+                    OptBtn.MouseEnter:Connect(function()
+                        Tween(OptBtn, {BackgroundTransparency = 0}, 0.12)
+                    end)
+                    OptBtn.MouseLeave:Connect(function()
+                        local isS = multi and table.find(selected, option) or selected == option
+                        if not isS then Tween(OptBtn, {BackgroundTransparency = 1}, 0.12) end
+                    end)
 
-                OptBtn.MouseButton1Click:Connect(function()
-                    if multi then
-                        local idx = table.find(selected, option)
-                        if idx then
-                            table.remove(selected, idx)
-                            Tween(OptBtn, {TextColor3 = Theme.SubText, BackgroundTransparency = 1}, 0.15)
+                    OptBtn.MouseButton1Click:Connect(function()
+                        if multi then
+                            local idx = table.find(selected, option)
+                            if idx then
+                                table.remove(selected, idx)
+                                Tween(OptBtn, {TextColor3 = Theme.SubText, BackgroundTransparency = 1}, 0.12)
+                            else
+                                table.insert(selected, option)
+                                Tween(OptBtn, {TextColor3 = Theme.Text, BackgroundTransparency = 0}, 0.12)
+                            end
                         else
-                            table.insert(selected, option)
-                            Tween(OptBtn, {TextColor3 = Theme.Accent, BackgroundTransparency = 0}, 0.15)
+                            for _, b in pairs(optionButtons) do
+                                Tween(b, {TextColor3 = Theme.SubText, BackgroundTransparency = 1}, 0.12)
+                            end
+                            selected = option
+                            Tween(OptBtn, {TextColor3 = Theme.Text, BackgroundTransparency = 0}, 0.12)
+                            task.wait(0.08)
+                            open = false
+                            Tween(Popup, {Size = UDim2.new(0, DropBtn.AbsoluteSize.X, 0, 0)}, 0.18)
+                            Tween(Arrow, {Rotation = 0}, 0.18)
                         end
-                    else
-                        for _, btn in pairs(optionButtons) do
-                            Tween(btn, {TextColor3 = Theme.SubText, BackgroundTransparency = 1}, 0.15)
-                        end
-                        selected = option
-                        Tween(OptBtn, {TextColor3 = Theme.Accent, BackgroundTransparency = 0}, 0.15)
+                        UpdateDisplay()
+                    end)
 
-                        -- Close after single select
-                        task.wait(0.1)
-                        open = false
-                        Tween(DropPopup, {Size = UDim2.new(0, DropBtn.AbsoluteSize.X, 0, 0)}, 0.2)
-                        Tween(Arrow, {Rotation = 0}, 0.2)
+                    local isS = multi and table.find(selected, option) or selected == option
+                    if isS then
+                        OptBtn.TextColor3 = Theme.Text
+                        OptBtn.BackgroundTransparency = 0
                     end
-                    UpdateDisplay()
-                end)
-            end
-
-            local function ToggleDropdown()
-                open = not open
-                local pos = DropBtn.AbsolutePosition
-                DropPopup.Position = UDim2.fromOffset(pos.X, pos.Y + DropBtn.AbsoluteSize.Y + 4)
-
-                if open then
-                    Nebula.ActiveDropdown = DropPopup
-                    Tween(DropPopup, {Size = UDim2.new(0, DropBtn.AbsoluteSize.X, 0, math.min(totalHeight, 200))}, 0.25)
-                    Tween(Arrow, {Rotation = 180}, 0.25)
-                else
-                    Tween(DropPopup, {Size = UDim2.new(0, DropBtn.AbsoluteSize.X, 0, 0)}, 0.2)
-                    Tween(Arrow, {Rotation = 0}, 0.2)
                 end
             end
 
-            DropBtn.MouseButton1Click:Connect(ToggleDropdown)
+            BuildOptions(options)
+
+            DropBtn.MouseButton1Click:Connect(function()
+                open = not open
+                Popup.Position = UDim2.fromOffset(DropBtn.AbsolutePosition.X, DropBtn.AbsolutePosition.Y + DropBtn.AbsoluteSize.Y + 3)
+                if open then
+                    Tween(Popup, {Size = UDim2.new(0, DropBtn.AbsoluteSize.X, 0, math.min(totalHeight, 180))}, 0.2)
+                    Tween(Arrow, {Rotation = 180}, 0.2)
+                else
+                    Tween(Popup, {Size = UDim2.new(0, DropBtn.AbsoluteSize.X, 0, 0)}, 0.15)
+                    Tween(Arrow, {Rotation = 0}, 0.15)
+                end
+            end)
 
             UpdateDisplay()
 
-            -- Highlight defaults
-            if multi then
-                for _, opt in ipairs(selected) do
-                    if optionButtons[opt] then
-                        optionButtons[opt].TextColor3 = Theme.Accent
-                        optionButtons[opt].BackgroundTransparency = 0
-                    end
-                end
-            elseif optionButtons[selected] then
-                optionButtons[selected].TextColor3 = Theme.Accent
-                optionButtons[selected].BackgroundTransparency = 0
-            end
-
             Nebula.ConfigFlags[flag] = function(val)
                 selected = val
-                UpdateDisplay()
-                for _, btn in pairs(optionButtons) do
-                    local isS = multi and table.find(selected, btn.Text:sub(3)) or selected == btn.Text:sub(3)
-                    btn.TextColor3 = isS and Theme.Accent or Theme.SubText
-                    btn.BackgroundTransparency = isS and 0 or 1
+                for _, b in pairs(optionButtons) do
+                    local isS = multi and table.find(selected, b.Text:sub(3)) or selected == b.Text:sub(3)
+                    b.TextColor3 = isS and Theme.Text or Theme.SubText
+                    b.BackgroundTransparency = isS and 0 or 1
                 end
+                UpdateDisplay()
             end
 
-            if cfg.Separator ~= false then
-                Create("Frame", {
-                    Parent = ElementsHolder,
-                    BackgroundColor3 = Theme.Border,
-                    Size = UDim2.new(1, 0, 0, 1),
-                    BackgroundTransparency = 0.5,
-                })
-            end
+            if cfg.Separator ~= false then AddSeparator() end
 
             return {
-                Set = function(val)
-                    selected = val
-                    UpdateDisplay()
-                end,
-                Refresh = function(newOptions)
-                    -- Clear old buttons
-                    for _, btn in pairs(optionButtons) do btn:Destroy() end
-                    optionButtons = {}
-                    options = newOptions
-                    totalHeight = 8
-                    -- Recreate
-                    for _, option in ipairs(options) do
-                        local OptBtn = Create("TextButton", {
-                            Parent = DropPopup,
-                            BackgroundColor3 = Theme.Tertiary,
-                            BackgroundTransparency = 1,
-                            Size = UDim2.new(1, 0, 0, 26),
-                            FontFace = Fonts.Regular,
-                            Text = "  " .. option,
-                            TextColor3 = Theme.SubText,
-                            TextSize = 13,
-                            TextXAlignment = Enum.TextXAlignment.Left,
-                            AutoButtonColor = false,
-                            ZIndex = 101,
-                        })
-                        Create("UICorner", { Parent = OptBtn, CornerRadius = UDim.new(0, 5) })
-                        totalHeight = totalHeight + 28
-                        optionButtons[option] = OptBtn
-
-                        OptBtn.MouseButton1Click:Connect(function()
-                            if not multi then
-                                for _, b in pairs(optionButtons) do
-                                    Tween(b, {TextColor3 = Theme.SubText, BackgroundTransparency = 1}, 0.15)
-                                end
-                                selected = option
-                                Tween(OptBtn, {TextColor3 = Theme.Accent, BackgroundTransparency = 0}, 0.15)
-                                open = false
-                                Tween(DropPopup, {Size = UDim2.new(0, DropBtn.AbsoluteSize.X, 0, 0)}, 0.2)
-                            end
-                            UpdateDisplay()
-                        end)
-                    end
-                end,
+                Set = function(val) selected = val; UpdateDisplay() end,
+                Refresh = function(newOpts) options = newOpts; BuildOptions(newOpts) end,
             }
         end
 
-        -- ═══ Button ═══
         function Section:AddButton(cfg)
             local BtnFrame = Create("Frame", {
                 Parent = ElementsHolder,
                 BackgroundTransparency = 1,
-                Size = UDim2.new(1, 0, 0, 36),
+                Size = UDim2.new(1, 0, 0, 34),
             })
 
             local Btn = Create("TextButton", {
                 Parent = BtnFrame,
                 BackgroundColor3 = Theme.Tertiary,
-                Size = UDim2.new(1, 0, 0, 30),
+                Size = UDim2.new(1, 0, 0, 28),
                 AnchorPoint = Vector2.new(0, 0.5),
                 Position = UDim2.new(0, 0, 0.5, 0),
-                FontFace = Fonts.Regular,
+                Font = Enum.Font.Gotham,
                 Text = cfg.Name or "Button",
                 TextColor3 = Theme.Text,
-                TextSize = 14,
+                TextSize = 13,
                 AutoButtonColor = false,
             })
-            Create("UICorner", { Parent = Btn, CornerRadius = UDim.new(0, 6) })
+            Create("UICorner", { Parent = Btn, CornerRadius = UDim.new(0, 5) })
             Create("UIStroke", { Parent = Btn, Color = Theme.Border, Thickness = 1 })
 
-            Btn.MouseEnter:Connect(function()
-                Tween(Btn, {BackgroundColor3 = Theme.Hover}, 0.15)
-            end)
-            Btn.MouseLeave:Connect(function()
-                Tween(Btn, {BackgroundColor3 = Theme.Tertiary}, 0.15)
-            end)
+            Btn.MouseEnter:Connect(function() Tween(Btn, {BackgroundColor3 = Theme.Hover}, 0.12) end)
+            Btn.MouseLeave:Connect(function() Tween(Btn, {BackgroundColor3 = Theme.Tertiary}, 0.12) end)
             Btn.MouseButton1Click:Connect(function()
-                Tween(Btn, {BackgroundColor3 = Theme.Accent}, 0.1)
-                task.wait(0.1)
-                Tween(Btn, {BackgroundColor3 = Theme.Tertiary}, 0.15)
+                Tween(Btn, {BackgroundColor3 = Theme.Accent}, 0.08)
+                task.wait(0.08)
+                Tween(Btn, {BackgroundColor3 = Theme.Tertiary}, 0.12)
                 if cfg.Callback then cfg.Callback() end
             end)
 
-            if cfg.Separator ~= false then
-                Create("Frame", {
-                    Parent = ElementsHolder,
-                    BackgroundColor3 = Theme.Border,
-                    Size = UDim2.new(1, 0, 0, 1),
-                    BackgroundTransparency = 0.5,
-                })
-            end
+            if cfg.Separator ~= false then AddSeparator() end
         end
 
-        -- ═══ TextBox ═══
         function Section:AddTextBox(cfg)
             local flag = cfg.Flag or NextFlag()
             local value = cfg.Default or ""
             Nebula.Flags[flag] = value
 
-            local TBFrame = Create("Frame", {
+            local Frame = Create("Frame", {
                 Parent = ElementsHolder,
                 BackgroundTransparency = 1,
-                Size = UDim2.new(1, 0, 0, 36),
+                Size = UDim2.new(1, 0, 0, 32),
             })
 
             Create("TextLabel", {
-                Parent = TBFrame,
+                Parent = Frame,
                 BackgroundTransparency = 1,
-                Position = UDim2.new(0, 4, 0, 0),
-                Size = UDim2.new(0.4, 0, 1, 0),
-                FontFace = Fonts.Regular,
+                Position = UDim2.new(0, 2, 0, 0),
+                Size = UDim2.new(0.38, 0, 1, 0),
+                Font = Enum.Font.Gotham,
                 Text = cfg.Name or "Input",
                 TextColor3 = Theme.Text,
-                TextSize = 14,
+                TextSize = 13,
                 TextXAlignment = Enum.TextXAlignment.Left,
             })
 
-            local InputBox = Create("TextBox", {
-                Parent = TBFrame,
+            local Input = Create("TextBox", {
+                Parent = Frame,
                 BackgroundColor3 = Theme.Tertiary,
                 AnchorPoint = Vector2.new(1, 0.5),
-                Position = UDim2.new(1, -4, 0.5, 0),
-                Size = UDim2.new(0.55, 0, 0, 24),
-                FontFace = Fonts.Regular,
+                Position = UDim2.new(1, -2, 0.5, 0),
+                Size = UDim2.new(0.58, 0, 0, 22),
+                Font = Enum.Font.Gotham,
                 Text = value,
-                PlaceholderText = cfg.Placeholder or "Type here...",
+                PlaceholderText = cfg.Placeholder or "...",
                 PlaceholderColor3 = Theme.Dim,
                 TextColor3 = Theme.SubText,
-                TextSize = 13,
+                TextSize = 12,
                 ClearTextOnFocus = false,
             })
-            Create("UICorner", { Parent = InputBox, CornerRadius = UDim.new(0, 6) })
-            Create("UIPadding", {
-                Parent = InputBox,
-                PaddingLeft = UDim.new(0, 8),
-                PaddingRight = UDim.new(0, 8),
-            })
+            Create("UICorner", { Parent = Input, CornerRadius = UDim.new(0, 5) })
+            Create("UIPadding", { Parent = Input, PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) })
 
-            InputBox.Focused:Connect(function()
-                Tween(InputBox, {TextColor3 = Theme.Text}, 0.15)
-                Create("UIStroke", { Parent = InputBox, Color = Theme.Accent, Thickness = 1, Name = "FocusStroke" })
-            end)
-
-            InputBox.FocusLost:Connect(function()
-                Tween(InputBox, {TextColor3 = Theme.SubText}, 0.15)
-                local stroke = InputBox:FindFirstChild("FocusStroke")
-                if stroke then stroke:Destroy() end
-                value = InputBox.Text
+            Input.Focused:Connect(function() Tween(Input, {TextColor3 = Theme.Text}, 0.12) end)
+            Input.FocusLost:Connect(function()
+                Tween(Input, {TextColor3 = Theme.SubText}, 0.12)
+                value = Input.Text
                 Nebula.Flags[flag] = value
                 if cfg.Callback then cfg.Callback(value) end
             end)
 
-            Nebula.ConfigFlags[flag] = function(val)
-                InputBox.Text = val
-                value = val
-                Nebula.Flags[flag] = val
-            end
+            Nebula.ConfigFlags[flag] = function(val) Input.Text = val; value = val; Nebula.Flags[flag] = val end
+            if cfg.Separator ~= false then AddSeparator() end
 
-            if cfg.Separator ~= false then
-                Create("Frame", {
-                    Parent = ElementsHolder,
-                    BackgroundColor3 = Theme.Border,
-                    Size = UDim2.new(1, 0, 0, 1),
-                    BackgroundTransparency = 0.5,
-                })
-            end
-
-            return {
-                Set = function(val)
-                    InputBox.Text = val
-                    value = val
-                    Nebula.Flags[flag] = val
-                end,
-            }
+            return { Set = function(val) Input.Text = val; value = val; Nebula.Flags[flag] = val end }
         end
 
-        -- ═══ Keybind ═══
         function Section:AddKeybind(cfg)
             local flag = cfg.Flag or NextFlag()
             local key = cfg.Default or nil
@@ -1262,51 +970,47 @@ function Nebula:CreateWindow(config)
 
             Nebula.Flags[flag] = { Key = key, Mode = mode, Active = active }
 
-            local KBFrame = Create("Frame", {
+            local Frame = Create("Frame", {
                 Parent = ElementsHolder,
                 BackgroundTransparency = 1,
-                Size = UDim2.new(1, 0, 0, 36),
+                Size = UDim2.new(1, 0, 0, 32),
             })
 
             Create("TextLabel", {
-                Parent = KBFrame,
+                Parent = Frame,
                 BackgroundTransparency = 1,
-                Position = UDim2.new(0, 4, 0, 0),
+                Position = UDim2.new(0, 2, 0, 0),
                 Size = UDim2.new(0.6, 0, 1, 0),
-                FontFace = Fonts.Regular,
+                Font = Enum.Font.Gotham,
                 Text = cfg.Name or "Keybind",
                 TextColor3 = Theme.Text,
-                TextSize = 14,
+                TextSize = 13,
                 TextXAlignment = Enum.TextXAlignment.Left,
             })
 
             local KBBtn = Create("TextButton", {
-                Parent = KBFrame,
+                Parent = Frame,
                 BackgroundColor3 = Theme.Tertiary,
                 AnchorPoint = Vector2.new(1, 0.5),
-                Position = UDim2.new(1, -4, 0.5, 0),
-                Size = UDim2.new(0, 0, 0, 22),
+                Position = UDim2.new(1, -2, 0.5, 0),
+                Size = UDim2.new(0, 0, 0, 20),
                 AutomaticSize = Enum.AutomaticSize.X,
                 AutoButtonColor = false,
                 Text = "",
             })
-            Create("UICorner", { Parent = KBBtn, CornerRadius = UDim.new(0, 5) })
+            Create("UICorner", { Parent = KBBtn, CornerRadius = UDim.new(0, 4) })
 
             local KBText = Create("TextLabel", {
                 Parent = KBBtn,
                 BackgroundTransparency = 1,
                 Size = UDim2.new(0, 0, 1, 0),
                 AutomaticSize = Enum.AutomaticSize.X,
-                FontFace = Fonts.Regular,
+                Font = Enum.Font.Gotham,
                 Text = key and (KeyNames[key] or tostring(key):gsub("Enum.KeyCode.", "")) or "None",
                 TextColor3 = Theme.SubText,
-                TextSize = 12,
+                TextSize = 11,
             })
-            Create("UIPadding", {
-                Parent = KBText,
-                PaddingLeft = UDim.new(0, 10),
-                PaddingRight = UDim.new(0, 10),
-            })
+            Create("UIPadding", { Parent = KBText, PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) })
 
             KBBtn.MouseButton1Click:Connect(function()
                 KBText.Text = "..."
@@ -1332,11 +1036,8 @@ function Nebula:CreateWindow(config)
                 if gpe or binding then return end
                 local inputKey = input.KeyCode ~= Enum.KeyCode.Unknown and input.KeyCode or input.UserInputType
                 if inputKey == key then
-                    if mode == "Toggle" then
-                        active = not active
-                    elseif mode == "Hold" then
-                        active = true
-                    end
+                    if mode == "Toggle" then active = not active
+                    elseif mode == "Hold" then active = true end
                     Nebula.Flags[flag] = { Key = key, Mode = mode, Active = active }
                     if cfg.Callback then cfg.Callback(active) end
                 end
@@ -1352,148 +1053,94 @@ function Nebula:CreateWindow(config)
                 end
             end)
 
-            if cfg.Separator ~= false then
-                Create("Frame", {
-                    Parent = ElementsHolder,
-                    BackgroundColor3 = Theme.Border,
-                    Size = UDim2.new(1, 0, 0, 1),
-                    BackgroundTransparency = 0.5,
-                })
-            end
+            if cfg.Separator ~= false then AddSeparator() end
         end
 
-        -- ═══ Label ═══
         function Section:AddLabel(cfg)
-            local LabelFrame = Create("Frame", {
+            Create("TextLabel", {
                 Parent = ElementsHolder,
                 BackgroundTransparency = 1,
                 Size = UDim2.new(1, 0, 0, 0),
                 AutomaticSize = Enum.AutomaticSize.Y,
-            })
-
-            local Label = Create("TextLabel", {
-                Parent = LabelFrame,
-                BackgroundTransparency = 1,
-                Position = UDim2.new(0, 4, 0, 4),
-                Size = UDim2.new(1, -8, 0, 0),
-                AutomaticSize = Enum.AutomaticSize.Y,
-                FontFace = cfg.Bold and Fonts.Bold or Fonts.Regular,
-                Text = cfg.Text or "Label",
+                Font = Enum.Font.Gotham,
+                Text = cfg.Text or "",
                 TextColor3 = cfg.Color or Theme.SubText,
-                TextSize = cfg.TextSize or 13,
+                TextSize = cfg.TextSize or 12,
                 TextWrapped = true,
                 TextXAlignment = Enum.TextXAlignment.Left,
             })
-
-            if cfg.Separator ~= false then
-                Create("Frame", {
-                    Parent = ElementsHolder,
-                    BackgroundColor3 = Theme.Border,
-                    Size = UDim2.new(1, 0, 0, 1),
-                    BackgroundTransparency = 0.5,
-                })
-            end
-
-            return {
-                SetText = function(text) Label.Text = text end,
-                SetColor = function(color) Label.TextColor3 = color end,
-            }
+            if cfg.Separator ~= false then AddSeparator() end
         end
 
-        -- ═══ Color Picker ═══
         function Section:AddColorPicker(cfg)
             local flag = cfg.Flag or NextFlag()
             local currentColor = cfg.Default or Color3.fromRGB(255, 255, 255)
             local h, s, v = currentColor:ToHSV()
             Nebula.Flags[flag] = currentColor
 
-            local CPFrame = Create("Frame", {
+            local Frame = Create("Frame", {
                 Parent = ElementsHolder,
                 BackgroundTransparency = 1,
-                Size = UDim2.new(1, 0, 0, 36),
+                Size = UDim2.new(1, 0, 0, 32),
             })
 
             Create("TextLabel", {
-                Parent = CPFrame,
+                Parent = Frame,
                 BackgroundTransparency = 1,
-                Position = UDim2.new(0, 4, 0, 0),
-                Size = UDim2.new(1, -40, 1, 0),
-                FontFace = Fonts.Regular,
+                Position = UDim2.new(0, 2, 0, 0),
+                Size = UDim2.new(1, -34, 1, 0),
+                Font = Enum.Font.Gotham,
                 Text = cfg.Name or "Color",
                 TextColor3 = Theme.Text,
-                TextSize = 14,
+                TextSize = 13,
                 TextXAlignment = Enum.TextXAlignment.Left,
             })
 
             local Preview = Create("TextButton", {
-                Parent = CPFrame,
+                Parent = Frame,
                 BackgroundColor3 = currentColor,
                 AnchorPoint = Vector2.new(1, 0.5),
-                Position = UDim2.new(1, -4, 0.5, 0),
-                Size = UDim2.new(0, 24, 0, 24),
+                Position = UDim2.new(1, -2, 0.5, 0),
+                Size = UDim2.new(0, 22, 0, 22),
                 Text = "",
                 AutoButtonColor = false,
             })
-            Create("UICorner", { Parent = Preview, CornerRadius = UDim.new(0, 6) })
+            Create("UICorner", { Parent = Preview, CornerRadius = UDim.new(0, 5) })
             Create("UIStroke", { Parent = Preview, Color = Theme.Border, Thickness = 1 })
 
-            -- Color Picker Popup
             local PopupOpen = false
-            local CPPopup = Create("Frame", {
+            local Popup = Create("Frame", {
                 Parent = DropdownHolder,
                 BackgroundColor3 = Theme.Secondary,
-                Size = UDim2.new(0, 200, 0, 0),
+                Size = UDim2.new(0, 190, 0, 0),
                 ClipsDescendants = true,
                 ZIndex = 100,
             })
-            Create("UICorner", { Parent = CPPopup, CornerRadius = UDim.new(0, 10) })
-            Create("UIStroke", { Parent = CPPopup, Color = Theme.Border, Thickness = 1 })
+            Create("UICorner", { Parent = Popup, CornerRadius = UDim.new(0, 8) })
+            Create("UIStroke", { Parent = Popup, Color = Theme.Border, Thickness = 1 })
 
-            -- Saturation/Value picker
-            local SVPicker = Create("TextButton", {
-                Parent = CPPopup,
+            local SVPicker = Create("Frame", {
+                Parent = Popup,
                 BackgroundColor3 = Color3.fromHSV(h, 1, 1),
-                Position = UDim2.new(0, 10, 0, 10),
-                Size = UDim2.new(1, -20, 0, 120),
-                Text = "",
-                AutoButtonColor = false,
+                Position = UDim2.new(0, 8, 0, 8),
+                Size = UDim2.new(1, -16, 0, 110),
                 ZIndex = 101,
             })
-            Create("UICorner", { Parent = SVPicker, CornerRadius = UDim.new(0, 6) })
+            Create("UICorner", { Parent = SVPicker, CornerRadius = UDim.new(0, 5) })
 
-            Create("Frame", {
-                Parent = SVPicker,
-                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-                Size = UDim2.new(1, 0, 1, 0),
-                ZIndex = 102,
-            }):FindFirstChildOfClass("UICorner") -- need gradient
-            local whiteGrad = Create("UIGradient", {
-                Parent = SVPicker:FindFirstChildOfClass("Frame") or SVPicker,
-                Transparency = NumberSequence.new{
-                    NumberSequenceKeypoint.new(0, 0),
-                    NumberSequenceKeypoint.new(1, 1),
-                },
-            })
-
-            -- Actually let me rebuild this cleaner
-            -- White overlay
-            local WhiteOverlay = Create("Frame", {
+            local WhiteOL = Create("Frame", {
                 Parent = SVPicker,
                 BackgroundColor3 = Color3.fromRGB(255, 255, 255),
                 Size = UDim2.new(1, 0, 1, 0),
                 ZIndex = 102,
             })
-            Create("UICorner", { Parent = WhiteOverlay, CornerRadius = UDim.new(0, 6) })
+            Create("UICorner", { Parent = WhiteOL, CornerRadius = UDim.new(0, 5) })
             Create("UIGradient", {
-                Parent = WhiteOverlay,
-                Transparency = NumberSequence.new{
-                    NumberSequenceKeypoint.new(0, 0),
-                    NumberSequenceKeypoint.new(1, 1),
-                },
+                Parent = WhiteOL,
+                Transparency = NumberSequence.new{NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1)},
             })
 
-            -- Black overlay
-            local BlackOverlay = Create("TextButton", {
+            local BlackOL = Create("TextButton", {
                 Parent = SVPicker,
                 BackgroundColor3 = Color3.fromRGB(0, 0, 0),
                 Size = UDim2.new(1, 0, 1, 0),
@@ -1501,32 +1148,27 @@ function Nebula:CreateWindow(config)
                 Text = "",
                 AutoButtonColor = false,
             })
-            Create("UICorner", { Parent = BlackOverlay, CornerRadius = UDim.new(0, 6) })
+            Create("UICorner", { Parent = BlackOL, CornerRadius = UDim.new(0, 5) })
             Create("UIGradient", {
-                Parent = BlackOverlay,
+                Parent = BlackOL,
                 Rotation = 270,
-                Transparency = NumberSequence.new{
-                    NumberSequenceKeypoint.new(0, 0),
-                    NumberSequenceKeypoint.new(1, 1),
-                },
+                Transparency = NumberSequence.new{NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1)},
             })
 
-            -- SV Cursor
             local SVCursor = Create("Frame", {
                 Parent = SVPicker,
                 BackgroundColor3 = currentColor,
-                Size = UDim2.new(0, 10, 0, 10),
-                Position = UDim2.new(s, -5, 1 - v, -5),
+                Size = UDim2.new(0, 8, 0, 8),
+                Position = UDim2.new(s, -4, 1 - v, -4),
                 ZIndex = 105,
             })
             Create("UICorner", { Parent = SVCursor, CornerRadius = UDim.new(1, 0) })
             Create("UIStroke", { Parent = SVCursor, Color = Color3.fromRGB(255, 255, 255), Thickness = 2 })
 
-            -- Hue bar
             local HueBar = Create("TextButton", {
-                Parent = CPPopup,
-                Position = UDim2.new(0, 10, 0, 140),
-                Size = UDim2.new(1, -20, 0, 12),
+                Parent = Popup,
+                Position = UDim2.new(0, 8, 0, 126),
+                Size = UDim2.new(1, -16, 0, 10),
                 Text = "",
                 AutoButtonColor = false,
                 ZIndex = 101,
@@ -1548,8 +1190,8 @@ function Nebula:CreateWindow(config)
             local HueCursor = Create("Frame", {
                 Parent = HueBar,
                 BackgroundColor3 = Color3.fromHSV(h, 1, 1),
-                Size = UDim2.new(0, 10, 0, 10),
-                Position = UDim2.new(h, -5, 0.5, -5),
+                Size = UDim2.new(0, 8, 0, 8),
+                Position = UDim2.new(h, -4, 0.5, -4),
                 ZIndex = 102,
             })
             Create("UICorner", { Parent = HueCursor, CornerRadius = UDim.new(1, 0) })
@@ -1558,24 +1200,20 @@ function Nebula:CreateWindow(config)
             local draggingSV, draggingHue = false, false
 
             local function UpdateColor()
-                local newColor = Color3.fromHSV(h, s, v)
-                Preview.BackgroundColor3 = newColor
+                local c = Color3.fromHSV(h, s, v)
+                Preview.BackgroundColor3 = c
                 SVPicker.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
-                SVCursor.Position = UDim2.new(s, -5, 1 - v, -5)
-                SVCursor.BackgroundColor3 = newColor
-                HueCursor.Position = UDim2.new(h, -5, 0.5, -5)
+                SVCursor.Position = UDim2.new(s, -4, 1 - v, -4)
+                SVCursor.BackgroundColor3 = c
+                HueCursor.Position = UDim2.new(h, -4, 0.5, -4)
                 HueCursor.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
-                currentColor = newColor
-                Nebula.Flags[flag] = newColor
-                if cfg.Callback then cfg.Callback(newColor) end
+                currentColor = c
+                Nebula.Flags[flag] = c
+                if cfg.Callback then cfg.Callback(c) end
             end
 
-            BlackOverlay.MouseButton1Down:Connect(function()
-                draggingSV = true
-            end)
-            HueBar.MouseButton1Down:Connect(function()
-                draggingHue = true
-            end)
+            BlackOL.MouseButton1Down:Connect(function() draggingSV = true end)
+            HueBar.MouseButton1Down:Connect(function() draggingHue = true end)
 
             Connect(UserInputService.InputEnded, function(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -1587,7 +1225,6 @@ function Nebula:CreateWindow(config)
             Connect(UserInputService.InputChanged, function(input)
                 if input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
                 local mouse = UserInputService:GetMouseLocation()
-
                 if draggingSV then
                     s = math.clamp((mouse.X - SVPicker.AbsolutePosition.X) / SVPicker.AbsoluteSize.X, 0, 1)
                     v = 1 - math.clamp((mouse.Y - SVPicker.AbsolutePosition.Y) / SVPicker.AbsoluteSize.Y, 0, 1)
@@ -1600,31 +1237,17 @@ function Nebula:CreateWindow(config)
 
             Preview.MouseButton1Click:Connect(function()
                 PopupOpen = not PopupOpen
-                local pos = Preview.AbsolutePosition
-                CPPopup.Position = UDim2.fromOffset(pos.X - 170, pos.Y + 30)
-
+                Popup.Position = UDim2.fromOffset(Preview.AbsolutePosition.X - 160, Preview.AbsolutePosition.Y + 28)
                 if PopupOpen then
-                    Tween(CPPopup, {Size = UDim2.new(0, 200, 0, 165)}, 0.25)
+                    Tween(Popup, {Size = UDim2.new(0, 190, 0, 148)}, 0.2)
                 else
-                    Tween(CPPopup, {Size = UDim2.new(0, 200, 0, 0)}, 0.2)
+                    Tween(Popup, {Size = UDim2.new(0, 190, 0, 0)}, 0.15)
                 end
             end)
 
             UpdateColor()
-
-            Nebula.ConfigFlags[flag] = function(color)
-                h, s, v = color:ToHSV()
-                UpdateColor()
-            end
-
-            if cfg.Separator ~= false then
-                Create("Frame", {
-                    Parent = ElementsHolder,
-                    BackgroundColor3 = Theme.Border,
-                    Size = UDim2.new(1, 0, 0, 1),
-                    BackgroundTransparency = 0.5,
-                })
-            end
+            Nebula.ConfigFlags[flag] = function(color) h, s, v = color:ToHSV(); UpdateColor() end
+            if cfg.Separator ~= false then AddSeparator() end
 
             return { Set = function(color) h, s, v = color:ToHSV(); UpdateColor() end }
         end
@@ -1632,75 +1255,55 @@ function Nebula:CreateWindow(config)
         return Section
     end
 
-    -- ═══════════════════════════════════════════
-    -- Tab Creation
-    -- ═══════════════════════════════════════════
     function Window:CreateTab(config)
         local Tab = {
             Name = config.Name or "Tab",
-            Icon = config.Icon or icons["home-2"],
-            Sections = {},
             Visible = false,
         }
 
-        -- Tab Button
         local TabBtn = Create("TextButton", {
             Parent = TabButtonsHolder,
             BackgroundColor3 = Theme.Tertiary,
             BackgroundTransparency = 1,
-            Size = UDim2.new(1, 0, 0, 38),
+            Size = UDim2.new(1, 0, 0, 34),
             Text = "",
             AutoButtonColor = false,
         })
-        Create("UICorner", { Parent = TabBtn, CornerRadius = UDim.new(0, 8) })
+        Create("UICorner", { Parent = TabBtn, CornerRadius = UDim.new(0, 7) })
 
-        -- Icon
-        local TabIcon = Create("ImageLabel", {
-            Parent = TabBtn,
-            BackgroundTransparency = 1,
-            Position = UDim2.new(0, 12, 0.5, -10),
-            Size = UDim2.new(0, 20, 0, 20),
-            Image = Tab.Icon,
-            ImageColor3 = Theme.Dim,
-        })
-
-        -- Tab Name
         local TabName = Create("TextLabel", {
             Parent = TabBtn,
             BackgroundTransparency = 1,
-            Position = UDim2.new(0, 42, 0, 0),
-            Size = UDim2.new(1, -52, 1, 0),
-            FontFace = Fonts.Regular,
+            Position = UDim2.new(0, 14, 0, 0),
+            Size = UDim2.new(1, -24, 1, 0),
+            Font = Enum.Font.Gotham,
             Text = Tab.Name,
             TextColor3 = Theme.Dim,
-            TextSize = 14,
+            TextSize = 13,
             TextXAlignment = Enum.TextXAlignment.Left,
         })
 
-        -- Active indicator
         local ActiveBar = Create("Frame", {
             Parent = TabBtn,
             BackgroundColor3 = Theme.Accent,
             BackgroundTransparency = 1,
-            Position = UDim2.new(0, 0, 0.5, -8),
-            Size = UDim2.new(0, 3, 0, 16),
+            Position = UDim2.new(0, 0, 0.5, -7),
+            Size = UDim2.new(0, 3, 0, 14),
         })
         Create("UICorner", { Parent = ActiveBar, CornerRadius = UDim.new(0, 2) })
         BindAccent(ActiveBar, "BackgroundColor3")
 
-        -- Tab Content
         local TabContent = Create("ScrollingFrame", {
             Parent = TabContentHolder,
             BackgroundTransparency = 1,
             Size = UDim2.new(1, 0, 1, 0),
             CanvasSize = UDim2.new(0, 0, 0, 0),
             AutomaticCanvasSize = Enum.AutomaticSize.Y,
-            ScrollBarThickness = 3,
+            ScrollBarThickness = 2,
             ScrollBarImageColor3 = Theme.Accent,
             Visible = false,
         })
 
-        -- Two column layout
         local ColumnsHolder = Create("Frame", {
             Parent = TabContent,
             BackgroundTransparency = 1,
@@ -1712,16 +1315,16 @@ function Nebula:CreateWindow(config)
             Parent = ColumnsHolder,
             FillDirection = Enum.FillDirection.Horizontal,
             HorizontalFlex = Enum.UIFlexAlignment.Fill,
-            Padding = UDim.new(0, 10),
+            Padding = UDim.new(0, 8),
             SortOrder = Enum.SortOrder.LayoutOrder,
         })
 
         Create("UIPadding", {
             Parent = ColumnsHolder,
-            PaddingTop = UDim.new(0, 10),
-            PaddingBottom = UDim.new(0, 10),
-            PaddingLeft = UDim.new(0, 15),
-            PaddingRight = UDim.new(0, 15),
+            PaddingTop = UDim.new(0, 8),
+            PaddingBottom = UDim.new(0, 8),
+            PaddingLeft = UDim.new(0, 12),
+            PaddingRight = UDim.new(0, 12),
         })
 
         local LeftColumn = Create("Frame", {
@@ -1731,11 +1334,7 @@ function Nebula:CreateWindow(config)
             AutomaticSize = Enum.AutomaticSize.Y,
             LayoutOrder = 1,
         })
-        Create("UIListLayout", {
-            Parent = LeftColumn,
-            Padding = UDim.new(0, 10),
-            SortOrder = Enum.SortOrder.LayoutOrder,
-        })
+        Create("UIListLayout", { Parent = LeftColumn, Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder })
 
         local RightColumn = Create("Frame", {
             Parent = ColumnsHolder,
@@ -1744,77 +1343,50 @@ function Nebula:CreateWindow(config)
             AutomaticSize = Enum.AutomaticSize.Y,
             LayoutOrder = 2,
         })
-        Create("UIListLayout", {
-            Parent = RightColumn,
-            Padding = UDim.new(0, 10),
-            SortOrder = Enum.SortOrder.LayoutOrder,
-        })
+        Create("UIListLayout", { Parent = RightColumn, Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder })
 
         function Tab:Show()
             if Window.CurrentTab and Window.CurrentTab ~= Tab then
                 Window.CurrentTab:Hide()
             end
-
             Tab.Visible = true
             TabContent.Visible = true
             Window.CurrentTab = Tab
-
             TabTitle.Text = Tab.Name
-
-            Tween(TabBtn, {BackgroundTransparency = 0}, 0.2)
-            Tween(TabIcon, {ImageColor3 = Theme.Accent}, 0.2)
-            Tween(TabName, {TextColor3 = Theme.Text}, 0.2)
-            Tween(ActiveBar, {BackgroundTransparency = 0}, 0.2)
-
-            -- Fade transition
+            Tween(TabBtn, {BackgroundTransparency = 0}, 0.18)
+            Tween(TabName, {TextColor3 = Theme.Text}, 0.18)
+            Tween(ActiveBar, {BackgroundTransparency = 0}, 0.18)
             FadeOverlay.BackgroundTransparency = 0
-            Tween(FadeOverlay, {BackgroundTransparency = 1}, 0.3)
+            Tween(FadeOverlay, {BackgroundTransparency = 1}, 0.25)
         end
 
         function Tab:Hide()
             Tab.Visible = false
             TabContent.Visible = false
-
-            Tween(TabBtn, {BackgroundTransparency = 1}, 0.2)
-            Tween(TabIcon, {ImageColor3 = Theme.Dim}, 0.2)
-            Tween(TabName, {TextColor3 = Theme.Dim}, 0.2)
-            Tween(ActiveBar, {BackgroundTransparency = 1}, 0.2)
+            Tween(TabBtn, {BackgroundTransparency = 1}, 0.18)
+            Tween(TabName, {TextColor3 = Theme.Dim}, 0.18)
+            Tween(ActiveBar, {BackgroundTransparency = 1}, 0.18)
         end
 
         function Tab:AddSection(cfg)
-            local side = cfg.Side or "Left"
-            local parent = side == "Right" and RightColumn or LeftColumn
+            local parent = (cfg.Side == "Right") and RightColumn or LeftColumn
             return CreateSection(parent, cfg)
         end
 
-        TabBtn.MouseButton1Click:Connect(function()
-            Tab:Show()
-        end)
-
+        TabBtn.MouseButton1Click:Connect(function() Tab:Show() end)
         TabBtn.MouseEnter:Connect(function()
-            if not Tab.Visible then
-                Tween(TabBtn, {BackgroundTransparency = 0.5}, 0.15)
-            end
+            if not Tab.Visible then Tween(TabBtn, {BackgroundTransparency = 0.5}, 0.12) end
         end)
-
         TabBtn.MouseLeave:Connect(function()
-            if not Tab.Visible then
-                Tween(TabBtn, {BackgroundTransparency = 1}, 0.15)
-            end
+            if not Tab.Visible then Tween(TabBtn, {BackgroundTransparency = 1}, 0.12) end
         end)
 
         table.insert(Window.Tabs, Tab)
-
-        if #Window.Tabs == 1 then
-            Tab:Show()
-        end
+        if #Window.Tabs == 1 then Tab:Show() end
 
         return Tab
     end
 
-    -- ═══════════════════════════════════════════
-    -- Config System
-    -- ═══════════════════════════════════════════
     function Window:SaveConfig(name)
         local data = {}
         for flag, value in pairs(Nebula.Flags) do
@@ -1861,54 +1433,42 @@ function Nebula:CreateWindow(config)
     function Window:GetConfigs()
         local list = {}
         for _, file in ipairs(listfiles(Nebula.Directory .. "/configs")) do
-            table.insert(list, file:match("([^/\\]+)%.cfg$") or "")
+            local name = file:match("([^/\\]+)%.cfg$")
+            if name then table.insert(list, name) end
         end
         return list
     end
 
-    -- ═══════════════════════════════════════════
-    -- Update Theme
-    -- ═══════════════════════════════════════════
     function Window:SetAccent(color)
         Theme.Accent = color
-        Theme.AccentDark = Color3.fromHSV(color:ToHSV())
         for prop, objects in pairs(AccentBinds) do
             for _, obj in ipairs(objects) do
                 if obj and obj.Parent then
-                    Tween(obj, {[prop] = color}, 0.3)
+                    Tween(obj, {[prop] = color}, 0.25)
                 end
             end
         end
     end
 
-    -- Built-in Settings Tab
     function Window:AddSettingsTab()
-        local SettingsTab = Window:CreateTab({
-            Name = "Settings",
-            Icon = icons["settings"],
-        })
+        local SettingsTab = Window:CreateTab({ Name = "Settings" })
 
-        local ConfigSection = SettingsTab:AddSection({
-            Name = "Configuration",
-            Side = "Left",
-        })
+        local ConfigSection = SettingsTab:AddSection({ Name = "Configuration", Side = "Left" })
 
         local configList = ConfigSection:AddDropdown({
-            Name = "Config File",
+            Name = "Config",
             Flag = "__config_list",
             Options = Window:GetConfigs(),
-            Separator = true,
         })
 
         ConfigSection:AddTextBox({
-            Name = "Config Name",
+            Name = "Name",
             Flag = "__config_name",
-            Placeholder = "my_config",
-            Separator = true,
+            Placeholder = "config name",
         })
 
         ConfigSection:AddButton({
-            Name = "💾  Save Config",
+            Name = "Save",
             Callback = function()
                 local name = Nebula.Flags["__config_name"]
                 if name and name ~= "" then
@@ -1919,17 +1479,15 @@ function Nebula:CreateWindow(config)
         })
 
         ConfigSection:AddButton({
-            Name = "📂  Load Config",
+            Name = "Load",
             Callback = function()
                 local name = Nebula.Flags["__config_list"]
-                if name then
-                    Window:LoadConfig(name)
-                end
+                if name then Window:LoadConfig(name) end
             end,
         })
 
         ConfigSection:AddButton({
-            Name = "🗑️  Delete Config",
+            Name = "Delete",
             Callback = function()
                 local name = Nebula.Flags["__config_list"]
                 if name then
@@ -1940,33 +1498,21 @@ function Nebula:CreateWindow(config)
             Separator = false,
         })
 
-        local AppearanceSection = SettingsTab:AddSection({
-            Name = "Appearance",
-            Side = "Right",
-        })
+        local AppSection = SettingsTab:AddSection({ Name = "Appearance", Side = "Right" })
 
-        AppearanceSection:AddColorPicker({
-            Name = "Accent Color",
+        AppSection:AddColorPicker({
+            Name = "Accent",
             Default = Theme.Accent,
-            Callback = function(color)
-                Window:SetAccent(color)
-            end,
+            Callback = function(color) Window:SetAccent(color) end,
         })
 
-        AppearanceSection:AddKeybind({
+        AppSection:AddKeybind({
             Name = "Toggle UI",
             Default = Window.ToggleKey,
             Mode = "Toggle",
-            Callback = function(active)
-                -- handled by the main toggle
-            end,
         })
 
-        AppearanceSection:AddLabel({
-            Text = "Nebula Hub v1.0",
-            Color = Theme.Dim,
-            Separator = false,
-        })
+        AppSection:AddLabel({ Text = "OsamaHub v1.0", Separator = false })
 
         return SettingsTab
     end
@@ -1974,16 +1520,9 @@ function Nebula:CreateWindow(config)
     return Window
 end
 
--- ═══════════════════════════════════════════
--- Cleanup
--- ═══════════════════════════════════════════
 function Nebula:Destroy()
-    if self.ScreenGui then
-        self.ScreenGui:Destroy()
-    end
-    for _, conn in ipairs(self.Connections) do
-        conn:Disconnect()
-    end
+    if self.ScreenGui then self.ScreenGui:Destroy() end
+    for _, conn in ipairs(self.Connections) do conn:Disconnect() end
     self.Connections = {}
 end
 
