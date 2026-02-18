@@ -44,9 +44,6 @@ local palette = {
     frame_bg = rgb(16, 19, 28),
     frame_bg_hover = rgb(20, 24, 35),
     frame_bg_active = rgb(24, 28, 40),
-    button = rgb(16, 19, 28),
-    button_hover = rgb(22, 26, 38),
-    button_active = rgb(28, 33, 48),
     header = rgb(12, 15, 22),
     header_hover = rgb(16, 20, 30),
     separator = rgb(25, 30, 45),
@@ -73,6 +70,7 @@ getgenv().library = {
     keybind_list_on = true,
     notif_position = "TopRight",
     current_open = nil,
+    popups = {},
 }
 
 local themes = {
@@ -163,7 +161,6 @@ function library:draggify(frame, handle)
             local nx = clamp(startPos.X.Offset + (i.Position.X - start.X), 0, vx - frame.AbsoluteSize.X)
             local ny = clamp(startPos.Y.Offset + (i.Position.Y - start.Y), 0, vy - frame.AbsoluteSize.Y)
             frame.Position = dim2(0, nx, 0, ny)
-            library:close_element()
         end
     end)
 end
@@ -182,12 +179,21 @@ function library:connection(s, cb)
     return c
 end
 
-function library:close_element(np)
-    local o = library.current_open
-    if o and np ~= o then
-        pcall(function() o.set_visible(false); o.open = false end)
+function library:close_all_popups(except)
+    for i, popup in pairs(library.popups) do
+        if popup ~= except then
+            pcall(function()
+                if popup.holder and popup.holder.Visible then
+                    popup.holder.Visible = false
+                    popup.open = false
+                end
+            end)
+        end
     end
-    if np ~= o then library.current_open = np or nil end
+end
+
+function library:register_popup(popup_data)
+    insert(library.popups, popup_data)
 end
 
 function library:create(inst, opts)
@@ -217,6 +223,7 @@ end
 function library:unload_menu()
     pcall(function()
         if library["items"] then library["items"]:Destroy() end
+        if library["popup_gui"] then library["popup_gui"]:Destroy() end
         if library["overlay"] then library["overlay"]:Destroy() end
         for _, c in pairs(library.connections) do c:Disconnect() end
     end)
@@ -323,31 +330,28 @@ end
 
 function library:setup_click_outside()
     library:connection(uis.InputBegan, function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            local open = library.current_open
-            if not open then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.MouseButton2 then
             task.defer(function()
-                local holder = nil
-                pcall(function()
-                    if open.items then
-                        holder = open.items["colorpicker_holder"] or open.items["dropdown_holder"] or open.items["mode_popup"]
-                    end
-                end)
-                if not holder then return end
-                if not holder.Visible then return end
                 local mp = uis:GetMouseLocation()
-                local pos, size = holder.AbsolutePosition, holder.AbsoluteSize
-                local inside = mp.X >= pos.X and mp.X <= pos.X + size.X and mp.Y >= pos.Y and mp.Y <= pos.Y + size.Y
-                if inside then return end
-                local trigger = nil
-                pcall(function()
-                    trigger = open.items["colorpicker"] or open.items["dropdown_btn"] or open.items["keybind_btn"]
-                end)
-                if trigger then
-                    local tp, ts = trigger.AbsolutePosition, trigger.AbsoluteSize
-                    if mp.X >= tp.X and mp.X <= tp.X + ts.X and mp.Y >= tp.Y and mp.Y <= tp.Y + ts.Y then return end
+                local any_closed = false
+                for _, popup in pairs(library.popups) do
+                    if popup.holder and popup.holder.Visible then
+                        local pos, size = popup.holder.AbsolutePosition, popup.holder.AbsoluteSize
+                        local inside = mp.X >= pos.X and mp.X <= pos.X + size.X and mp.Y >= pos.Y and mp.Y <= pos.Y + size.Y
+                        if not inside then
+                            local trigger_inside = false
+                            if popup.trigger then
+                                local tp, ts = popup.trigger.AbsolutePosition, popup.trigger.AbsoluteSize
+                                trigger_inside = mp.X >= tp.X and mp.X <= tp.X + ts.X and mp.Y >= tp.Y and mp.Y <= tp.Y + ts.Y
+                            end
+                            if not trigger_inside then
+                                popup.holder.Visible = false
+                                popup.open = false
+                                any_closed = true
+                            end
+                        end
+                    end
                 end
-                library:close_element()
             end)
         end
     end)
@@ -387,7 +391,7 @@ end
 
 function library:window(properties)
     local cfg = {
-        name = properties.name or "imgui",
+        name = properties.name or "OsamaHub",
         suffix = properties.suffix or "",
         game_name = properties.gameInfo or "Game",
         size = properties.size or dim2(0, 580, 0, 460),
@@ -397,6 +401,10 @@ function library:window(properties)
 
     library["items"] = library:create("ScreenGui", {
         Parent = coregui, Name = "ImGui_Main", Enabled = true,
+        ZIndexBehavior = Enum.ZIndexBehavior.Global, IgnoreGuiInset = true,
+    })
+    library["popup_gui"] = library:create("ScreenGui", {
+        Parent = coregui, Name = "ImGui_Popups", Enabled = true,
         ZIndexBehavior = Enum.ZIndexBehavior.Global, IgnoreGuiInset = true,
     })
     library["overlay"] = library:create("ScreenGui", {
@@ -508,9 +516,9 @@ function library:window(properties)
 
     local wm = library:create("Frame", {
         Parent = library["overlay"], Size = dim2(0, 0, 0, 24),
-        Position = dim2(0, 8, 0, 8), BorderSizePixel = 0,
-        BackgroundColor3 = palette.bg, AutomaticSize = Enum.AutomaticSize.X,
-        Visible = library.watermark_on,
+        Position = dim2(0.5, 0, 0, 8), AnchorPoint = vec2(0.5, 0),
+        BorderSizePixel = 0, BackgroundColor3 = palette.bg,
+        AutomaticSize = Enum.AutomaticSize.X, Visible = library.watermark_on,
     })
     library.watermark_frame = wm
     library:create("UIStroke", {
@@ -528,7 +536,6 @@ function library:window(properties)
         AutomaticSize = Enum.AutomaticSize.X, TextSize = 11,
     })
     library:create("UIPadding", {Parent = wt, PaddingLeft = dim(0, 8), PaddingRight = dim(0, 8)})
-    library:draggify(wm)
 
     task.spawn(function()
         while task.wait(0.5) do
@@ -574,15 +581,16 @@ function library:window(properties)
     library:create("UIPadding", {Parent = ke, PaddingBottom = dim(0, 6)})
     library:draggify(kb)
 
-    function cfg.toggle_menu(bool) library["items"].Enabled = bool end
+    function cfg.toggle_menu(bool)
+        library["items"].Enabled = bool
+        library["popup_gui"].Enabled = bool
+    end
     return setmetatable(cfg, library)
 end
 
 function library:tab(properties)
     local cfg = {
         name = properties.name or "Tab",
-        pages = {},
-        current_multi = nil,
         items = {},
     }
     local items = cfg.items
@@ -640,7 +648,7 @@ function library:tab(properties)
         items["tab_content"].Visible = true
         items["tab_content"].Parent = self.items["content"]
         self.selected_tab = cfg
-        library:close_element()
+        library:close_all_popups()
     end
 
     items["button"].MouseButton1Down:Connect(function() cfg.open_tab() end)
@@ -662,12 +670,16 @@ end
 function library:column(p)
     local c = library:create("ScrollingFrame", {
         Parent = self.parent or self.items["columns_holder"],
-        BackgroundTransparency = 1, CanvasSize = UDim2.new(0, 0, 0, 0),
-        AutomaticCanvasSize = Enum.AutomaticSize.Y, ScrollBarThickness = 2,
+        BackgroundTransparency = 1, CanvasSize = dim2(0, 0, 0, 0),
+        AutomaticCanvasSize = Enum.AutomaticSize.Y, ScrollBarThickness = 3,
         ScrollBarImageColor3 = palette.scrollbar_grab,
+        TopImage = "rbxasset://textures/ui/Scroll/scroll-middle.png",
+        BottomImage = "rbxasset://textures/ui/Scroll/scroll-middle.png",
+        MidImage = "rbxasset://textures/ui/Scroll/scroll-middle.png",
+        ScrollingDirection = Enum.ScrollingDirection.Y,
         Size = dim2(0, 0, 1, 0), BorderSizePixel = 0, ZIndex = 3,
     })
-    library:create("UIPadding", {PaddingBottom = dim(0, 4), Parent = c})
+    library:create("UIPadding", {PaddingBottom = dim(0, 4), PaddingRight = dim(0, 4), Parent = c})
     library:create("UIListLayout", {
         Parent = c, HorizontalFlex = Enum.UIFlexAlignment.Fill,
         Padding = dim(0, 6), FillDirection = Enum.FillDirection.Vertical,
@@ -992,12 +1004,15 @@ function library:dropdown(o)
     })
 
     items["dropdown_holder"] = library:create("ScrollingFrame", {
-        Parent = library["items"], Visible = false,
-        Size = dim2(0, 0, 0, 0), BorderSizePixel = 0, ZIndex = 20,
+        Parent = library["popup_gui"], Visible = false,
+        Size = dim2(0, 0, 0, 0), BorderSizePixel = 0, ZIndex = 50,
         BackgroundColor3 = palette.bg_popup, ScrollBarThickness = 2,
         ScrollBarImageColor3 = palette.scrollbar_grab,
         AutomaticCanvasSize = Enum.AutomaticSize.Y,
         CanvasSize = dim2(0, 0, 0, 0),
+        TopImage = "rbxasset://textures/ui/Scroll/scroll-middle.png",
+        BottomImage = "rbxasset://textures/ui/Scroll/scroll-middle.png",
+        MidImage = "rbxasset://textures/ui/Scroll/scroll-middle.png",
     })
     library:create("UIStroke", {
         Color = palette.border, Parent = items["dropdown_holder"],
@@ -1013,29 +1028,33 @@ function library:dropdown(o)
         SortOrder = Enum.SortOrder.LayoutOrder,
     })
 
+    local popup_data = {holder = items["dropdown_holder"], trigger = items["dropdown_btn"], open = false}
+    library:register_popup(popup_data)
+
     function cfg.render_option(t)
         local b = library:create("TextButton", {
             FontFace = fonts.regular, TextColor3 = palette.text_dim,
             Text = t, Parent = items["dropdown_holder"],
             Size = dim2(1, 0, 0, 18), BackgroundTransparency = 1,
             TextXAlignment = Enum.TextXAlignment.Left, BorderSizePixel = 0,
-            AutoButtonColor = false, TextSize = 11, ZIndex = 20,
+            AutoButtonColor = false, TextSize = 11, ZIndex = 50,
         })
         library:create("UIPadding", {Parent = b, PaddingLeft = dim(0, 6)})
         return b
     end
 
     function cfg.set_visible(b)
+        library:close_all_popups(popup_data)
         items["dropdown_holder"].Visible = b
+        popup_data.open = b
         items["arrow"].Text = b and "▲" or "▼"
         if b then
             local btnPos = items["dropdown_btn"].AbsolutePosition
             local btnSize = items["dropdown_btn"].AbsoluteSize
             local maxH = math.min(cfg.y_size, 180)
             items["dropdown_holder"].Size = dim_offset(btnSize.X, maxH)
-            items["dropdown_holder"].Position = dim2(0, btnPos.X, 0, btnPos.Y + btnSize.Y + 2)
+            items["dropdown_holder"].Position = dim_offset(btnPos.X, btnPos.Y + btnSize.Y + 2)
         end
-        library:close_element(cfg)
     end
 
     function cfg.set(v)
@@ -1145,9 +1164,9 @@ function library:separator(p)
         library:create("TextLabel", {
             FontFace = fonts.regular, TextColor3 = palette.text_disabled,
             Text = string.upper(p.name), Parent = sep,
-            Size = dim2(0, 0, 1, 0), Position = dim2(0, 0, 0, 0),
+            Size = dim2(0, 0, 1, 0),
             BackgroundTransparency = 1, AutomaticSize = Enum.AutomaticSize.X,
-            TextSize = 9, ZIndex = 4, BackgroundColor3 = palette.bg_child,
+            TextSize = 9, ZIndex = 4,
         })
     end
     return setmetatable({items = {separator = sep}}, library)
@@ -1186,26 +1205,29 @@ function library:colorpicker(o)
     })
 
     items["colorpicker_holder"] = library:create("Frame", {
-        Parent = library["items"], Size = dim2(0, 200, 0, 195),
+        Parent = library["popup_gui"], Size = dim2(0, 200, 0, 195),
         BorderSizePixel = 0, Visible = false,
-        BackgroundColor3 = palette.bg_popup, ZIndex = 25,
+        BackgroundColor3 = palette.bg_popup, ZIndex = 55,
     })
     library:create("UIStroke", {
         Color = palette.border, Parent = items["colorpicker_holder"],
         Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
     })
 
+    local popup_data = {holder = items["colorpicker_holder"], trigger = items["colorpicker"], open = false}
+    library:register_popup(popup_data)
+
     library:create("TextLabel", {
         FontFace = fonts.bold, Text = cfg.name, TextColor3 = palette.text,
         Parent = items["colorpicker_holder"], Size = dim2(1, 0, 0, 20),
         Position = dim2(0, 8, 0, 4), BackgroundTransparency = 1,
-        TextXAlignment = Enum.TextXAlignment.Left, TextSize = 10, ZIndex = 25,
+        TextXAlignment = Enum.TextXAlignment.Left, TextSize = 10, ZIndex = 55,
     })
 
     items["sat_holder"] = library:create("Frame", {
         Parent = items["colorpicker_holder"], Position = dim2(0, 8, 0, 26),
         Size = dim2(1, -16, 0, 120), BorderSizePixel = 0,
-        BackgroundColor3 = hsv(h, 1, 1), ZIndex = 25,
+        BackgroundColor3 = hsv(h, 1, 1), ZIndex = 55,
     })
     library:create("UIStroke", {
         Color = palette.border, Parent = items["sat_holder"],
@@ -1214,7 +1236,7 @@ function library:colorpicker(o)
 
     items["sat"] = library:create("TextButton", {
         Parent = items["sat_holder"], Size = dim2(1, 0, 1, 0),
-        Text = "", AutoButtonColor = false, ZIndex = 26,
+        Text = "", AutoButtonColor = false, ZIndex = 56,
         BorderSizePixel = 0, BackgroundColor3 = rgb(255, 255, 255),
     })
     library:create("UIGradient", {
@@ -1223,14 +1245,14 @@ function library:colorpicker(o)
     })
     items["val"] = library:create("Frame", {
         Parent = items["sat_holder"], Size = dim2(1, 0, 1, 0),
-        BorderSizePixel = 0, BackgroundColor3 = rgb(255, 255, 255), ZIndex = 25,
+        BorderSizePixel = 0, BackgroundColor3 = rgb(255, 255, 255), ZIndex = 55,
     })
     library:create("UIGradient", {Parent = items["val"], Transparency = numseq{numkey(0, 0), numkey(1, 1)}})
 
     items["svp"] = library:create("Frame", {
         AnchorPoint = vec2(0.5, 0.5), Parent = items["sat_holder"],
         Position = dim2(s, 0, 1 - v, 0), Size = dim2(0, 8, 0, 8),
-        ZIndex = 27, BorderSizePixel = 0, BackgroundTransparency = 1,
+        ZIndex = 57, BorderSizePixel = 0, BackgroundTransparency = 1,
     })
     library:create("UIStroke", {
         Color = rgb(255, 255, 255), Parent = items["svp"],
@@ -1241,7 +1263,7 @@ function library:colorpicker(o)
         Parent = items["colorpicker_holder"], Position = dim2(0, 8, 1, -38),
         Size = dim2(1, -16, 0, 10), BorderSizePixel = 0,
         BackgroundColor3 = rgb(255, 255, 255), AutoButtonColor = false,
-        Text = "", ZIndex = 25,
+        Text = "", ZIndex = 55,
     })
     library:create("UIGradient", {
         Color = rgbseq{
@@ -1258,14 +1280,14 @@ function library:colorpicker(o)
     items["hp"] = library:create("Frame", {
         AnchorPoint = vec2(0.5, 0.5), Parent = items["hue_bar"],
         Position = dim2(h, 0, 0.5, 0), Size = dim2(0, 4, 0, 14),
-        ZIndex = 26, BorderSizePixel = 0, BackgroundColor3 = rgb(255, 255, 255),
+        ZIndex = 56, BorderSizePixel = 0, BackgroundColor3 = rgb(255, 255, 255),
     })
 
     items["alpha_bar"] = library:create("TextButton", {
         Parent = items["colorpicker_holder"], Position = dim2(0, 8, 1, -22),
         Size = dim2(1, -16, 0, 10), BorderSizePixel = 0,
         BackgroundColor3 = palette.frame_bg, AutoButtonColor = false,
-        Text = "", ZIndex = 25,
+        Text = "", ZIndex = 55,
     })
     library:create("UIGradient", {
         Color = rgbseq{rgbkey(0, rgb(0, 0, 0)), rgbkey(1, rgb(255, 255, 255))},
@@ -1278,11 +1300,13 @@ function library:colorpicker(o)
     items["ap"] = library:create("Frame", {
         AnchorPoint = vec2(0.5, 0.5), Parent = items["alpha_bar"],
         Position = dim2(1 - a, 0, 0.5, 0), Size = dim2(0, 4, 0, 14),
-        ZIndex = 26, BorderSizePixel = 0, BackgroundColor3 = rgb(255, 255, 255),
+        ZIndex = 56, BorderSizePixel = 0, BackgroundColor3 = rgb(255, 255, 255),
     })
 
     function cfg.set_visible(b)
+        library:close_all_popups(popup_data)
         items["colorpicker_holder"].Visible = b
+        popup_data.open = b
         if b then
             local cpPos = items["colorpicker"].AbsolutePosition
             local cpSize = items["colorpicker"].AbsoluteSize
@@ -1291,7 +1315,6 @@ function library:colorpicker(o)
                 cpPos.Y + cpSize.Y + 4
             )
         end
-        library:close_element(cfg)
     end
 
     function cfg.set(nc, av)
@@ -1413,31 +1436,37 @@ function library:keybind(o)
     flags[cfg.flag] = {mode = cfg.mode, key = cfg.key, active = cfg.active}
     local items = cfg.items
 
-    items["keybind_element"] = library:create("TextButton", {
-        Text = "", Parent = self.items["elements"], BackgroundTransparency = 1,
-        Size = dim2(1, 0, 0, 18), BorderSizePixel = 0, ZIndex = 3,
-    })
-    items["name"] = library:create("TextLabel", {
-        FontFace = fonts.regular, TextColor3 = palette.text,
-        Text = cfg.name or "Keybind", Parent = items["keybind_element"],
-        Size = dim2(1, -80, 1, 0), BackgroundTransparency = 1,
-        TextXAlignment = Enum.TextXAlignment.Left, BorderSizePixel = 0,
-        TextSize = 12, ZIndex = 3,
-    })
-    items["right_components"] = library:create("Frame", {
-        Parent = items["keybind_element"], Position = dim2(1, 0, 0, 0),
-        Size = dim2(0, 0, 1, 0), BorderSizePixel = 0,
-        BackgroundTransparency = 1, ZIndex = 3,
-    })
-    library:create("UIListLayout", {
-        FillDirection = Enum.FillDirection.Horizontal,
-        HorizontalAlignment = Enum.HorizontalAlignment.Right,
-        Parent = items["right_components"], Padding = dim(0, 4),
-        SortOrder = Enum.SortOrder.LayoutOrder,
-    })
+    local is_standalone = self.items["elements"] ~= nil and not self.items["right_components"]
+
+    if is_standalone then
+        items["keybind_element"] = library:create("TextButton", {
+            Text = "", Parent = self.items["elements"], BackgroundTransparency = 1,
+            Size = dim2(1, 0, 0, 18), BorderSizePixel = 0, ZIndex = 3,
+        })
+        items["name"] = library:create("TextLabel", {
+            FontFace = fonts.regular, TextColor3 = palette.text,
+            Text = cfg.name or "Keybind", Parent = items["keybind_element"],
+            Size = dim2(1, -80, 1, 0), BackgroundTransparency = 1,
+            TextXAlignment = Enum.TextXAlignment.Left, BorderSizePixel = 0,
+            TextSize = 12, ZIndex = 3,
+        })
+        items["right_components"] = library:create("Frame", {
+            Parent = items["keybind_element"], Position = dim2(1, 0, 0, 0),
+            Size = dim2(0, 0, 1, 0), BorderSizePixel = 0,
+            BackgroundTransparency = 1, ZIndex = 3,
+        })
+        library:create("UIListLayout", {
+            FillDirection = Enum.FillDirection.Horizontal,
+            HorizontalAlignment = Enum.HorizontalAlignment.Right,
+            Parent = items["right_components"], Padding = dim(0, 4),
+            SortOrder = Enum.SortOrder.LayoutOrder,
+        })
+    end
+
+    local keybind_parent = is_standalone and items["right_components"] or self.items["right_components"]
 
     items["keybind_btn"] = library:create("TextButton", {
-        FontFace = fonts.regular, Text = "", Parent = items["right_components"],
+        FontFace = fonts.regular, Text = "", Parent = keybind_parent,
         AutoButtonColor = false, Size = dim2(0, 0, 0, 18),
         BorderSizePixel = 0, AutomaticSize = Enum.AutomaticSize.X,
         BackgroundColor3 = palette.frame_bg, ZIndex = 3,
@@ -1456,40 +1485,41 @@ function library:keybind(o)
     library:create("UIPadding", {Parent = items["key"], PaddingRight = dim(0, 6), PaddingLeft = dim(0, 6)})
 
     items["mode_popup"] = library:create("Frame", {
-        Parent = library["items"], Size = dim2(0, 75, 0, 0),
-        BorderSizePixel = 0, ZIndex = 30, Visible = false, BackgroundTransparency = 1,
-    })
-    local mode_inner = library:create("Frame", {
-        Parent = items["mode_popup"], Size = dim2(1, 0, 1, 0),
-        ClipsDescendants = true, BorderSizePixel = 0,
-        BackgroundColor3 = palette.bg_popup, ZIndex = 30,
+        Parent = library["popup_gui"], Size = dim2(0, 80, 0, 0),
+        BorderSizePixel = 0, ZIndex = 60, Visible = false,
+        BackgroundColor3 = palette.bg_popup,
     })
     library:create("UIStroke", {
-        Color = palette.border, Parent = mode_inner,
+        Color = palette.border, Parent = items["mode_popup"],
         Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
     })
     library:create("UIPadding", {
         PaddingBottom = dim(0, 3), PaddingTop = dim(0, 3),
         PaddingLeft = dim(0, 3), PaddingRight = dim(0, 3),
-        Parent = mode_inner,
+        Parent = items["mode_popup"],
     })
-    library:create("UIListLayout", {Parent = mode_inner, Padding = dim(0, 1), SortOrder = Enum.SortOrder.LayoutOrder})
+    library:create("UIListLayout", {Parent = items["mode_popup"], Padding = dim(0, 1), SortOrder = Enum.SortOrder.LayoutOrder})
+
+    local popup_data = {holder = items["mode_popup"], trigger = items["keybind_btn"], open = false}
+    library:register_popup(popup_data)
 
     local modes = {"Toggle", "Hold", "Always"}
     local popup_height = 6
     for _, option in ipairs(modes) do
         local mb = library:create("TextButton", {
             FontFace = fonts.regular, TextColor3 = palette.text_dim,
-            Text = option, Parent = mode_inner, Size = dim2(1, 0, 0, 16),
+            Text = option, Parent = items["mode_popup"], Size = dim2(1, 0, 0, 16),
             BackgroundTransparency = 1, AutoButtonColor = false,
             TextXAlignment = Enum.TextXAlignment.Left, BorderSizePixel = 0,
-            TextSize = 10, ZIndex = 30,
+            TextSize = 10, ZIndex = 60,
         })
         cfg.hold_instances[option] = mb
         popup_height = popup_height + 17
         library:create("UIPadding", {Parent = mb, PaddingLeft = dim(0, 4)})
         mb.MouseButton1Click:Connect(function()
-            cfg.set(option); cfg.set_visible(false); cfg.open = false
+            cfg.set_mode(option)
+            cfg.set_visible(false)
+            cfg.open = false
         end)
         mb.MouseEnter:Connect(function()
             if mb.TextColor3 ~= themes.preset.accent then
@@ -1505,15 +1535,22 @@ function library:keybind(o)
     cfg.popup_height = popup_height
 
     function cfg.modify_mode_color(p)
-        for _, v in pairs(cfg.hold_instances) do v.TextColor3 = palette.text_dim end
+        for _, vv in pairs(cfg.hold_instances) do vv.TextColor3 = palette.text_dim end
         if cfg.hold_instances[p] then cfg.hold_instances[p].TextColor3 = themes.preset.accent end
     end
 
     function cfg.set_mode(m)
         cfg.mode = m
-        if m == "Always" then cfg.set(true) elseif m == "Hold" then cfg.set(false) end
-        flags[cfg.flag]["mode"] = m
+        if m == "Always" then cfg.active = true; cfg.callback(true)
+        elseif m == "Hold" then cfg.active = false; cfg.callback(false) end
+        flags[cfg.flag] = {mode = cfg.mode, key = cfg.key, active = cfg.active}
         cfg.modify_mode_color(m)
+        library.active_keybinds[cfg.flag] = {
+            name = cfg.name or "Keybind",
+            key_text = items["key"].Text,
+            active = cfg.active, mode = cfg.mode,
+        }
+        pcall(function() library:update_keybind_list() end)
     end
 
     function cfg.set(input)
@@ -1524,8 +1561,8 @@ function library:keybind(o)
             input = input.Name == "Escape" and "NONE" or input
             cfg.key = input or "NONE"
         elseif find({"Toggle", "Hold", "Always"}, input) then
-            if input == "Always" then cfg.active = true end
-            cfg.mode = input; cfg.set_mode(cfg.mode)
+            cfg.set_mode(input)
+            return
         elseif type(input) == "table" then
             if type(input.key) == "string" and input.key ~= "NONE" then
                 pcall(function() input.key = library:convert_enum(input.key) end)
@@ -1533,8 +1570,9 @@ function library:keybind(o)
             if input.key == Enum.KeyCode.Escape then input.key = "NONE" end
             cfg.key = input.key or "NONE"
             cfg.mode = input.mode or "Toggle"
-            if input.active then cfg.active = input.active end
-            cfg.set_mode(cfg.mode)
+            if input.active ~= nil then cfg.active = input.active end
+            cfg.modify_mode_color(cfg.mode)
+            if cfg.mode == "Always" then cfg.active = true end
         end
         cfg.callback(cfg.active)
         local text = "None"
@@ -1551,16 +1589,15 @@ function library:keybind(o)
     end
 
     function cfg.set_visible(bool)
+        library:close_all_popups(popup_data)
         if bool then
             local kp = items["keybind_btn"].AbsolutePosition
             local ks = items["keybind_btn"].AbsoluteSize
             items["mode_popup"].Position = dim_offset(kp.X, kp.Y + ks.Y + 2)
-            items["mode_popup"].Size = dim_offset(math.max(ks.X, 75), cfg.popup_height)
-            items["mode_popup"].Visible = true
-        else
-            items["mode_popup"].Visible = false
+            items["mode_popup"].Size = dim_offset(math.max(ks.X + 20, 80), cfg.popup_height)
         end
-        library:close_element(cfg)
+        items["mode_popup"].Visible = bool
+        popup_data.open = bool
     end
 
     items["keybind_btn"].MouseButton1Down:Connect(function()
@@ -1655,6 +1692,9 @@ function library:list(p)
         ScrollBarThickness = 2, ScrollBarImageColor3 = palette.scrollbar_grab,
         AutomaticCanvasSize = Enum.AutomaticSize.Y,
         CanvasSize = dim2(0, 0, 0, 0), ZIndex = 3,
+        TopImage = "rbxasset://textures/ui/Scroll/scroll-middle.png",
+        BottomImage = "rbxasset://textures/ui/Scroll/scroll-middle.png",
+        MidImage = "rbxasset://textures/ui/Scroll/scroll-middle.png",
     })
     library:create("UIStroke", {
         Color = palette.border, Parent = items["list_scroll"],
