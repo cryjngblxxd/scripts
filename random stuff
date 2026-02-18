@@ -1,6 +1,3 @@
-local Osama = {}
-Osama.__index = Osama
-
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
@@ -8,77 +5,81 @@ local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 
-Osama.Directory = "OsamaHub"
-Osama.Flags = {}
-Osama.ConfigFlags = {}
-Osama.Connections = {}
+local Library = {}
+Library.__index = Library
+Library.Flags = {}
+Library.ConfigFlags = {}
+Library.Connections = {}
+Library.Directory = "OsamaHub"
 
-if not isfolder(Osama.Directory) then makefolder(Osama.Directory) end
-if not isfolder(Osama.Directory .. "/configs") then makefolder(Osama.Directory .. "/configs") end
+if not isfolder(Library.Directory) then makefolder(Library.Directory) end
+if not isfolder(Library.Directory .. "/configs") then makefolder(Library.Directory .. "/configs") end
 
-local Theme = {
-    Bg = Color3.fromRGB(8, 8, 12),
-    Card = Color3.fromRGB(14, 14, 20),
-    CardLight = Color3.fromRGB(20, 20, 28),
-    Elevated = Color3.fromRGB(28, 28, 38),
-    Accent = Color3.fromRGB(255, 255, 255),
-    AccentSoft = Color3.fromRGB(200, 200, 210),
-    Text = Color3.fromRGB(255, 255, 255),
-    TextSoft = Color3.fromRGB(160, 160, 175),
-    TextDim = Color3.fromRGB(90, 90, 105),
-    Stroke = Color3.fromRGB(38, 38, 50),
-    StrokeLight = Color3.fromRGB(55, 55, 70),
-    Glow = Color3.fromRGB(255, 255, 255),
-    Green = Color3.fromRGB(100, 220, 140),
-    Red = Color3.fromRGB(240, 70, 70),
-    Yellow = Color3.fromRGB(250, 200, 60),
+local Color = {
+    Base = Color3.fromRGB(13, 13, 18),
+    Surface = Color3.fromRGB(19, 19, 26),
+    Card = Color3.fromRGB(24, 24, 33),
+    CardHover = Color3.fromRGB(30, 30, 40),
+    Elevated = Color3.fromRGB(34, 34, 45),
+    Input = Color3.fromRGB(28, 28, 38),
+    White = Color3.fromRGB(255, 255, 255),
+    Text90 = Color3.fromRGB(230, 230, 235),
+    Text70 = Color3.fromRGB(170, 170, 180),
+    Text40 = Color3.fromRGB(100, 100, 115),
+    Text20 = Color3.fromRGB(55, 55, 68),
+    Outline = Color3.fromRGB(42, 42, 55),
+    OutlineLight = Color3.fromRGB(58, 58, 72),
+    Accent1 = Color3.fromRGB(140, 120, 255),
+    Accent2 = Color3.fromRGB(90, 200, 255),
+    Green = Color3.fromRGB(75, 220, 130),
+    Red = Color3.fromRGB(255, 80, 80),
+    Orange = Color3.fromRGB(255, 170, 50),
 }
 
-local AccentBinds = { BackgroundColor3 = {}, TextColor3 = {}, ImageColor3 = {} }
+local ABind = { BackgroundColor3 = {}, TextColor3 = {}, ImageColor3 = {} }
 
-local function C(class, props)
-    local i = Instance.new(class)
-    for k, v in pairs(props) do i[k] = v end
-    return i
+local function New(c, p)
+    local o = Instance.new(c)
+    for k, v in pairs(p) do o[k] = v end
+    return o
 end
 
-local function T(obj, props, dur, style)
-    TweenService:Create(obj, TweenInfo.new(dur or 0.3, style or Enum.EasingStyle.Quart, Enum.EasingDirection.Out), props):Play()
+local function Anim(o, p, d, s)
+    return TweenService:Create(o, TweenInfo.new(d or 0.35, s or Enum.EasingStyle.Quart, Enum.EasingDirection.Out), p):Play()
 end
 
-local function Cn(signal, cb)
-    local c = signal:Connect(cb)
-    table.insert(Osama.Connections, c)
+local function Bind(o, p)
+    table.insert(ABind[p], o)
+end
+
+local function Hook(s, f)
+    local c = s:Connect(f)
+    table.insert(Library.Connections, c)
     return c
 end
 
-local function BA(obj, prop)
-    table.insert(AccentBinds[prop], obj)
+local function Flag()
+    return "_f" .. tostring(#Library.Flags + 1) .. "_" .. math.random(1000, 9999)
 end
 
-local function NF()
-    return string.format("_f%d_%d", #Osama.Flags + 1, math.random(1000, 9999))
-end
-
-local function Rnd(n, d)
+local function Round(n, d)
     local m = 1 / (d or 1)
     return math.floor(n * m + 0.5) / m
 end
 
-local KN = {
+local KNames = {
     [Enum.KeyCode.LeftShift] = "LSHIFT", [Enum.KeyCode.RightShift] = "RSHIFT",
     [Enum.KeyCode.LeftControl] = "LCTRL", [Enum.KeyCode.RightControl] = "RCTRL",
     [Enum.KeyCode.LeftAlt] = "LALT", [Enum.KeyCode.RightAlt] = "RALT",
     [Enum.KeyCode.CapsLock] = "CAPS", [Enum.KeyCode.Space] = "SPACE",
-    [Enum.KeyCode.Return] = "ENTER", [Enum.KeyCode.Backspace] = "BKSP",
+    [Enum.KeyCode.Return] = "ENTER", [Enum.KeyCode.Backspace] = "BACK",
     [Enum.KeyCode.Tab] = "TAB", [Enum.KeyCode.Escape] = "ESC",
-    [Enum.KeyCode.Insert] = "INS", [Enum.KeyCode.Delete] = "DEL",
-    [Enum.UserInputType.MouseButton1] = "MB1",
-    [Enum.UserInputType.MouseButton2] = "MB2",
-    [Enum.UserInputType.MouseButton3] = "MB3",
+    [Enum.UserInputType.MouseButton1] = "M1",
+    [Enum.UserInputType.MouseButton2] = "M2",
+    [Enum.UserInputType.MouseButton3] = "M3",
 }
 
-local function Drag(frame, handle)
+local function MakeDrag(frame, handle)
     local d, ds, sp = false, nil, nil
     handle.InputBegan:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -88,954 +89,953 @@ local function Drag(frame, handle)
     handle.InputEnded:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1 then d = false end
     end)
-    Cn(UserInputService.InputChanged, function(i)
+    Hook(UserInputService.InputChanged, function(i)
         if d and i.UserInputType == Enum.UserInputType.MouseMovement then
             local dt = i.Position - ds
             local vp = workspace.CurrentCamera.ViewportSize
-            T(frame, {Position = UDim2.new(0,
+            Anim(frame, {Position = UDim2.new(0,
                 math.clamp(sp.X.Offset + dt.X, 0, vp.X - frame.AbsoluteSize.X), 0,
                 math.clamp(sp.Y.Offset + dt.Y, 0, vp.Y - frame.AbsoluteSize.Y))
-            }, 0.06, Enum.EasingStyle.Linear)
+            }, 0.05, Enum.EasingStyle.Linear)
         end
     end)
 end
 
-local NH
-function Osama:Notify(cfg)
-    if not NH then
-        NH = C("Frame", {
-            Parent = self.SG, BackgroundTransparency = 1,
+local function PulseAnim(dot)
+    task.spawn(function()
+        while dot and dot.Parent do
+            Anim(dot, {Size = UDim2.new(0, 10, 0, 10), BackgroundTransparency = 0.4}, 0.8, Enum.EasingStyle.Sine)
+            task.wait(0.8)
+            Anim(dot, {Size = UDim2.new(0, 7, 0, 7), BackgroundTransparency = 0}, 0.8, Enum.EasingStyle.Sine)
+            task.wait(0.8)
+        end
+    end)
+end
+
+local NotifHolder
+function Library:Notify(cfg)
+    if not NotifHolder then
+        NotifHolder = New("Frame", {
+            Parent = self.GUI, BackgroundTransparency = 1,
             AnchorPoint = Vector2.new(1, 1),
-            Position = UDim2.new(1, -24, 1, -24),
-            Size = UDim2.new(0, 320, 1, -48),
+            Position = UDim2.new(1, -20, 1, -20),
+            Size = UDim2.new(0, 340, 1, -40),
+            ZIndex = 200,
         })
-        C("UIListLayout", {
-            Parent = NH, SortOrder = Enum.SortOrder.LayoutOrder,
+        New("UIListLayout", {
+            Parent = NotifHolder, SortOrder = Enum.SortOrder.LayoutOrder,
             VerticalAlignment = Enum.VerticalAlignment.Bottom,
-            Padding = UDim.new(0, 10),
+            Padding = UDim.new(0, 12),
         })
     end
 
-    local ac = (cfg.Type == "Success" and Theme.Green) or (cfg.Type == "Error" and Theme.Red) or (cfg.Type == "Warning" and Theme.Yellow) or Theme.Accent
+    local ac = (cfg.Type == "Success" and Color.Green) or (cfg.Type == "Error" and Color.Red) or (cfg.Type == "Warning" and Color.Orange) or Color.Accent1
 
-    local nf = C("Frame", {
-        Parent = NH, BackgroundColor3 = Theme.Card,
+    local card = New("Frame", {
+        Parent = NotifHolder, BackgroundColor3 = Color.Surface,
         Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
         ClipsDescendants = true,
     })
-    C("UICorner", { Parent = nf, CornerRadius = UDim.new(0, 14) })
-    C("UIStroke", { Parent = nf, Color = Theme.Stroke, Thickness = 1.5, Transparency = 0.3 })
-    C("UIPadding", { Parent = nf, PaddingTop = UDim.new(0, 14), PaddingBottom = UDim.new(0, 14), PaddingLeft = UDim.new(0, 16), PaddingRight = UDim.new(0, 16) })
+    New("UICorner", { Parent = card, CornerRadius = UDim.new(0, 16) })
+    New("UIStroke", { Parent = card, Color = Color.Outline, Thickness = 1.5, Transparency = 0.2 })
+    New("UIPadding", { Parent = card, PaddingTop = UDim.new(0, 16), PaddingBottom = UDim.new(0, 18), PaddingLeft = UDim.new(0, 18), PaddingRight = UDim.new(0, 18) })
 
-    local glow = C("Frame", {
-        Parent = nf, BackgroundColor3 = ac,
-        Position = UDim2.new(0, -16, 0, -14),
-        Size = UDim2.new(0, 4, 1, 28),
+    local glow = New("Frame", {
+        Parent = card, BackgroundColor3 = ac,
+        Position = UDim2.new(0, -18, 0, -16),
+        Size = UDim2.new(0, 5, 1, 34),
     })
+    New("UICorner", { Parent = glow, CornerRadius = UDim.new(0, 3) })
 
-    C("TextLabel", {
-        Parent = nf, BackgroundTransparency = 1,
+    New("TextLabel", {
+        Parent = card, BackgroundTransparency = 1,
         Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
         Font = Enum.Font.GothamBold, Text = cfg.Title or "Notice",
-        TextColor3 = Theme.Text, TextSize = 15,
+        TextColor3 = Color.White, TextSize = 15,
         TextXAlignment = Enum.TextXAlignment.Left,
     })
 
-    C("TextLabel", {
-        Parent = nf, BackgroundTransparency = 1,
-        Position = UDim2.new(0, 0, 0, 22),
+    New("TextLabel", {
+        Parent = card, BackgroundTransparency = 1,
+        Position = UDim2.new(0, 0, 0, 24),
         Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
         Font = Enum.Font.Gotham, Text = cfg.Message or "",
-        TextColor3 = Theme.TextSoft, TextSize = 13,
+        TextColor3 = Color.Text70, TextSize = 13,
         TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left,
     })
 
-    local bar = C("Frame", {
-        Parent = nf, BackgroundColor3 = ac,
-        AnchorPoint = Vector2.new(0, 1),
-        Position = UDim2.new(0, -16, 1, 14),
-        Size = UDim2.new(1, 32, 0, 3),
+    local bar = New("Frame", {
+        Parent = card, BackgroundColor3 = ac,
+        AnchorPoint = Vector2.new(0.5, 1),
+        Position = UDim2.new(0.5, 0, 1, 18),
+        Size = UDim2.new(1, 0, 0, 3),
+        BackgroundTransparency = 0.3,
     })
-    C("UICorner", { Parent = bar, CornerRadius = UDim.new(0, 2) })
+    New("UICorner", { Parent = bar, CornerRadius = UDim.new(0, 2) })
 
-    nf.BackgroundTransparency = 1
-    for _, d in ipairs(nf:GetDescendants()) do
+    card.BackgroundTransparency = 1
+    for _, d in ipairs(card:GetDescendants()) do
         if d:IsA("TextLabel") then d.TextTransparency = 1 end
-        if d:IsA("Frame") and d ~= nf then d.BackgroundTransparency = 1 end
+        if d:IsA("Frame") and d ~= card then d.BackgroundTransparency = 1 end
     end
-
-    T(nf, {BackgroundTransparency = 0}, 0.4)
-    for _, d in ipairs(nf:GetDescendants()) do
-        if d:IsA("TextLabel") then T(d, {TextTransparency = 0}, 0.4) end
-        if d:IsA("Frame") and d ~= nf then T(d, {BackgroundTransparency = 0}, 0.4) end
+    Anim(card, {BackgroundTransparency = 0}, 0.5)
+    for _, d in ipairs(card:GetDescendants()) do
+        if d:IsA("TextLabel") then Anim(d, {TextTransparency = 0}, 0.5) end
+        if d:IsA("Frame") and d ~= card then Anim(d, {BackgroundTransparency = d == bar and 0.3 or 0}, 0.5) end
     end
 
     local dur = cfg.Duration or 4
-    T(bar, {Size = UDim2.new(0, 0, 0, 3)}, dur, Enum.EasingStyle.Linear)
+    Anim(bar, {Size = UDim2.new(0, 0, 0, 3)}, dur, Enum.EasingStyle.Linear)
 
     task.delay(dur, function()
-        T(nf, {BackgroundTransparency = 1}, 0.5)
-        for _, d in ipairs(nf:GetDescendants()) do
-            if d:IsA("TextLabel") then T(d, {TextTransparency = 1}, 0.5) end
-            if d:IsA("Frame") then T(d, {BackgroundTransparency = 1}, 0.5) end
+        Anim(card, {BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0)}, 0.5)
+        for _, d in ipairs(card:GetDescendants()) do
+            if d:IsA("TextLabel") then Anim(d, {TextTransparency = 1}, 0.4) end
+            if d:IsA("Frame") then Anim(d, {BackgroundTransparency = 1}, 0.4) end
+            if d:IsA("UIStroke") then Anim(d, {Transparency = 1}, 0.4) end
         end
         task.wait(0.6)
-        nf:Destroy()
+        card:Destroy()
     end)
 end
 
-function Osama:CreateWindow(cfg)
+function Library:Window(cfg)
     local W = {
         Name = cfg.Name or "OsamaHub",
-        Tabs = {}, CurrentTab = nil, Visible = true,
-        ToggleKey = cfg.ToggleKey or Enum.KeyCode.RightControl,
+        Tabs = {}, Current = nil, Visible = true,
+        Key = cfg.Key or Enum.KeyCode.RightControl,
     }
 
-    self.SG = C("ScreenGui", {
+    self.GUI = New("ScreenGui", {
         Parent = CoreGui, Name = "OsamaHub",
         ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
         ResetOnSpawn = false, IgnoreGuiInset = true,
     })
 
-    local DH = C("ScreenGui", {
+    self.Drop = New("ScreenGui", {
         Parent = CoreGui, Name = "OsamaDrop",
         ZIndexBehavior = Enum.ZIndexBehavior.Global,
         ResetOnSpawn = false, IgnoreGuiInset = true,
     })
 
-    local Main = C("Frame", {
-        Parent = self.SG, BackgroundColor3 = Theme.Bg,
-        Size = UDim2.new(0, 780, 0, 540),
-        Position = UDim2.new(0.5, -390, 0.5, -270),
+    local Root = New("Frame", {
+        Parent = self.GUI, BackgroundColor3 = Color.Base,
+        Size = UDim2.new(0, 820, 0, 560),
+        Position = UDim2.new(0.5, -410, 0.5, -280),
         ClipsDescendants = true,
     })
-    Main.Position = UDim2.fromOffset(Main.AbsolutePosition.X, Main.AbsolutePosition.Y)
-    C("UICorner", { Parent = Main, CornerRadius = UDim.new(0, 18) })
-    C("UIStroke", { Parent = Main, Color = Theme.Stroke, Thickness = 1.5, Transparency = 0.2 })
+    Root.Position = UDim2.fromOffset(Root.AbsolutePosition.X, Root.AbsolutePosition.Y)
+    New("UICorner", { Parent = Root, CornerRadius = UDim.new(0, 20) })
+    New("UIStroke", { Parent = Root, Color = Color.Outline, Thickness = 1.5, Transparency = 0.15 })
 
-    local Shadow = C("ImageLabel", {
-        Parent = Main, BackgroundTransparency = 1,
-        Position = UDim2.new(0, -40, 0, -40),
-        Size = UDim2.new(1, 80, 1, 80),
+    New("ImageLabel", {
+        Parent = Root, BackgroundTransparency = 1,
+        Position = UDim2.new(0, -50, 0, -50),
+        Size = UDim2.new(1, 100, 1, 100),
         ZIndex = 0, Image = "rbxassetid://6015897843",
-        ImageColor3 = Color3.fromRGB(0, 0, 0), ImageTransparency = 0.35,
+        ImageColor3 = Color3.new(0, 0, 0), ImageTransparency = 0.3,
         ScaleType = Enum.ScaleType.Slice,
         SliceCenter = Rect.new(49, 49, 450, 450),
     })
 
-    local TopGlow = C("Frame", {
-        Parent = Main, BackgroundColor3 = Theme.Accent,
-        Size = UDim2.new(1, 0, 0, 1), BackgroundTransparency = 0.85,
+    local TopAccent = New("Frame", {
+        Parent = Root, BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 0, 3),
     })
+    New("UIGradient", {
+        Parent = TopAccent,
+        Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color.Accent1),
+            ColorSequenceKeypoint.new(0.5, Color.Accent2),
+            ColorSequenceKeypoint.new(1, Color.Accent1),
+        },
+        Transparency = NumberSequence.new{
+            NumberSequenceKeypoint.new(0, 0.6),
+            NumberSequenceKeypoint.new(0.5, 0),
+            NumberSequenceKeypoint.new(1, 0.6),
+        },
+    })
+    TopAccent.BackgroundTransparency = 0
+    TopAccent.BackgroundColor3 = Color.White
 
-    local Sidebar = C("Frame", {
-        Parent = Main, BackgroundColor3 = Theme.Card,
-        Size = UDim2.new(0, 200, 1, 0),
+    local Side = New("Frame", {
+        Parent = Root, BackgroundColor3 = Color.Surface,
+        Size = UDim2.new(0, 220, 1, 0),
     })
-    C("UICorner", { Parent = Sidebar, CornerRadius = UDim.new(0, 18) })
-    C("Frame", {
-        Parent = Sidebar, BackgroundColor3 = Theme.Card,
-        Position = UDim2.new(1, -18, 0, 0),
-        Size = UDim2.new(0, 18, 1, 0),
+    New("UICorner", { Parent = Side, CornerRadius = UDim.new(0, 20) })
+    New("Frame", {
+        Parent = Side, BackgroundColor3 = Color.Surface,
+        Position = UDim2.new(1, -20, 0, 0),
+        Size = UDim2.new(0, 20, 1, 0),
     })
-
-    local SideStroke = C("Frame", {
-        Parent = Sidebar, BackgroundColor3 = Theme.Stroke,
+    New("Frame", {
+        Parent = Side, BackgroundColor3 = Color.Outline,
         AnchorPoint = Vector2.new(1, 0),
         Position = UDim2.new(1, 0, 0, 0),
         Size = UDim2.new(0, 1, 1, 0),
         BackgroundTransparency = 0.3,
     })
 
-    local LogoHolder = C("Frame", {
-        Parent = Sidebar, BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 0, 80),
+    local LogoWrap = New("Frame", {
+        Parent = Side, BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 0, 90),
     })
 
-    local LogoDot = C("Frame", {
-        Parent = LogoHolder, BackgroundColor3 = Theme.Accent,
-        Position = UDim2.new(0, 22, 0.5, -12),
-        Size = UDim2.new(0, 24, 0, 24),
+    local LogoBg = New("Frame", {
+        Parent = LogoWrap, BackgroundColor3 = Color.Accent1,
+        Position = UDim2.new(0, 24, 0, 22),
+        Size = UDim2.new(0, 40, 0, 40),
     })
-    C("UICorner", { Parent = LogoDot, CornerRadius = UDim.new(0, 8) })
-    BA(LogoDot, "BackgroundColor3")
+    New("UICorner", { Parent = LogoBg, CornerRadius = UDim.new(0, 14) })
+    New("UIGradient", {
+        Parent = LogoBg,
+        Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color.Accent1),
+            ColorSequenceKeypoint.new(1, Color.Accent2),
+        },
+        Rotation = 45,
+    })
+    Bind(LogoBg, "BackgroundColor3")
 
-    local LogoIcon = C("TextLabel", {
-        Parent = LogoDot, BackgroundTransparency = 1,
+    New("TextLabel", {
+        Parent = LogoBg, BackgroundTransparency = 1,
         Size = UDim2.new(1, 0, 1, 0),
-        Font = Enum.Font.GothamBold, Text = "O",
-        TextColor3 = Theme.Bg, TextSize = 14,
+        Font = Enum.Font.GothamBlack, Text = "O",
+        TextColor3 = Color.Base, TextSize = 20,
     })
 
-    local TitleLbl = C("TextLabel", {
-        Parent = LogoHolder, BackgroundTransparency = 1,
-        Position = UDim2.new(0, 56, 0, 18),
-        Size = UDim2.new(1, -66, 0, 22),
-        Font = Enum.Font.GothamBold,
-        Text = W.Name, TextColor3 = Theme.Text,
-        TextSize = 18, TextXAlignment = Enum.TextXAlignment.Left,
+    New("TextLabel", {
+        Parent = LogoWrap, BackgroundTransparency = 1,
+        Position = UDim2.new(0, 74, 0, 20),
+        Size = UDim2.new(1, -84, 0, 22),
+        Font = Enum.Font.GothamBlack,
+        Text = W.Name, TextColor3 = Color.White,
+        TextSize = 17, TextXAlignment = Enum.TextXAlignment.Left,
     })
 
-    local SubLbl = C("TextLabel", {
-        Parent = LogoHolder, BackgroundTransparency = 1,
-        Position = UDim2.new(0, 56, 0, 42),
-        Size = UDim2.new(1, -66, 0, 16),
+    local VerLabel = New("TextLabel", {
+        Parent = LogoWrap, BackgroundTransparency = 1,
+        Position = UDim2.new(0, 74, 0, 44),
+        Size = UDim2.new(1, -84, 0, 16),
         Font = Enum.Font.Gotham,
-        Text = "v2.0 premium", TextColor3 = Theme.TextDim,
-        TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left,
+        Text = "v2.0 ─ premium", TextColor3 = Color.Text40,
+        TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left,
     })
 
-    C("Frame", {
-        Parent = Sidebar, BackgroundColor3 = Theme.Stroke,
-        Position = UDim2.new(0, 18, 0, 80),
-        Size = UDim2.new(1, -36, 0, 1),
-        BackgroundTransparency = 0.4,
+    New("Frame", {
+        Parent = Side, BackgroundColor3 = Color.Outline,
+        Position = UDim2.new(0, 20, 0, 90),
+        Size = UDim2.new(1, -40, 0, 1),
+        BackgroundTransparency = 0.5,
     })
 
-    local NavLabel = C("TextLabel", {
-        Parent = Sidebar, BackgroundTransparency = 1,
-        Position = UDim2.new(0, 22, 0, 90),
-        Size = UDim2.new(1, -44, 0, 20),
+    New("TextLabel", {
+        Parent = Side, BackgroundTransparency = 1,
+        Position = UDim2.new(0, 26, 0, 102),
+        Size = UDim2.new(1, -52, 0, 16),
         Font = Enum.Font.GothamBold,
-        Text = "NAVIGATION", TextColor3 = Theme.TextDim,
+        Text = "MENU", TextColor3 = Color.Text20,
         TextSize = 10, TextXAlignment = Enum.TextXAlignment.Left,
     })
 
-    local TabHolder = C("ScrollingFrame", {
-        Parent = Sidebar, BackgroundTransparency = 1,
-        Position = UDim2.new(0, 0, 0, 114),
-        Size = UDim2.new(1, 0, 1, -170),
+    local TabScroll = New("ScrollingFrame", {
+        Parent = Side, BackgroundTransparency = 1,
+        Position = UDim2.new(0, 0, 0, 124),
+        Size = UDim2.new(1, 0, 1, -192),
         ScrollBarThickness = 0,
         AutomaticCanvasSize = Enum.AutomaticSize.Y,
         CanvasSize = UDim2.new(0, 0, 0, 0),
     })
-    C("UIListLayout", { Parent = TabHolder, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 4) })
-    C("UIPadding", { Parent = TabHolder, PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12), PaddingTop = UDim.new(0, 2) })
+    New("UIListLayout", { Parent = TabScroll, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 4) })
+    New("UIPadding", { Parent = TabScroll, PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 14), PaddingTop = UDim.new(0, 2) })
 
-    local BottomInfo = C("Frame", {
-        Parent = Sidebar, BackgroundTransparency = 1,
+    local BottomArea = New("Frame", {
+        Parent = Side, BackgroundTransparency = 1,
         AnchorPoint = Vector2.new(0, 1),
         Position = UDim2.new(0, 0, 1, 0),
-        Size = UDim2.new(1, 0, 0, 56),
+        Size = UDim2.new(1, 0, 0, 68),
     })
-    C("Frame", {
-        Parent = BottomInfo, BackgroundColor3 = Theme.Stroke,
-        Position = UDim2.new(0, 18, 0, 0),
-        Size = UDim2.new(1, -36, 0, 1),
-        BackgroundTransparency = 0.4,
+    New("Frame", {
+        Parent = BottomArea, BackgroundColor3 = Color.Outline,
+        Position = UDim2.new(0, 20, 0, 0),
+        Size = UDim2.new(1, -40, 0, 1), BackgroundTransparency = 0.5,
     })
 
-    local UserPfp = C("Frame", {
-        Parent = BottomInfo, BackgroundColor3 = Theme.Elevated,
-        Position = UDim2.new(0, 22, 0, 14),
-        Size = UDim2.new(0, 28, 0, 28),
+    local pfpHolder = New("Frame", {
+        Parent = BottomArea, BackgroundColor3 = Color.Elevated,
+        Position = UDim2.new(0, 24, 0, 16),
+        Size = UDim2.new(0, 36, 0, 36),
     })
-    C("UICorner", { Parent = UserPfp, CornerRadius = UDim.new(1, 0) })
+    New("UICorner", { Parent = pfpHolder, CornerRadius = UDim.new(1, 0) })
 
-    local PfpImg = C("ImageLabel", {
-        Parent = UserPfp, BackgroundTransparency = 1,
+    local pfpImg = New("ImageLabel", {
+        Parent = pfpHolder, BackgroundTransparency = 1,
         Size = UDim2.new(1, 0, 1, 0),
         Image = Players:GetUserThumbnailAsync(Players.LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48),
     })
-    C("UICorner", { Parent = PfpImg, CornerRadius = UDim.new(1, 0) })
+    New("UICorner", { Parent = pfpImg, CornerRadius = UDim.new(1, 0) })
 
-    C("TextLabel", {
-        Parent = BottomInfo, BackgroundTransparency = 1,
-        Position = UDim2.new(0, 58, 0, 14),
-        Size = UDim2.new(1, -78, 0, 16),
+    local statusDot = New("Frame", {
+        Parent = BottomArea, BackgroundColor3 = Color.Green,
+        Position = UDim2.new(0, 50, 0, 44),
+        Size = UDim2.new(0, 7, 0, 7),
+    })
+    New("UICorner", { Parent = statusDot, CornerRadius = UDim.new(1, 0) })
+    New("UIStroke", { Parent = statusDot, Color = Color.Surface, Thickness = 2 })
+    PulseAnim(statusDot)
+
+    New("TextLabel", {
+        Parent = BottomArea, BackgroundTransparency = 1,
+        Position = UDim2.new(0, 70, 0, 16),
+        Size = UDim2.new(1, -90, 0, 18),
         Font = Enum.Font.GothamBold,
         Text = Players.LocalPlayer.DisplayName,
-        TextColor3 = Theme.Text, TextSize = 12,
+        TextColor3 = Color.Text90, TextSize = 13,
         TextXAlignment = Enum.TextXAlignment.Left,
         TextTruncate = Enum.TextTruncate.AtEnd,
     })
-    C("TextLabel", {
-        Parent = BottomInfo, BackgroundTransparency = 1,
-        Position = UDim2.new(0, 58, 0, 30),
-        Size = UDim2.new(1, -78, 0, 14),
+    New("TextLabel", {
+        Parent = BottomArea, BackgroundTransparency = 1,
+        Position = UDim2.new(0, 70, 0, 34),
+        Size = UDim2.new(1, -90, 0, 14),
         Font = Enum.Font.Gotham,
-        Text = "Premium User",
-        TextColor3 = Theme.TextDim, TextSize = 11,
-        TextXAlignment = Enum.TextXAlignment.Left,
+        Text = "Online", TextColor3 = Color.Green,
+        TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left,
     })
 
-    local OnlineDot = C("Frame", {
-        Parent = BottomInfo, BackgroundColor3 = Theme.Green,
-        Position = UDim2.new(0, 42, 0, 36),
-        Size = UDim2.new(0, 8, 0, 8),
-    })
-    C("UICorner", { Parent = OnlineDot, CornerRadius = UDim.new(1, 0) })
-    C("UIStroke", { Parent = OnlineDot, Color = Theme.Card, Thickness = 2 })
-
-    local Content = C("Frame", {
-        Parent = Main, BackgroundTransparency = 1,
-        Position = UDim2.new(0, 201, 0, 0),
-        Size = UDim2.new(1, -201, 1, 0),
+    local Content = New("Frame", {
+        Parent = Root, BackgroundTransparency = 1,
+        Position = UDim2.new(0, 221, 0, 0),
+        Size = UDim2.new(1, -221, 1, 0),
     })
 
-    local TopBar = C("Frame", {
+    local TopBar = New("Frame", {
         Parent = Content, BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 0, 55),
+        Size = UDim2.new(1, 0, 0, 60),
     })
 
-    local TabTitleIcon = C("ImageLabel", {
+    local TabIcon = New("ImageLabel", {
         Parent = TopBar, BackgroundTransparency = 1,
-        Position = UDim2.new(0, 22, 0.5, -10),
-        Size = UDim2.new(0, 20, 0, 20),
+        Position = UDim2.new(0, 24, 0.5, -11),
+        Size = UDim2.new(0, 22, 0, 22),
         Image = "rbxassetid://7733960981",
-        ImageColor3 = Theme.Accent,
+        ImageColor3 = Color.Accent1,
     })
-    BA(TabTitleIcon, "ImageColor3")
+    Bind(TabIcon, "ImageColor3")
 
-    local TabTitle = C("TextLabel", {
+    local TabTitle = New("TextLabel", {
         Parent = TopBar, BackgroundTransparency = 1,
-        Position = UDim2.new(0, 50, 0, 0),
-        Size = UDim2.new(0.5, -50, 1, 0),
+        Position = UDim2.new(0, 56, 0, 0),
+        Size = UDim2.new(0.5, -56, 1, 0),
         Font = Enum.Font.GothamBold,
-        Text = "", TextColor3 = Theme.Text,
-        TextSize = 17, TextXAlignment = Enum.TextXAlignment.Left,
+        Text = "", TextColor3 = Color.White,
+        TextSize = 18, TextXAlignment = Enum.TextXAlignment.Left,
     })
 
-    local SearchBox = C("Frame", {
-        Parent = TopBar, BackgroundColor3 = Theme.Card,
+    local BreadCrumb = New("TextLabel", {
+        Parent = TopBar, BackgroundTransparency = 1,
         AnchorPoint = Vector2.new(1, 0.5),
-        Position = UDim2.new(1, -18, 0.5, 0),
-        Size = UDim2.new(0, 180, 0, 34),
-    })
-    C("UICorner", { Parent = SearchBox, CornerRadius = UDim.new(0, 12) })
-    C("UIStroke", { Parent = SearchBox, Color = Theme.Stroke, Thickness = 1, Transparency = 0.4 })
-
-    C("ImageLabel", {
-        Parent = SearchBox, BackgroundTransparency = 1,
-        Position = UDim2.new(0, 10, 0.5, -7),
-        Size = UDim2.new(0, 14, 0, 14),
-        Image = "rbxassetid://7072706663",
-        ImageColor3 = Theme.TextDim,
-    })
-
-    C("TextLabel", {
-        Parent = SearchBox, BackgroundTransparency = 1,
-        Position = UDim2.new(0, 30, 0, 0),
-        Size = UDim2.new(1, -40, 1, 0),
+        Position = UDim2.new(1, -24, 0.5, 0),
+        Size = UDim2.new(0, 0, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.XY,
         Font = Enum.Font.Gotham,
-        Text = "Search...", TextColor3 = Theme.TextDim,
-        TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left,
+        Text = "Home", TextColor3 = Color.Text40,
+        TextSize = 12,
     })
 
-    C("Frame", {
-        Parent = Content, BackgroundColor3 = Theme.Stroke,
-        Position = UDim2.new(0, 16, 0, 55),
-        Size = UDim2.new(1, -32, 0, 1),
-        BackgroundTransparency = 0.5,
+    New("Frame", {
+        Parent = Content, BackgroundColor3 = Color.Outline,
+        Position = UDim2.new(0, 18, 0, 60),
+        Size = UDim2.new(1, -36, 0, 1), BackgroundTransparency = 0.5,
     })
 
-    local TabContent = C("Frame", {
+    local TabArea = New("Frame", {
         Parent = Content, BackgroundTransparency = 1,
-        Position = UDim2.new(0, 0, 0, 60),
-        Size = UDim2.new(1, 0, 1, -60),
+        Position = UDim2.new(0, 0, 0, 65),
+        Size = UDim2.new(1, 0, 1, -65),
     })
 
-    local Fade = C("Frame", {
-        Parent = Content, BackgroundColor3 = Theme.Bg,
+    local Fade = New("Frame", {
+        Parent = Content, BackgroundColor3 = Color.Base,
         BackgroundTransparency = 1,
-        Position = UDim2.new(0, 0, 0, 60),
-        Size = UDim2.new(1, 0, 1, -60),
+        Position = UDim2.new(0, 0, 0, 65),
+        Size = UDim2.new(1, 0, 1, -65),
         ZIndex = 50,
     })
 
-    Drag(Main, TopBar)
+    MakeDrag(Root, TopBar)
 
-    Cn(UserInputService.InputBegan, function(i, g)
+    Hook(UserInputService.InputBegan, function(i, g)
         if g then return end
-        if i.KeyCode == W.ToggleKey then
+        if i.KeyCode == W.Key then
             W.Visible = not W.Visible
-            self.SG.Enabled = W.Visible
+            self.GUI.Enabled = W.Visible
         end
     end)
 
-    local function MakeSection(parent, scfg)
-        local S = {}
+    local function BuildSection(parent, sc)
+        local Sec = {}
 
-        local SF = C("Frame", {
-            Parent = parent, BackgroundColor3 = Theme.Card,
+        local Frame = New("Frame", {
+            Parent = parent, BackgroundColor3 = Color.Card,
             Size = UDim2.new(1, 0, 0, 0),
             AutomaticSize = Enum.AutomaticSize.Y,
-            LayoutOrder = scfg.Order or 0,
+            LayoutOrder = sc.Order or 0,
         })
-        C("UICorner", { Parent = SF, CornerRadius = UDim.new(0, 14) })
-        C("UIStroke", { Parent = SF, Color = Theme.Stroke, Thickness = 1, Transparency = 0.3 })
+        New("UICorner", { Parent = Frame, CornerRadius = UDim.new(0, 16) })
+        New("UIStroke", { Parent = Frame, Color = Color.Outline, Thickness = 1, Transparency = 0.35 })
 
-        local HGlow = C("Frame", {
-            Parent = SF, BackgroundColor3 = Theme.Accent,
-            Position = UDim2.new(0, 16, 0, 16),
-            Size = UDim2.new(0, 4, 0, 16),
+        local HeaderArea = New("Frame", {
+            Parent = Frame, BackgroundTransparency = 1,
+            Size = UDim2.new(1, 0, 0, 48),
         })
-        C("UICorner", { Parent = HGlow, CornerRadius = UDim.new(0, 3) })
-        BA(HGlow, "BackgroundColor3")
 
-        local HIcon = C("ImageLabel", {
-            Parent = SF, BackgroundTransparency = 1,
-            Position = UDim2.new(0, 28, 0, 14),
-            Size = UDim2.new(0, 18, 0, 18),
-            Image = scfg.Icon or "rbxassetid://7733960981",
-            ImageColor3 = Theme.Accent,
+        local AccBar = New("Frame", {
+            Parent = HeaderArea, BackgroundColor3 = Color.Accent1,
+            Position = UDim2.new(0, 18, 0.5, -9),
+            Size = UDim2.new(0, 4, 0, 18),
         })
-        BA(HIcon, "ImageColor3")
+        New("UICorner", { Parent = AccBar, CornerRadius = UDim.new(0, 3) })
+        New("UIGradient", {
+            Parent = AccBar,
+            Color = ColorSequence.new{
+                ColorSequenceKeypoint.new(0, Color.Accent1),
+                ColorSequenceKeypoint.new(1, Color.Accent2),
+            },
+            Rotation = 90,
+        })
+        Bind(AccBar, "BackgroundColor3")
 
-        C("TextLabel", {
-            Parent = SF, BackgroundTransparency = 1,
-            Position = UDim2.new(0, 52, 0, 12),
-            Size = UDim2.new(1, -68, 0, 22),
+        local SecIcon = New("ImageLabel", {
+            Parent = HeaderArea, BackgroundTransparency = 1,
+            Position = UDim2.new(0, 32, 0.5, -10),
+            Size = UDim2.new(0, 20, 0, 20),
+            Image = sc.Icon or "rbxassetid://7733960981",
+            ImageColor3 = Color.Accent1,
+        })
+        Bind(SecIcon, "ImageColor3")
+
+        New("TextLabel", {
+            Parent = HeaderArea, BackgroundTransparency = 1,
+            Position = UDim2.new(0, 60, 0, 0),
+            Size = UDim2.new(1, -76, 1, 0),
             Font = Enum.Font.GothamBold,
-            Text = scfg.Name or "Section",
-            TextColor3 = Theme.Text, TextSize = 14,
+            Text = sc.Name or "Section",
+            TextColor3 = Color.White, TextSize = 14,
             TextXAlignment = Enum.TextXAlignment.Left,
         })
 
-        C("Frame", {
-            Parent = SF, BackgroundColor3 = Theme.Stroke,
-            Position = UDim2.new(0, 14, 0, 46),
-            Size = UDim2.new(1, -28, 0, 1),
-            BackgroundTransparency = 0.5,
+        New("Frame", {
+            Parent = Frame, BackgroundColor3 = Color.Outline,
+            Position = UDim2.new(0, 16, 0, 48),
+            Size = UDim2.new(1, -32, 0, 1), BackgroundTransparency = 0.5,
         })
 
-        local EH = C("Frame", {
-            Parent = SF, BackgroundTransparency = 1,
-            Position = UDim2.new(0, 0, 0, 52),
+        local Holder = New("Frame", {
+            Parent = Frame, BackgroundTransparency = 1,
+            Position = UDim2.new(0, 0, 0, 54),
             Size = UDim2.new(1, 0, 0, 0),
             AutomaticSize = Enum.AutomaticSize.Y,
         })
-        C("UIListLayout", { Parent = EH, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 2) })
-        C("UIPadding", { Parent = EH, PaddingBottom = UDim.new(0, 14), PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 14) })
+        New("UIListLayout", { Parent = Holder, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 0) })
+        New("UIPadding", { Parent = Holder, PaddingBottom = UDim.new(0, 14), PaddingLeft = UDim.new(0, 16), PaddingRight = UDim.new(0, 16) })
 
         local function Sep()
-            C("Frame", {
-                Parent = EH, BackgroundColor3 = Theme.Stroke,
+            New("Frame", {
+                Parent = Holder, BackgroundColor3 = Color.Outline,
                 Size = UDim2.new(1, 0, 0, 1), BackgroundTransparency = 0.6,
             })
         end
 
-        function S:AddToggle(tc)
-            local flag = tc.Flag or NF()
+        function Sec:Toggle(tc)
+            local flag = tc.Flag or Flag()
             local on = tc.Default or false
-            Osama.Flags[flag] = on
+            Library.Flags[flag] = on
 
-            local F = C("Frame", { Parent = EH, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 40) })
+            local Row = New("Frame", {
+                Parent = Holder, BackgroundColor3 = Color.Card,
+                Size = UDim2.new(1, 0, 0, 44),
+            })
+            New("UICorner", { Parent = Row, CornerRadius = UDim.new(0, 12) })
 
-            local Ic = C("ImageLabel", {
-                Parent = F, BackgroundTransparency = 1,
-                Position = UDim2.new(0, 2, 0.5, -8),
-                Size = UDim2.new(0, 16, 0, 16),
+            local Ic = New("ImageLabel", {
+                Parent = Row, BackgroundTransparency = 1,
+                Position = UDim2.new(0, 6, 0.5, -9),
+                Size = UDim2.new(0, 18, 0, 18),
                 Image = tc.Icon or "rbxassetid://7733717078",
-                ImageColor3 = Theme.TextDim,
+                ImageColor3 = Color.Text40,
             })
 
-            C("TextLabel", {
-                Parent = F, BackgroundTransparency = 1,
-                Position = UDim2.new(0, 26, 0, 0),
-                Size = UDim2.new(1, -76, 1, 0),
+            New("TextLabel", {
+                Parent = Row, BackgroundTransparency = 1,
+                Position = UDim2.new(0, 32, 0, 0),
+                Size = UDim2.new(1, -90, 1, 0),
                 Font = Enum.Font.Gotham,
                 Text = tc.Name or "Toggle",
-                TextColor3 = Theme.Text, TextSize = 13,
+                TextColor3 = Color.Text90, TextSize = 13,
                 TextXAlignment = Enum.TextXAlignment.Left,
             })
 
-            local Track = C("Frame", {
-                Parent = F, BackgroundColor3 = Theme.Elevated,
+            local Track = New("Frame", {
+                Parent = Row, BackgroundColor3 = Color.Elevated,
                 AnchorPoint = Vector2.new(1, 0.5),
-                Position = UDim2.new(1, 0, 0.5, 0),
-                Size = UDim2.new(0, 44, 0, 24),
+                Position = UDim2.new(1, -6, 0.5, 0),
+                Size = UDim2.new(0, 48, 0, 26),
             })
-            C("UICorner", { Parent = Track, CornerRadius = UDim.new(1, 0) })
+            New("UICorner", { Parent = Track, CornerRadius = UDim.new(1, 0) })
 
-            local Knob = C("Frame", {
-                Parent = Track, BackgroundColor3 = Theme.TextDim,
-                Position = UDim2.new(0, 3, 0.5, -9),
+            local Knob = New("Frame", {
+                Parent = Track, BackgroundColor3 = Color.Text40,
+                Position = UDim2.new(0, 4, 0.5, -9),
                 Size = UDim2.new(0, 18, 0, 18),
             })
-            C("UICorner", { Parent = Knob, CornerRadius = UDim.new(1, 0) })
-
-            local KnobGlow = C("ImageLabel", {
-                Parent = Knob, BackgroundTransparency = 1,
-                Position = UDim2.new(0.5, -12, 0.5, -12),
-                Size = UDim2.new(0, 24, 0, 24),
-                Image = "rbxassetid://6015897843",
-                ImageColor3 = Theme.Accent, ImageTransparency = 1,
-                ScaleType = Enum.ScaleType.Slice,
-                SliceCenter = Rect.new(49, 49, 450, 450),
-            })
+            New("UICorner", { Parent = Knob, CornerRadius = UDim.new(1, 0) })
 
             local function Upd()
                 if on then
-                    T(Track, {BackgroundColor3 = Theme.Accent}, 0.25)
-                    T(Knob, {Position = UDim2.new(1, -21, 0.5, -9), BackgroundColor3 = Theme.Bg}, 0.25)
-                    T(Ic, {ImageColor3 = Theme.Accent}, 0.2)
-                    T(KnobGlow, {ImageTransparency = 0.7}, 0.3)
+                    Anim(Track, {BackgroundColor3 = Color.Accent1}, 0.3)
+                    Anim(Knob, {Position = UDim2.new(1, -22, 0.5, -9), BackgroundColor3 = Color.White}, 0.3)
+                    Anim(Ic, {ImageColor3 = Color.Accent1}, 0.25)
                 else
-                    T(Track, {BackgroundColor3 = Theme.Elevated}, 0.25)
-                    T(Knob, {Position = UDim2.new(0, 3, 0.5, -9), BackgroundColor3 = Theme.TextDim}, 0.25)
-                    T(Ic, {ImageColor3 = Theme.TextDim}, 0.2)
-                    T(KnobGlow, {ImageTransparency = 1}, 0.3)
+                    Anim(Track, {BackgroundColor3 = Color.Elevated}, 0.3)
+                    Anim(Knob, {Position = UDim2.new(0, 4, 0.5, -9), BackgroundColor3 = Color.Text40}, 0.3)
+                    Anim(Ic, {ImageColor3 = Color.Text40}, 0.25)
                 end
-                Osama.Flags[flag] = on
+                Library.Flags[flag] = on
                 if tc.Callback then tc.Callback(on) end
             end
 
-            C("TextButton", {
-                Parent = F, BackgroundTransparency = 1,
+            local Btn = New("TextButton", {
+                Parent = Row, BackgroundTransparency = 1,
                 Size = UDim2.new(1, 0, 1, 0), Text = "",
-            }).MouseButton1Click:Connect(function()
-                on = not on; Upd()
-            end)
+            })
+
+            Btn.MouseEnter:Connect(function() if not on then Anim(Row, {BackgroundColor3 = Color.CardHover}, 0.2) end end)
+            Btn.MouseLeave:Connect(function() Anim(Row, {BackgroundColor3 = Color.Card}, 0.2) end)
+            Btn.MouseButton1Click:Connect(function() on = not on; Upd() end)
 
             Upd()
-            Osama.ConfigFlags[flag] = function(v) on = v; Upd() end
+            Library.ConfigFlags[flag] = function(v) on = v; Upd() end
             if tc.Separator ~= false then Sep() end
             return { Set = function(v) on = v; Upd() end, Get = function() return on end }
         end
 
-        function S:AddSlider(sc)
-            local flag = sc.Flag or NF()
+        function Sec:Slider(sc)
+            local flag = sc.Flag or Flag()
             local mn, mx, inc = sc.Min or 0, sc.Max or 100, sc.Increment or 1
             local val = sc.Default or mn
             local sfx = sc.Suffix or ""
-            Osama.Flags[flag] = val
+            Library.Flags[flag] = val
 
-            local F = C("Frame", { Parent = EH, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 52) })
+            local Row = New("Frame", { Parent = Holder, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 56) })
 
-            C("ImageLabel", {
-                Parent = F, BackgroundTransparency = 1,
-                Position = UDim2.new(0, 2, 0, 4),
-                Size = UDim2.new(0, 14, 0, 14),
+            New("ImageLabel", {
+                Parent = Row, BackgroundTransparency = 1,
+                Position = UDim2.new(0, 6, 0, 6),
+                Size = UDim2.new(0, 16, 0, 16),
                 Image = sc.Icon or "rbxassetid://7734053495",
-                ImageColor3 = Theme.TextDim,
+                ImageColor3 = Color.Text40,
             })
 
-            C("TextLabel", {
-                Parent = F, BackgroundTransparency = 1,
-                Position = UDim2.new(0, 24, 0, 0),
-                Size = UDim2.new(0.55, 0, 0, 22),
+            New("TextLabel", {
+                Parent = Row, BackgroundTransparency = 1,
+                Position = UDim2.new(0, 30, 0, 2),
+                Size = UDim2.new(0.55, 0, 0, 24),
                 Font = Enum.Font.Gotham, Text = sc.Name or "Slider",
-                TextColor3 = Theme.Text, TextSize = 13,
+                TextColor3 = Color.Text90, TextSize = 13,
                 TextXAlignment = Enum.TextXAlignment.Left,
             })
 
-            local VL = C("TextLabel", {
-                Parent = F, BackgroundTransparency = 1,
-                Position = UDim2.new(0.55, 0, 0, 0),
-                Size = UDim2.new(0.45, 0, 0, 22),
+            local VL = New("TextLabel", {
+                Parent = Row, BackgroundTransparency = 1,
+                Position = UDim2.new(0.55, 0, 0, 2),
+                Size = UDim2.new(0.45, -6, 0, 24),
                 Font = Enum.Font.GothamBold,
                 Text = tostring(val) .. sfx,
-                TextColor3 = Theme.Accent, TextSize = 13,
+                TextColor3 = Color.Accent1, TextSize = 13,
                 TextXAlignment = Enum.TextXAlignment.Right,
             })
-            BA(VL, "TextColor3")
+            Bind(VL, "TextColor3")
 
-            local SBG = C("Frame", {
-                Parent = F, BackgroundColor3 = Theme.Elevated,
-                Position = UDim2.new(0, 2, 0, 32),
-                Size = UDim2.new(1, -4, 0, 8),
+            local Bar = New("Frame", {
+                Parent = Row, BackgroundColor3 = Color.Elevated,
+                Position = UDim2.new(0, 6, 0, 34),
+                Size = UDim2.new(1, -12, 0, 10),
             })
-            C("UICorner", { Parent = SBG, CornerRadius = UDim.new(1, 0) })
+            New("UICorner", { Parent = Bar, CornerRadius = UDim.new(1, 0) })
 
-            local Fill = C("Frame", {
-                Parent = SBG, BackgroundColor3 = Theme.Accent,
+            local Fill = New("Frame", {
+                Parent = Bar, BackgroundColor3 = Color.Accent1,
                 Size = UDim2.new(0, 0, 1, 0),
             })
-            C("UICorner", { Parent = Fill, CornerRadius = UDim.new(1, 0) })
-            C("UIGradient", {
+            New("UICorner", { Parent = Fill, CornerRadius = UDim.new(1, 0) })
+            New("UIGradient", {
                 Parent = Fill,
                 Color = ColorSequence.new{
-                    ColorSequenceKeypoint.new(0, Color3.fromRGB(180, 180, 190)),
-                    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
+                    ColorSequenceKeypoint.new(0, Color.Accent1),
+                    ColorSequenceKeypoint.new(1, Color.Accent2),
                 },
             })
-            BA(Fill, "BackgroundColor3")
+            Bind(Fill, "BackgroundColor3")
 
-            local SK = C("Frame", {
-                Parent = Fill, BackgroundColor3 = Theme.Text,
+            local Dot = New("Frame", {
+                Parent = Fill, BackgroundColor3 = Color.White,
                 AnchorPoint = Vector2.new(1, 0.5),
                 Position = UDim2.new(1, 0, 0.5, 0),
-                Size = UDim2.new(0, 16, 0, 16),
+                Size = UDim2.new(0, 18, 0, 18),
             })
-            C("UICorner", { Parent = SK, CornerRadius = UDim.new(1, 0) })
-            C("UIStroke", { Parent = SK, Color = Theme.Accent, Thickness = 2, Transparency = 0.5 })
+            New("UICorner", { Parent = Dot, CornerRadius = UDim.new(1, 0) })
+            New("UIStroke", { Parent = Dot, Color = Color.Accent1, Thickness = 2.5, Transparency = 0.3 })
 
             local drag = false
 
             local function SV(v)
-                val = math.clamp(Rnd(v, inc), mn, mx)
+                val = math.clamp(Round(v, inc), mn, mx)
                 local p = (val - mn) / (mx - mn)
-                T(Fill, {Size = UDim2.new(p, 0, 1, 0)}, 0.06, Enum.EasingStyle.Linear)
+                Anim(Fill, {Size = UDim2.new(p, 0, 1, 0)}, 0.05, Enum.EasingStyle.Linear)
                 VL.Text = tostring(val) .. sfx
-                Osama.Flags[flag] = val
+                Library.Flags[flag] = val
                 if sc.Callback then sc.Callback(val) end
             end
 
-            C("TextButton", {
-                Parent = SBG, BackgroundTransparency = 1,
-                Size = UDim2.new(1, 0, 1, 20),
-                Position = UDim2.new(0, 0, 0.5, -10),
+            New("TextButton", {
+                Parent = Bar, BackgroundTransparency = 1,
+                Size = UDim2.new(1, 0, 1, 24),
+                Position = UDim2.new(0, 0, 0.5, -12),
                 Text = "", ZIndex = 2,
             }).MouseButton1Down:Connect(function() drag = true end)
 
-            Cn(UserInputService.InputEnded, function(i)
+            Hook(UserInputService.InputEnded, function(i)
                 if i.UserInputType == Enum.UserInputType.MouseButton1 then drag = false end
             end)
 
-            Cn(UserInputService.InputChanged, function(i)
+            Hook(UserInputService.InputChanged, function(i)
                 if drag and i.UserInputType == Enum.UserInputType.MouseMovement then
-                    local p = math.clamp((i.Position.X - SBG.AbsolutePosition.X) / SBG.AbsoluteSize.X, 0, 1)
+                    local p = math.clamp((i.Position.X - Bar.AbsolutePosition.X) / Bar.AbsoluteSize.X, 0, 1)
                     SV(mn + (mx - mn) * p)
                 end
             end)
 
             SV(val)
-            Osama.ConfigFlags[flag] = SV
+            Library.ConfigFlags[flag] = SV
             if sc.Separator ~= false then Sep() end
             return { Set = SV, Get = function() return val end }
         end
 
-        function S:AddDropdown(dc)
-            local flag = dc.Flag or NF()
+        function Sec:Dropdown(dc)
+            local flag = dc.Flag or Flag()
             local multi = dc.Multi or false
             local opts = dc.Options or {}
             local sel = dc.Default or (multi and {} or opts[1])
-            local opn = false
-            Osama.Flags[flag] = sel
+            local open = false
+            Library.Flags[flag] = sel
 
-            local F = C("Frame", { Parent = EH, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 40) })
+            local Row = New("Frame", { Parent = Holder, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 44) })
 
-            C("ImageLabel", {
-                Parent = F, BackgroundTransparency = 1,
-                Position = UDim2.new(0, 2, 0.5, -8),
-                Size = UDim2.new(0, 14, 0, 14),
+            New("ImageLabel", {
+                Parent = Row, BackgroundTransparency = 1,
+                Position = UDim2.new(0, 6, 0.5, -8),
+                Size = UDim2.new(0, 16, 0, 16),
                 Image = dc.Icon or "rbxassetid://7072706663",
-                ImageColor3 = Theme.TextDim,
+                ImageColor3 = Color.Text40,
             })
 
-            C("TextLabel", {
-                Parent = F, BackgroundTransparency = 1,
-                Position = UDim2.new(0, 24, 0, 0),
+            New("TextLabel", {
+                Parent = Row, BackgroundTransparency = 1,
+                Position = UDim2.new(0, 30, 0, 0),
                 Size = UDim2.new(0.35, 0, 1, 0),
                 Font = Enum.Font.Gotham, Text = dc.Name or "Dropdown",
-                TextColor3 = Theme.Text, TextSize = 13,
+                TextColor3 = Color.Text90, TextSize = 13,
                 TextXAlignment = Enum.TextXAlignment.Left,
             })
 
-            local DB = C("TextButton", {
-                Parent = F, BackgroundColor3 = Theme.Elevated,
+            local DB = New("TextButton", {
+                Parent = Row, BackgroundColor3 = Color.Input,
                 AnchorPoint = Vector2.new(1, 0.5),
                 Position = UDim2.new(1, 0, 0.5, 0),
-                Size = UDim2.new(0.58, 0, 0, 30),
+                Size = UDim2.new(0.58, 0, 0, 32),
                 Text = "", AutoButtonColor = false,
             })
-            C("UICorner", { Parent = DB, CornerRadius = UDim.new(0, 10) })
-            C("UIStroke", { Parent = DB, Color = Theme.Stroke, Thickness = 1, Transparency = 0.4 })
+            New("UICorner", { Parent = DB, CornerRadius = UDim.new(0, 12) })
+            New("UIStroke", { Parent = DB, Color = Color.Outline, Thickness = 1, Transparency = 0.4 })
 
-            local ST = C("TextLabel", {
+            local ST = New("TextLabel", {
                 Parent = DB, BackgroundTransparency = 1,
-                Position = UDim2.new(0, 12, 0, 0),
-                Size = UDim2.new(1, -36, 1, 0),
+                Position = UDim2.new(0, 14, 0, 0),
+                Size = UDim2.new(1, -40, 1, 0),
                 Font = Enum.Font.Gotham,
                 Text = multi and table.concat(sel, ", ") or tostring(sel or ""),
-                TextColor3 = Theme.TextSoft, TextSize = 12,
+                TextColor3 = Color.Text70, TextSize = 12,
                 TextXAlignment = Enum.TextXAlignment.Left,
                 TextTruncate = Enum.TextTruncate.AtEnd,
             })
 
-            local Arr = C("ImageLabel", {
+            local Arr = New("ImageLabel", {
                 Parent = DB, BackgroundTransparency = 1,
                 AnchorPoint = Vector2.new(1, 0.5),
-                Position = UDim2.new(1, -8, 0.5, 0),
+                Position = UDim2.new(1, -10, 0.5, 0),
                 Size = UDim2.new(0, 12, 0, 12),
                 Image = "rbxassetid://7072706663",
-                ImageColor3 = Theme.TextDim, Rotation = 90,
+                ImageColor3 = Color.Text40, Rotation = 90,
             })
 
-            local Pop = C("Frame", {
-                Parent = DH, BackgroundColor3 = Theme.Card,
+            local Pop = New("Frame", {
+                Parent = Library.Drop, BackgroundColor3 = Color.Surface,
                 Size = UDim2.new(0, 0, 0, 0),
                 ClipsDescendants = true, ZIndex = 100,
             })
-            C("UICorner", { Parent = Pop, CornerRadius = UDim.new(0, 12) })
-            C("UIStroke", { Parent = Pop, Color = Theme.Stroke, Thickness = 1, Transparency = 0.3 })
-            C("UIListLayout", { Parent = Pop, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 2) })
-            C("UIPadding", { Parent = Pop, PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 6), PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) })
+            New("UICorner", { Parent = Pop, CornerRadius = UDim.new(0, 14) })
+            New("UIStroke", { Parent = Pop, Color = Color.Outline, Thickness = 1.5, Transparency = 0.2 })
+            New("UIListLayout", { Parent = Pop, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 3) })
+            New("UIPadding", { Parent = Pop, PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 8), PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) })
 
             local OB = {}
-            local TH = 12
+            local TH = 16
 
             local function UD()
-                if multi then
-                    ST.Text = #sel > 0 and table.concat(sel, ", ") or "None"
-                else
-                    ST.Text = tostring(sel or "")
-                end
-                Osama.Flags[flag] = sel
+                if multi then ST.Text = #sel > 0 and table.concat(sel, ", ") or "None"
+                else ST.Text = tostring(sel or "") end
+                Library.Flags[flag] = sel
                 if dc.Callback then dc.Callback(sel) end
             end
 
             local function BO(ol)
                 for _, b in pairs(OB) do b:Destroy() end
-                OB = {}; TH = 12
+                OB = {}; TH = 16
                 for _, o in ipairs(ol) do
-                    local OBtn = C("TextButton", {
-                        Parent = Pop, BackgroundColor3 = Theme.Elevated,
+                    local OBtn = New("TextButton", {
+                        Parent = Pop, BackgroundColor3 = Color.Elevated,
                         BackgroundTransparency = 1,
-                        Size = UDim2.new(1, 0, 0, 30),
-                        Font = Enum.Font.Gotham, Text = "  " .. o,
-                        TextColor3 = Theme.TextSoft, TextSize = 12,
+                        Size = UDim2.new(1, 0, 0, 32),
+                        Font = Enum.Font.Gotham, Text = "   " .. o,
+                        TextColor3 = Color.Text70, TextSize = 12,
                         TextXAlignment = Enum.TextXAlignment.Left,
                         AutoButtonColor = false, ZIndex = 101,
                     })
-                    C("UICorner", { Parent = OBtn, CornerRadius = UDim.new(0, 8) })
-                    TH = TH + 32; OB[o] = OBtn
+                    New("UICorner", { Parent = OBtn, CornerRadius = UDim.new(0, 10) })
+                    TH = TH + 35; OB[o] = OBtn
 
-                    OBtn.MouseEnter:Connect(function() T(OBtn, {BackgroundTransparency = 0}, 0.12) end)
+                    OBtn.MouseEnter:Connect(function() Anim(OBtn, {BackgroundTransparency = 0}, 0.15) end)
                     OBtn.MouseLeave:Connect(function()
                         local iS = multi and table.find(sel, o) or sel == o
-                        if not iS then T(OBtn, {BackgroundTransparency = 1}, 0.12) end
+                        if not iS then Anim(OBtn, {BackgroundTransparency = 1}, 0.15) end
                     end)
-
                     OBtn.MouseButton1Click:Connect(function()
                         if multi then
                             local idx = table.find(sel, o)
-                            if idx then
-                                table.remove(sel, idx)
-                                T(OBtn, {TextColor3 = Theme.TextSoft, BackgroundTransparency = 1}, 0.12)
-                            else
-                                table.insert(sel, o)
-                                T(OBtn, {TextColor3 = Theme.Text, BackgroundTransparency = 0}, 0.12)
-                            end
+                            if idx then table.remove(sel, idx); Anim(OBtn, {TextColor3 = Color.Text70, BackgroundTransparency = 1}, 0.15)
+                            else table.insert(sel, o); Anim(OBtn, {TextColor3 = Color.Accent1, BackgroundTransparency = 0}, 0.15) end
                         else
-                            for _, b in pairs(OB) do T(b, {TextColor3 = Theme.TextSoft, BackgroundTransparency = 1}, 0.12) end
-                            sel = o
-                            T(OBtn, {TextColor3 = Theme.Text, BackgroundTransparency = 0}, 0.12)
-                            task.wait(0.08)
-                            opn = false
-                            T(Pop, {Size = UDim2.new(0, DB.AbsoluteSize.X, 0, 0)}, 0.2)
-                            T(Arr, {Rotation = 90}, 0.2)
+                            for _, b in pairs(OB) do Anim(b, {TextColor3 = Color.Text70, BackgroundTransparency = 1}, 0.15) end
+                            sel = o; Anim(OBtn, {TextColor3 = Color.Accent1, BackgroundTransparency = 0}, 0.15)
+                            task.wait(0.1); open = false
+                            Anim(Pop, {Size = UDim2.new(0, DB.AbsoluteSize.X, 0, 0)}, 0.2)
+                            Anim(Arr, {Rotation = 90}, 0.2)
                         end
                         UD()
                     end)
-
                     local iS = multi and table.find(sel, o) or sel == o
-                    if iS then OBtn.TextColor3 = Theme.Text; OBtn.BackgroundTransparency = 0 end
+                    if iS then OBtn.TextColor3 = Color.Accent1; OBtn.BackgroundTransparency = 0 end
                 end
             end
 
             BO(opts)
 
+            DB.MouseEnter:Connect(function() Anim(DB, {BackgroundColor3 = Color.Elevated}, 0.15) end)
+            DB.MouseLeave:Connect(function() Anim(DB, {BackgroundColor3 = Color.Input}, 0.15) end)
             DB.MouseButton1Click:Connect(function()
-                opn = not opn
-                Pop.Position = UDim2.fromOffset(DB.AbsolutePosition.X, DB.AbsolutePosition.Y + DB.AbsoluteSize.Y + 4)
-                if opn then
-                    T(Pop, {Size = UDim2.new(0, DB.AbsoluteSize.X, 0, math.min(TH, 200))}, 0.25)
-                    T(Arr, {Rotation = 270}, 0.25)
+                open = not open
+                Pop.Position = UDim2.fromOffset(DB.AbsolutePosition.X, DB.AbsolutePosition.Y + DB.AbsoluteSize.Y + 6)
+                if open then
+                    Anim(Pop, {Size = UDim2.new(0, DB.AbsoluteSize.X, 0, math.min(TH, 220))}, 0.25)
+                    Anim(Arr, {Rotation = 270}, 0.25)
                 else
-                    T(Pop, {Size = UDim2.new(0, DB.AbsoluteSize.X, 0, 0)}, 0.18)
-                    T(Arr, {Rotation = 90}, 0.18)
+                    Anim(Pop, {Size = UDim2.new(0, DB.AbsoluteSize.X, 0, 0)}, 0.18)
+                    Anim(Arr, {Rotation = 90}, 0.18)
                 end
             end)
 
             UD()
-
-            Osama.ConfigFlags[flag] = function(v)
+            Library.ConfigFlags[flag] = function(v)
                 sel = v
                 for _, b in pairs(OB) do
-                    local iS = multi and table.find(sel, b.Text:sub(3)) or sel == b.Text:sub(3)
-                    b.TextColor3 = iS and Theme.Text or Theme.TextSoft
+                    local iS = multi and table.find(sel, b.Text:sub(4)) or sel == b.Text:sub(4)
+                    b.TextColor3 = iS and Color.Accent1 or Color.Text70
                     b.BackgroundTransparency = iS and 0 or 1
                 end
                 UD()
             end
-
             if dc.Separator ~= false then Sep() end
             return { Set = function(v) sel = v; UD() end, Refresh = function(no) opts = no; BO(no) end }
         end
 
-        function S:AddButton(bc)
-            local BF = C("Frame", { Parent = EH, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 40) })
+        function Sec:Button(bc)
+            local Row = New("Frame", { Parent = Holder, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 44) })
 
-            local Btn = C("TextButton", {
-                Parent = BF, BackgroundColor3 = Theme.Elevated,
-                Size = UDim2.new(1, 0, 0, 34),
+            local Btn = New("TextButton", {
+                Parent = Row, BackgroundColor3 = Color.Elevated,
+                Size = UDim2.new(1, 0, 0, 36),
                 AnchorPoint = Vector2.new(0, 0.5),
                 Position = UDim2.new(0, 0, 0.5, 0),
                 Text = "", AutoButtonColor = false,
             })
-            C("UICorner", { Parent = Btn, CornerRadius = UDim.new(0, 10) })
-            C("UIStroke", { Parent = Btn, Color = Theme.Stroke, Thickness = 1, Transparency = 0.4 })
+            New("UICorner", { Parent = Btn, CornerRadius = UDim.new(0, 12) })
+            New("UIStroke", { Parent = Btn, Color = Color.Outline, Thickness = 1, Transparency = 0.4 })
 
-            C("ImageLabel", {
+            New("ImageLabel", {
                 Parent = Btn, BackgroundTransparency = 1,
-                Position = UDim2.new(0, 12, 0.5, -7),
-                Size = UDim2.new(0, 14, 0, 14),
+                Position = UDim2.new(0, 14, 0.5, -8),
+                Size = UDim2.new(0, 16, 0, 16),
                 Image = bc.Icon or "rbxassetid://7733717078",
-                ImageColor3 = Theme.TextDim,
+                ImageColor3 = Color.Text40,
             })
 
-            C("TextLabel", {
+            New("TextLabel", {
                 Parent = Btn, BackgroundTransparency = 1,
-                Position = UDim2.new(0, 34, 0, 0),
-                Size = UDim2.new(1, -44, 1, 0),
+                Position = UDim2.new(0, 38, 0, 0),
+                Size = UDim2.new(1, -48, 1, 0),
                 Font = Enum.Font.GothamBold,
                 Text = bc.Name or "Button",
-                TextColor3 = Theme.Text, TextSize = 13,
+                TextColor3 = Color.Text90, TextSize = 13,
                 TextXAlignment = Enum.TextXAlignment.Left,
             })
 
-            Btn.MouseEnter:Connect(function() T(Btn, {BackgroundColor3 = Theme.CardLight}, 0.15) end)
-            Btn.MouseLeave:Connect(function() T(Btn, {BackgroundColor3 = Theme.Elevated}, 0.15) end)
+            Btn.MouseEnter:Connect(function() Anim(Btn, {BackgroundColor3 = Color.CardHover}, 0.15) end)
+            Btn.MouseLeave:Connect(function() Anim(Btn, {BackgroundColor3 = Color.Elevated}, 0.15) end)
             Btn.MouseButton1Click:Connect(function()
-                T(Btn, {BackgroundColor3 = Theme.Accent}, 0.08)
-                task.wait(0.1)
-                T(Btn, {BackgroundColor3 = Theme.Elevated}, 0.15)
+                Anim(Btn, {BackgroundColor3 = Color.Accent1}, 0.08)
+                task.wait(0.12)
+                Anim(Btn, {BackgroundColor3 = Color.Elevated}, 0.2)
                 if bc.Callback then bc.Callback() end
             end)
 
             if bc.Separator ~= false then Sep() end
         end
 
-        function S:AddTextBox(tc)
-            local flag = tc.Flag or NF()
+        function Sec:TextBox(tc)
+            local flag = tc.Flag or Flag()
             local val = tc.Default or ""
-            Osama.Flags[flag] = val
+            Library.Flags[flag] = val
 
-            local F = C("Frame", { Parent = EH, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 40) })
+            local Row = New("Frame", { Parent = Holder, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 44) })
 
-            C("ImageLabel", {
-                Parent = F, BackgroundTransparency = 1,
-                Position = UDim2.new(0, 2, 0.5, -7),
-                Size = UDim2.new(0, 14, 0, 14),
-                Image = tc.Icon or "rbxassetid://7734053495",
-                ImageColor3 = Theme.TextDim,
-            })
-
-            C("TextLabel", {
-                Parent = F, BackgroundTransparency = 1,
-                Position = UDim2.new(0, 24, 0, 0),
+            New("TextLabel", {
+                Parent = Row, BackgroundTransparency = 1,
+                Position = UDim2.new(0, 6, 0, 0),
                 Size = UDim2.new(0.35, 0, 1, 0),
                 Font = Enum.Font.Gotham, Text = tc.Name or "Input",
-                TextColor3 = Theme.Text, TextSize = 13,
+                TextColor3 = Color.Text90, TextSize = 13,
                 TextXAlignment = Enum.TextXAlignment.Left,
             })
 
-            local Inp = C("TextBox", {
-                Parent = F, BackgroundColor3 = Theme.Elevated,
+            local Inp = New("TextBox", {
+                Parent = Row, BackgroundColor3 = Color.Input,
                 AnchorPoint = Vector2.new(1, 0.5),
                 Position = UDim2.new(1, 0, 0.5, 0),
-                Size = UDim2.new(0.58, 0, 0, 30),
+                Size = UDim2.new(0.6, 0, 0, 32),
                 Font = Enum.Font.Gotham, Text = val,
-                PlaceholderText = tc.Placeholder or "...",
-                PlaceholderColor3 = Theme.TextDim,
-                TextColor3 = Theme.TextSoft, TextSize = 12,
+                PlaceholderText = tc.Placeholder or "type here...",
+                PlaceholderColor3 = Color.Text20,
+                TextColor3 = Color.Text70, TextSize = 12,
                 ClearTextOnFocus = false,
             })
-            C("UICorner", { Parent = Inp, CornerRadius = UDim.new(0, 10) })
-            C("UIStroke", { Parent = Inp, Color = Theme.Stroke, Thickness = 1, Transparency = 0.4 })
-            C("UIPadding", { Parent = Inp, PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) })
+            New("UICorner", { Parent = Inp, CornerRadius = UDim.new(0, 12) })
+            New("UIStroke", { Parent = Inp, Color = Color.Outline, Thickness = 1, Transparency = 0.4 })
+            New("UIPadding", { Parent = Inp, PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) })
 
             Inp.Focused:Connect(function()
-                T(Inp, {TextColor3 = Theme.Text}, 0.15)
+                Anim(Inp, {TextColor3 = Color.White}, 0.15)
                 local s = Inp:FindFirstChildOfClass("UIStroke")
-                if s then T(s, {Color = Theme.Accent, Transparency = 0}, 0.15) end
+                if s then Anim(s, {Color = Color.Accent1, Transparency = 0}, 0.15) end
             end)
             Inp.FocusLost:Connect(function()
-                T(Inp, {TextColor3 = Theme.TextSoft}, 0.15)
+                Anim(Inp, {TextColor3 = Color.Text70}, 0.15)
                 local s = Inp:FindFirstChildOfClass("UIStroke")
-                if s then T(s, {Color = Theme.Stroke, Transparency = 0.4}, 0.15) end
-                val = Inp.Text; Osama.Flags[flag] = val
+                if s then Anim(s, {Color = Color.Outline, Transparency = 0.4}, 0.15) end
+                val = Inp.Text; Library.Flags[flag] = val
                 if tc.Callback then tc.Callback(val) end
             end)
 
-            Osama.ConfigFlags[flag] = function(v) Inp.Text = v; val = v; Osama.Flags[flag] = v end
+            Library.ConfigFlags[flag] = function(v) Inp.Text = v; val = v; Library.Flags[flag] = v end
             if tc.Separator ~= false then Sep() end
-            return { Set = function(v) Inp.Text = v; val = v; Osama.Flags[flag] = v end }
+            return { Set = function(v) Inp.Text = v; val = v; Library.Flags[flag] = v end }
         end
 
-        function S:AddKeybind(kc)
-            local flag = kc.Flag or NF()
+        function Sec:Keybind(kc)
+            local flag = kc.Flag or Flag()
             local key = kc.Default or nil
             local mode = kc.Mode or "Toggle"
             local active, binding = false, false
-            Osama.Flags[flag] = { Key = key, Mode = mode, Active = active }
+            Library.Flags[flag] = { Key = key, Mode = mode, Active = active }
 
-            local F = C("Frame", { Parent = EH, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 40) })
+            local Row = New("Frame", { Parent = Holder, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 44) })
 
-            C("ImageLabel", {
-                Parent = F, BackgroundTransparency = 1,
-                Position = UDim2.new(0, 2, 0.5, -7),
-                Size = UDim2.new(0, 14, 0, 14),
-                Image = "rbxassetid://7733960981",
-                ImageColor3 = Theme.TextDim,
-            })
-
-            C("TextLabel", {
-                Parent = F, BackgroundTransparency = 1,
-                Position = UDim2.new(0, 24, 0, 0),
-                Size = UDim2.new(0.55, 0, 1, 0),
+            New("TextLabel", {
+                Parent = Row, BackgroundTransparency = 1,
+                Position = UDim2.new(0, 6, 0, 0),
+                Size = UDim2.new(0.6, 0, 1, 0),
                 Font = Enum.Font.Gotham, Text = kc.Name or "Keybind",
-                TextColor3 = Theme.Text, TextSize = 13,
+                TextColor3 = Color.Text90, TextSize = 13,
                 TextXAlignment = Enum.TextXAlignment.Left,
             })
 
-            local KB = C("TextButton", {
-                Parent = F, BackgroundColor3 = Theme.Elevated,
+            local KB = New("TextButton", {
+                Parent = Row, BackgroundColor3 = Color.Input,
                 AnchorPoint = Vector2.new(1, 0.5),
                 Position = UDim2.new(1, 0, 0.5, 0),
-                Size = UDim2.new(0, 0, 0, 28),
+                Size = UDim2.new(0, 0, 0, 30),
                 AutomaticSize = Enum.AutomaticSize.X,
                 AutoButtonColor = false, Text = "",
             })
-            C("UICorner", { Parent = KB, CornerRadius = UDim.new(0, 10) })
-            C("UIStroke", { Parent = KB, Color = Theme.Stroke, Thickness = 1, Transparency = 0.4 })
+            New("UICorner", { Parent = KB, CornerRadius = UDim.new(0, 10) })
+            New("UIStroke", { Parent = KB, Color = Color.Outline, Thickness = 1, Transparency = 0.4 })
 
-            local KT = C("TextLabel", {
+            local KT = New("TextLabel", {
                 Parent = KB, BackgroundTransparency = 1,
                 Size = UDim2.new(0, 0, 1, 0),
                 AutomaticSize = Enum.AutomaticSize.X,
                 Font = Enum.Font.GothamBold,
-                Text = key and (KN[key] or tostring(key):gsub("Enum.KeyCode.", "")) or "None",
-                TextColor3 = Theme.TextSoft, TextSize = 11,
+                Text = key and (KNames[key] or tostring(key):gsub("Enum.KeyCode.", "")) or "None",
+                TextColor3 = Color.Text70, TextSize = 11,
             })
-            C("UIPadding", { Parent = KT, PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 14) })
+            New("UIPadding", { Parent = KT, PaddingLeft = UDim.new(0, 16), PaddingRight = UDim.new(0, 16) })
+
+            KB.MouseEnter:Connect(function() Anim(KB, {BackgroundColor3 = Color.Elevated}, 0.15) end)
+            KB.MouseLeave:Connect(function() Anim(KB, {BackgroundColor3 = Color.Input}, 0.15) end)
 
             KB.MouseButton1Click:Connect(function()
-                KT.Text = "..."
-                T(KB, {BackgroundColor3 = Theme.Accent}, 0.15)
-                binding = true
+                KT.Text = "..."; binding = true
+                Anim(KB, {BackgroundColor3 = Color.Accent1}, 0.15)
                 local cn
-                cn = Cn(UserInputService.InputBegan, function(i)
+                cn = Hook(UserInputService.InputBegan, function(i)
                     if not binding then return end
                     local nk = i.KeyCode ~= Enum.KeyCode.Unknown and i.KeyCode or i.UserInputType
                     if nk == Enum.KeyCode.Escape then key = nil; KT.Text = "None"
-                    else key = nk; KT.Text = KN[key] or tostring(key):gsub("Enum.KeyCode.", ""):gsub("Enum.UserInputType.", "") end
+                    else key = nk; KT.Text = KNames[key] or tostring(key):gsub("Enum.KeyCode.", ""):gsub("Enum.UserInputType.", "") end
                     binding = false
-                    T(KB, {BackgroundColor3 = Theme.Elevated}, 0.15)
-                    Osama.Flags[flag] = { Key = key, Mode = mode, Active = active }
+                    Anim(KB, {BackgroundColor3 = Color.Input}, 0.15)
+                    Library.Flags[flag] = { Key = key, Mode = mode, Active = active }
                     cn:Disconnect()
                 end)
             end)
 
-            Cn(UserInputService.InputBegan, function(i, g)
+            Hook(UserInputService.InputBegan, function(i, g)
                 if g or binding then return end
                 local ik = i.KeyCode ~= Enum.KeyCode.Unknown and i.KeyCode or i.UserInputType
                 if ik == key then
                     if mode == "Toggle" then active = not active
                     elseif mode == "Hold" then active = true end
-                    Osama.Flags[flag] = { Key = key, Mode = mode, Active = active }
+                    Library.Flags[flag] = { Key = key, Mode = mode, Active = active }
                     if kc.Callback then kc.Callback(active) end
                 end
             end)
 
-            Cn(UserInputService.InputEnded, function(i)
+            Hook(UserInputService.InputEnded, function(i)
                 if binding then return end
                 local ik = i.KeyCode ~= Enum.KeyCode.Unknown and i.KeyCode or i.UserInputType
                 if ik == key and mode == "Hold" then
                     active = false
-                    Osama.Flags[flag] = { Key = key, Mode = mode, Active = active }
+                    Library.Flags[flag] = { Key = key, Mode = mode, Active = active }
                     if kc.Callback then kc.Callback(active) end
                 end
             end)
@@ -1043,103 +1043,99 @@ function Osama:CreateWindow(cfg)
             if kc.Separator ~= false then Sep() end
         end
 
-        function S:AddLabel(lc)
-            local LF = C("Frame", { Parent = EH, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y })
-            C("TextLabel", {
-                Parent = LF, BackgroundTransparency = 1,
+        function Sec:Label(lc)
+            New("TextLabel", {
+                Parent = Holder, BackgroundTransparency = 1,
                 Size = UDim2.new(1, 0, 0, 0),
                 AutomaticSize = Enum.AutomaticSize.Y,
                 Font = Enum.Font.Gotham, Text = lc.Text or "",
-                TextColor3 = lc.Color or Theme.TextDim,
+                TextColor3 = lc.Color or Color.Text40,
                 TextSize = lc.TextSize or 12,
                 TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left,
             })
             if lc.Separator ~= false then Sep() end
         end
 
-        function S:AddColorPicker(cc)
-            local flag = cc.Flag or NF()
+        function Sec:ColorPicker(cc)
+            local flag = cc.Flag or Flag()
             local cur = cc.Default or Color3.fromRGB(255, 255, 255)
             local h, s, v = cur:ToHSV()
-            Osama.Flags[flag] = cur
+            Library.Flags[flag] = cur
 
-            local F = C("Frame", { Parent = EH, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 40) })
+            local Row = New("Frame", { Parent = Holder, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 44) })
 
-            C("TextLabel", {
-                Parent = F, BackgroundTransparency = 1,
-                Position = UDim2.new(0, 2, 0, 0),
-                Size = UDim2.new(1, -40, 1, 0),
+            New("TextLabel", {
+                Parent = Row, BackgroundTransparency = 1,
+                Position = UDim2.new(0, 6, 0, 0),
+                Size = UDim2.new(1, -46, 1, 0),
                 Font = Enum.Font.Gotham, Text = cc.Name or "Color",
-                TextColor3 = Theme.Text, TextSize = 13,
+                TextColor3 = Color.Text90, TextSize = 13,
                 TextXAlignment = Enum.TextXAlignment.Left,
             })
 
-            local Pv = C("TextButton", {
-                Parent = F, BackgroundColor3 = cur,
+            local Pv = New("TextButton", {
+                Parent = Row, BackgroundColor3 = cur,
                 AnchorPoint = Vector2.new(1, 0.5),
                 Position = UDim2.new(1, 0, 0.5, 0),
-                Size = UDim2.new(0, 28, 0, 28),
+                Size = UDim2.new(0, 32, 0, 32),
                 Text = "", AutoButtonColor = false,
             })
-            C("UICorner", { Parent = Pv, CornerRadius = UDim.new(0, 10) })
-            C("UIStroke", { Parent = Pv, Color = Theme.Stroke, Thickness = 1.5, Transparency = 0.3 })
+            New("UICorner", { Parent = Pv, CornerRadius = UDim.new(0, 12) })
+            New("UIStroke", { Parent = Pv, Color = Color.Outline, Thickness = 1.5, Transparency = 0.2 })
 
             local po = false
-            local Pop = C("Frame", {
-                Parent = DH, BackgroundColor3 = Theme.Card,
-                Size = UDim2.new(0, 200, 0, 0),
+            local Pop = New("Frame", {
+                Parent = Library.Drop, BackgroundColor3 = Color.Surface,
+                Size = UDim2.new(0, 210, 0, 0),
                 ClipsDescendants = true, ZIndex = 100,
             })
-            C("UICorner", { Parent = Pop, CornerRadius = UDim.new(0, 14) })
-            C("UIStroke", { Parent = Pop, Color = Theme.Stroke, Thickness = 1, Transparency = 0.3 })
+            New("UICorner", { Parent = Pop, CornerRadius = UDim.new(0, 16) })
+            New("UIStroke", { Parent = Pop, Color = Color.Outline, Thickness = 1.5, Transparency = 0.2 })
 
-            local SV = C("Frame", {
+            local SVBox = New("Frame", {
                 Parent = Pop, BackgroundColor3 = Color3.fromHSV(h, 1, 1),
-                Position = UDim2.new(0, 10, 0, 10),
-                Size = UDim2.new(1, -20, 0, 120),
-                ZIndex = 101,
+                Position = UDim2.new(0, 12, 0, 12),
+                Size = UDim2.new(1, -24, 0, 130), ZIndex = 101,
             })
-            C("UICorner", { Parent = SV, CornerRadius = UDim.new(0, 10) })
+            New("UICorner", { Parent = SVBox, CornerRadius = UDim.new(0, 12) })
 
-            local WO = C("Frame", {
-                Parent = SV, BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+            local WO = New("Frame", {
+                Parent = SVBox, BackgroundColor3 = Color3.fromRGB(255, 255, 255),
                 Size = UDim2.new(1, 0, 1, 0), ZIndex = 102,
             })
-            C("UICorner", { Parent = WO, CornerRadius = UDim.new(0, 10) })
-            C("UIGradient", {
+            New("UICorner", { Parent = WO, CornerRadius = UDim.new(0, 12) })
+            New("UIGradient", {
                 Parent = WO,
                 Transparency = NumberSequence.new{NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1)},
             })
 
-            local BO = C("TextButton", {
-                Parent = SV, BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+            local BO = New("TextButton", {
+                Parent = SVBox, BackgroundColor3 = Color3.fromRGB(0, 0, 0),
                 Size = UDim2.new(1, 0, 1, 0), ZIndex = 103,
                 Text = "", AutoButtonColor = false,
             })
-            C("UICorner", { Parent = BO, CornerRadius = UDim.new(0, 10) })
-            C("UIGradient", {
+            New("UICorner", { Parent = BO, CornerRadius = UDim.new(0, 12) })
+            New("UIGradient", {
                 Parent = BO, Rotation = 270,
                 Transparency = NumberSequence.new{NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1)},
             })
 
-            local SC = C("Frame", {
-                Parent = SV, BackgroundColor3 = cur,
-                Size = UDim2.new(0, 12, 0, 12),
-                Position = UDim2.new(s, -6, 1 - v, -6),
-                ZIndex = 105,
+            local SC = New("Frame", {
+                Parent = SVBox, BackgroundColor3 = cur,
+                Size = UDim2.new(0, 14, 0, 14),
+                Position = UDim2.new(s, -7, 1 - v, -7), ZIndex = 105,
             })
-            C("UICorner", { Parent = SC, CornerRadius = UDim.new(1, 0) })
-            C("UIStroke", { Parent = SC, Color = Color3.fromRGB(255, 255, 255), Thickness = 2.5 })
+            New("UICorner", { Parent = SC, CornerRadius = UDim.new(1, 0) })
+            New("UIStroke", { Parent = SC, Color = Color.White, Thickness = 3 })
 
-            local HB = C("TextButton", {
-                Parent = Pop,
-                Position = UDim2.new(0, 10, 0, 140),
-                Size = UDim2.new(1, -20, 0, 14),
+            local HBar = New("TextButton", {
+                Parent = Pop, Position = UDim2.new(0, 12, 0, 152),
+                Size = UDim2.new(1, -24, 0, 16),
                 Text = "", AutoButtonColor = false, ZIndex = 101,
             })
-            C("UICorner", { Parent = HB, CornerRadius = UDim.new(1, 0) })
-            C("UIGradient", {
-                Parent = HB,
+            New("UICorner", { Parent = HBar, CornerRadius = UDim.new(1, 0) })
+            New("UIGradient", {
+                Parent = HBar,
                 Color = ColorSequence.new{
                     ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
                     ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 255, 0)),
@@ -1151,173 +1147,178 @@ function Osama:CreateWindow(cfg)
                 },
             })
 
-            local HC = C("Frame", {
-                Parent = HB, BackgroundColor3 = Color3.fromHSV(h, 1, 1),
-                Size = UDim2.new(0, 14, 0, 14),
-                Position = UDim2.new(h, -7, 0.5, -7), ZIndex = 102,
+            local HC = New("Frame", {
+                Parent = HBar, BackgroundColor3 = Color3.fromHSV(h, 1, 1),
+                Size = UDim2.new(0, 16, 0, 16),
+                Position = UDim2.new(h, -8, 0.5, -8), ZIndex = 102,
             })
-            C("UICorner", { Parent = HC, CornerRadius = UDim.new(1, 0) })
-            C("UIStroke", { Parent = HC, Color = Color3.fromRGB(255, 255, 255), Thickness = 2.5 })
+            New("UICorner", { Parent = HC, CornerRadius = UDim.new(1, 0) })
+            New("UIStroke", { Parent = HC, Color = Color.White, Thickness = 3 })
 
             local dSV, dH = false, false
 
             local function UC()
                 local c = Color3.fromHSV(h, s, v)
                 Pv.BackgroundColor3 = c
-                SV.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
-                SC.Position = UDim2.new(s, -6, 1 - v, -6)
-                SC.BackgroundColor3 = c
-                HC.Position = UDim2.new(h, -7, 0.5, -7)
-                HC.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
-                cur = c; Osama.Flags[flag] = c
+                SVBox.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
+                SC.Position = UDim2.new(s, -7, 1 - v, -7); SC.BackgroundColor3 = c
+                HC.Position = UDim2.new(h, -8, 0.5, -8); HC.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
+                cur = c; Library.Flags[flag] = c
                 if cc.Callback then cc.Callback(c) end
             end
 
             BO.MouseButton1Down:Connect(function() dSV = true end)
-            HB.MouseButton1Down:Connect(function() dH = true end)
-
-            Cn(UserInputService.InputEnded, function(i)
+            HBar.MouseButton1Down:Connect(function() dH = true end)
+            Hook(UserInputService.InputEnded, function(i)
                 if i.UserInputType == Enum.UserInputType.MouseButton1 then dSV = false; dH = false end
             end)
-
-            Cn(UserInputService.InputChanged, function(i)
+            Hook(UserInputService.InputChanged, function(i)
                 if i.UserInputType ~= Enum.UserInputType.MouseMovement then return end
                 local m = UserInputService:GetMouseLocation()
                 if dSV then
-                    s = math.clamp((m.X - SV.AbsolutePosition.X) / SV.AbsoluteSize.X, 0, 1)
-                    v = 1 - math.clamp((m.Y - SV.AbsolutePosition.Y) / SV.AbsoluteSize.Y, 0, 1)
+                    s = math.clamp((m.X - SVBox.AbsolutePosition.X) / SVBox.AbsoluteSize.X, 0, 1)
+                    v = 1 - math.clamp((m.Y - SVBox.AbsolutePosition.Y) / SVBox.AbsoluteSize.Y, 0, 1)
                     UC()
                 elseif dH then
-                    h = math.clamp((m.X - HB.AbsolutePosition.X) / HB.AbsoluteSize.X, 0, 1)
+                    h = math.clamp((m.X - HBar.AbsolutePosition.X) / HBar.AbsoluteSize.X, 0, 1)
                     UC()
                 end
             end)
 
             Pv.MouseButton1Click:Connect(function()
                 po = not po
-                Pop.Position = UDim2.fromOffset(Pv.AbsolutePosition.X - 165, Pv.AbsolutePosition.Y + 34)
-                if po then T(Pop, {Size = UDim2.new(0, 200, 0, 168)}, 0.25)
-                else T(Pop, {Size = UDim2.new(0, 200, 0, 0)}, 0.18) end
+                Pop.Position = UDim2.fromOffset(Pv.AbsolutePosition.X - 172, Pv.AbsolutePosition.Y + 38)
+                if po then Anim(Pop, {Size = UDim2.new(0, 210, 0, 182)}, 0.25)
+                else Anim(Pop, {Size = UDim2.new(0, 210, 0, 0)}, 0.18) end
             end)
 
             UC()
-            Osama.ConfigFlags[flag] = function(c) h, s, v = c:ToHSV(); UC() end
+            Library.ConfigFlags[flag] = function(c) h, s, v = c:ToHSV(); UC() end
             if cc.Separator ~= false then Sep() end
             return { Set = function(c) h, s, v = c:ToHSV(); UC() end }
         end
 
-        return S
+        return Sec
     end
 
-    function W:CreateTab(tc)
+    function W:Tab(tc)
         local Tab = { Name = tc.Name or "Tab", Visible = false }
 
-        local TB = C("TextButton", {
-            Parent = TabHolder, BackgroundColor3 = Theme.Elevated,
+        local TB = New("TextButton", {
+            Parent = TabScroll, BackgroundColor3 = Color.Elevated,
             BackgroundTransparency = 1,
-            Size = UDim2.new(1, 0, 0, 42), Text = "", AutoButtonColor = false,
+            Size = UDim2.new(1, 0, 0, 46), Text = "", AutoButtonColor = false,
         })
-        C("UICorner", { Parent = TB, CornerRadius = UDim.new(0, 12) })
+        New("UICorner", { Parent = TB, CornerRadius = UDim.new(0, 14) })
 
-        local TIcon = C("ImageLabel", {
+        local TI = New("ImageLabel", {
             Parent = TB, BackgroundTransparency = 1,
-            Position = UDim2.new(0, 14, 0.5, -10),
-            Size = UDim2.new(0, 20, 0, 20),
+            Position = UDim2.new(0, 16, 0.5, -11),
+            Size = UDim2.new(0, 22, 0, 22),
             Image = tc.Icon or "rbxassetid://7733960981",
-            ImageColor3 = Theme.TextDim,
+            ImageColor3 = Color.Text40,
         })
 
-        local TN = C("TextLabel", {
+        local TN = New("TextLabel", {
             Parent = TB, BackgroundTransparency = 1,
-            Position = UDim2.new(0, 44, 0, 0),
-            Size = UDim2.new(1, -54, 1, 0),
+            Position = UDim2.new(0, 48, 0, 0),
+            Size = UDim2.new(1, -58, 1, 0),
             Font = Enum.Font.GothamBold,
-            Text = Tab.Name, TextColor3 = Theme.TextDim,
+            Text = Tab.Name, TextColor3 = Color.Text40,
             TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left,
         })
 
-        local AB = C("Frame", {
-            Parent = TB, BackgroundColor3 = Theme.Accent,
+        local AB = New("Frame", {
+            Parent = TB, BackgroundColor3 = Color.Accent1,
             BackgroundTransparency = 1,
-            Position = UDim2.new(0, 4, 0.5, -10),
-            Size = UDim2.new(0, 4, 0, 20),
+            Position = UDim2.new(0, 6, 0.5, -12),
+            Size = UDim2.new(0, 4, 0, 24),
         })
-        C("UICorner", { Parent = AB, CornerRadius = UDim.new(0, 3) })
-        BA(AB, "BackgroundColor3")
+        New("UICorner", { Parent = AB, CornerRadius = UDim.new(0, 3) })
+        New("UIGradient", {
+            Parent = AB,
+            Color = ColorSequence.new{
+                ColorSequenceKeypoint.new(0, Color.Accent1),
+                ColorSequenceKeypoint.new(1, Color.Accent2),
+            },
+            Rotation = 90,
+        })
+        Bind(AB, "BackgroundColor3")
 
-        local TC = C("ScrollingFrame", {
-            Parent = TabContent, BackgroundTransparency = 1,
+        local TC = New("ScrollingFrame", {
+            Parent = TabArea, BackgroundTransparency = 1,
             Size = UDim2.new(1, 0, 1, 0),
             CanvasSize = UDim2.new(0, 0, 0, 0),
             AutomaticCanvasSize = Enum.AutomaticSize.Y,
             ScrollBarThickness = 3,
-            ScrollBarImageColor3 = Theme.Accent,
+            ScrollBarImageColor3 = Color.Accent1,
             Visible = false,
         })
 
-        local CH = C("Frame", {
+        local CH = New("Frame", {
             Parent = TC, BackgroundTransparency = 1,
             Size = UDim2.new(1, 0, 0, 0),
             AutomaticSize = Enum.AutomaticSize.Y,
         })
-        C("UIListLayout", {
+        New("UIListLayout", {
             Parent = CH,
             FillDirection = Enum.FillDirection.Horizontal,
             HorizontalFlex = Enum.UIFlexAlignment.Fill,
-            Padding = UDim.new(0, 10),
+            Padding = UDim.new(0, 12),
             SortOrder = Enum.SortOrder.LayoutOrder,
         })
-        C("UIPadding", {
+        New("UIPadding", {
             Parent = CH,
-            PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 10),
-            PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 14),
+            PaddingTop = UDim.new(0, 12), PaddingBottom = UDim.new(0, 12),
+            PaddingLeft = UDim.new(0, 16), PaddingRight = UDim.new(0, 16),
         })
 
-        local LC = C("Frame", {
+        local LC = New("Frame", {
             Parent = CH, BackgroundTransparency = 1,
             Size = UDim2.new(0.5, 0, 0, 0),
             AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 1,
         })
-        C("UIListLayout", { Parent = LC, Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder })
+        New("UIListLayout", { Parent = LC, Padding = UDim.new(0, 12), SortOrder = Enum.SortOrder.LayoutOrder })
 
-        local RC = C("Frame", {
+        local RC = New("Frame", {
             Parent = CH, BackgroundTransparency = 1,
             Size = UDim2.new(0.5, 0, 0, 0),
             AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2,
         })
-        C("UIListLayout", { Parent = RC, Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder })
+        New("UIListLayout", { Parent = RC, Padding = UDim.new(0, 12), SortOrder = Enum.SortOrder.LayoutOrder })
 
         function Tab:Show()
-            if W.CurrentTab and W.CurrentTab ~= Tab then W.CurrentTab:Hide() end
-            Tab.Visible = true; TC.Visible = true; W.CurrentTab = Tab
+            if W.Current and W.Current ~= Tab then W.Current:Hide() end
+            Tab.Visible = true; TC.Visible = true; W.Current = Tab
             TabTitle.Text = Tab.Name
-            T(TB, {BackgroundTransparency = 0}, 0.2)
-            T(TIcon, {ImageColor3 = Theme.Accent}, 0.2)
-            T(TN, {TextColor3 = Theme.Text}, 0.2)
-            T(AB, {BackgroundTransparency = 0}, 0.2)
+            BreadCrumb.Text = W.Name .. " / " .. Tab.Name
+            Anim(TB, {BackgroundTransparency = 0}, 0.25)
+            Anim(TI, {ImageColor3 = Color.Accent1}, 0.25)
+            Anim(TN, {TextColor3 = Color.White}, 0.25)
+            Anim(AB, {BackgroundTransparency = 0}, 0.25)
             Fade.BackgroundTransparency = 0
-            T(Fade, {BackgroundTransparency = 1}, 0.3)
+            Anim(Fade, {BackgroundTransparency = 1}, 0.35)
         end
 
         function Tab:Hide()
             Tab.Visible = false; TC.Visible = false
-            T(TB, {BackgroundTransparency = 1}, 0.2)
-            T(TIcon, {ImageColor3 = Theme.TextDim}, 0.2)
-            T(TN, {TextColor3 = Theme.TextDim}, 0.2)
-            T(AB, {BackgroundTransparency = 1}, 0.2)
+            Anim(TB, {BackgroundTransparency = 1}, 0.25)
+            Anim(TI, {ImageColor3 = Color.Text40}, 0.25)
+            Anim(TN, {TextColor3 = Color.Text40}, 0.25)
+            Anim(AB, {BackgroundTransparency = 1}, 0.25)
         end
 
-        function Tab:AddSection(sc)
+        function Tab:Section(sc)
             local p = (sc.Side == "Right") and RC or LC
-            return MakeSection(p, sc)
+            return BuildSection(p, sc)
         end
 
         TB.MouseButton1Click:Connect(function() Tab:Show() end)
         TB.MouseEnter:Connect(function()
-            if not Tab.Visible then T(TB, {BackgroundTransparency = 0.4}, 0.12) end
+            if not Tab.Visible then Anim(TB, {BackgroundTransparency = 0.4}, 0.15) end
         end)
         TB.MouseLeave:Connect(function()
-            if not Tab.Visible then T(TB, {BackgroundTransparency = 1}, 0.12) end
+            if not Tab.Visible then Anim(TB, {BackgroundTransparency = 1}, 0.15) end
         end)
 
         table.insert(W.Tabs, Tab)
@@ -1327,82 +1328,81 @@ function Osama:CreateWindow(cfg)
 
     function W:SaveConfig(n)
         local d = {}
-        for f, v in pairs(Osama.Flags) do
+        for f, v in pairs(Library.Flags) do
             if type(v) == "table" and v.Key then d[f] = { Key = tostring(v.Key), Mode = v.Mode, Active = v.Active }
             elseif typeof(v) == "Color3" then d[f] = { _t = "c3", h = v:ToHex() }
             else d[f] = v end
         end
-        writefile(Osama.Directory .. "/configs/" .. n .. ".cfg", HttpService:JSONEncode(d))
-        Osama:Notify({ Title = "Config", Message = "Saved: " .. n, Type = "Success" })
+        writefile(Library.Directory .. "/configs/" .. n .. ".cfg", HttpService:JSONEncode(d))
+        Library:Notify({ Title = "Config", Message = "Saved: " .. n, Type = "Success" })
     end
 
     function W:LoadConfig(n)
-        local p = Osama.Directory .. "/configs/" .. n .. ".cfg"
-        if not isfile(p) then Osama:Notify({ Title = "Config", Message = "Not found", Type = "Error" }); return end
+        local p = Library.Directory .. "/configs/" .. n .. ".cfg"
+        if not isfile(p) then Library:Notify({ Title = "Error", Message = "Config not found", Type = "Error" }); return end
         local d = HttpService:JSONDecode(readfile(p))
         for f, v in pairs(d) do
-            local s = Osama.ConfigFlags[f]
+            local s = Library.ConfigFlags[f]
             if s then
                 if type(v) == "table" and v._t == "c3" then s(Color3.fromHex(v.h))
                 else s(v) end
             end
         end
-        Osama:Notify({ Title = "Config", Message = "Loaded: " .. n, Type = "Success" })
+        Library:Notify({ Title = "Config", Message = "Loaded: " .. n, Type = "Success" })
     end
 
     function W:DeleteConfig(n)
-        local p = Osama.Directory .. "/configs/" .. n .. ".cfg"
-        if isfile(p) then delfile(p); Osama:Notify({ Title = "Config", Message = "Deleted: " .. n, Type = "Warning" }) end
+        local p = Library.Directory .. "/configs/" .. n .. ".cfg"
+        if isfile(p) then delfile(p); Library:Notify({ Title = "Config", Message = "Deleted: " .. n, Type = "Warning" }) end
     end
 
     function W:GetConfigs()
         local l = {}
-        for _, f in ipairs(listfiles(Osama.Directory .. "/configs")) do
-            local n = f:match("([^/\\]+)%.cfg$")
-            if n then table.insert(l, n) end
+        for _, f in ipairs(listfiles(Library.Directory .. "/configs")) do
+            local n = f:match("([^/\\]+)%.cfg$"); if n then table.insert(l, n) end
         end
         return l
     end
 
     function W:SetAccent(c)
-        Theme.Accent = c
-        for prop, objs in pairs(AccentBinds) do
+        Color.Accent1 = c
+        for prop, objs in pairs(ABind) do
             for _, o in ipairs(objs) do
-                if o and o.Parent then T(o, {[prop] = c}, 0.3) end
+                if o and o.Parent then Anim(o, {[prop] = c}, 0.35) end
             end
         end
     end
 
-    function W:AddSettingsTab()
-        local ST = W:CreateTab({ Name = "Settings", Icon = "rbxassetid://7734053495" })
-        local CS = ST:AddSection({ Name = "Configs", Side = "Left", Icon = "rbxassetid://7734053495" })
-        local cl = CS:AddDropdown({ Name = "Config", Flag = "_cl", Options = W:GetConfigs() })
-        CS:AddTextBox({ Name = "Name", Flag = "_cn", Placeholder = "config name" })
-        CS:AddButton({ Name = "Save Config", Icon = "rbxassetid://7733717078", Callback = function()
-            local n = Osama.Flags["_cn"]
-            if n and n ~= "" then W:SaveConfig(n); cl.Refresh(W:GetConfigs()) end
+    function W:Settings()
+        local ST = W:Tab({ Name = "Settings", Icon = "rbxassetid://7734053495" })
+        local CS = ST:Section({ Name = "Configs", Side = "Left", Icon = "rbxassetid://7734053495" })
+        local cl = CS:Dropdown({ Name = "Config", Flag = "_cl", Options = W:GetConfigs() })
+        CS:TextBox({ Name = "Name", Flag = "_cn", Placeholder = "config name" })
+        CS:Button({ Name = "Save Config", Callback = function()
+            local n = Library.Flags["_cn"]; if n and n ~= "" then W:SaveConfig(n); cl.Refresh(W:GetConfigs()) end
         end })
-        CS:AddButton({ Name = "Load Config", Icon = "rbxassetid://7733717078", Callback = function()
-            local n = Osama.Flags["_cl"]; if n then W:LoadConfig(n) end
+        CS:Button({ Name = "Load Config", Callback = function()
+            local n = Library.Flags["_cl"]; if n then W:LoadConfig(n) end
         end })
-        CS:AddButton({ Name = "Delete Config", Icon = "rbxassetid://7733717078", Callback = function()
-            local n = Osama.Flags["_cl"]; if n then W:DeleteConfig(n); cl.Refresh(W:GetConfigs()) end
+        CS:Button({ Name = "Delete Config", Callback = function()
+            local n = Library.Flags["_cl"]; if n then W:DeleteConfig(n); cl.Refresh(W:GetConfigs()) end
         end, Separator = false })
 
-        local AS = ST:AddSection({ Name = "Appearance", Side = "Right", Icon = "rbxassetid://7743870115" })
-        AS:AddColorPicker({ Name = "Accent Color", Default = Theme.Accent, Callback = function(c) W:SetAccent(c) end })
-        AS:AddKeybind({ Name = "Toggle UI", Default = W.ToggleKey, Mode = "Toggle" })
-        AS:AddLabel({ Text = "OsamaHub v2.0", Separator = false })
+        local AS = ST:Section({ Name = "Appearance", Side = "Right", Icon = "rbxassetid://7743870115" })
+        AS:ColorPicker({ Name = "Accent", Default = Color.Accent1, Callback = function(c) W:SetAccent(c) end })
+        AS:Keybind({ Name = "Toggle UI", Default = W.Key, Mode = "Toggle" })
+        AS:Label({ Text = "OsamaHub v2.0", Separator = false })
         return ST
     end
 
     return W
 end
 
-function Osama:Destroy()
-    if self.SG then self.SG:Destroy() end
+function Library:Destroy()
+    if self.GUI then self.GUI:Destroy() end
+    if self.Drop then self.Drop:Destroy() end
     for _, c in ipairs(self.Connections) do c:Disconnect() end
     self.Connections = {}
 end
 
-return Osama
+return Library
