@@ -1,28 +1,13 @@
-for _, v in pairs(getgc(true)) do
-    if typeof(v) == "table" then
-        pcall(function()
-            if v.recoil and typeof(v.recoil) == "table" and v.recoil.func and typeof(v.recoil.func) == "function" then
-                v.recoil.func = function() end
-            end
-        end)
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+
+local savedOrientation = nil
+
+RunService:BindToRenderStep("AntiRecoil", Enum.RenderPriority.Camera.Value + 1, function()
+    local delta = UserInputService:GetMouseDelta()
+    if savedOrientation and delta.Magnitude == 0 then
+        Camera.CFrame = CFrame.new(Camera.CFrame.Position) * savedOrientation
     end
-end
-
-local GunModule = require(game:GetService("ReplicatedStorage").Modules.Items.Item.Gun)
-GunModule.recoil_function = function() end
-GunModule.__index.recoil_function = function() end
-GunModule.kickback = function() end
-GunModule.__index.kickback = function() end
-
-pcall(function()
-    require(game:GetService("ReplicatedStorage").Modules.CameraShake).load = function() end
-end)
-
-local oldIndex
-oldIndex = hookmetamethod(game, "__index", function(self, key)
-    local result = oldIndex(self, key)
-    if typeof(result) == "table" and rawget(result, "func") and rawget(result, "running") ~= nil and rawget(result, "done_hooks") then
-        result.func = function() end
-    end
-    return result
+    savedOrientation = Camera.CFrame - Camera.CFrame.Position
 end)
