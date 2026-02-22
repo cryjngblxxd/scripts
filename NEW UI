@@ -2665,14 +2665,14 @@ local library_t = {
 				});
 
 				utility_t.new_instance("Frame", {
-					Parent = section_frame,
-					Size = UDim2.new(1, 0, 0, 10),
-					ZIndex = 999,
-					BackgroundTransparency = 0.5,
-					Position = UDim2.new(0, 0, 0, -1),
-					BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-					BorderSizePixel = 0
-				});
+                Parent = section_frame,
+                Size = UDim2.new(1, 0, 0, 10),
+                ZIndex = 999,
+                BackgroundTransparency = 1,
+                Position = UDim2.new(0, 0, 0, -1),
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BorderSizePixel = 0
+                });
 
 				utility_t.connect(user_input_service.InputChanged, function(input)
 					if self.lib.base.current_tab == self and self.lib.base.is_open and input.UserInputType == Enum.UserInputType.MouseWheel and utility_t.is_mouse_in_frame(main_frame) then
