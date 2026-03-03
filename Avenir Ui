@@ -1,12 +1,3 @@
--- getgenv support stupid way i did this ik chill
-if getgenv().AvenirShowKeybindList == nil then
-    getgenv().AvenirShowKeybindList = false
-end
-
-if getgenv().AvenirShowWatermark == nil then
-    getgenv().AvenirShowWatermark = false
-end
-
 -- Variables 
     local uis = game:GetService("UserInputService") 
     local players = game:GetService("Players") 
@@ -49,22 +40,16 @@ end
 -- 
 
 -- Color Constants
-    local DARK_BLUE = rgb(0, 100, 200)
-    local BLACK = rgb(12, 12, 12)
-    local DARK_GRAY = rgb(20, 20, 20)
-    local WHITE = rgb(240, 240, 240)
-    
-    -- Menu colors
     local MENU_BG = rgb(12, 12, 12)
     local MENU_BG_SECONDARY = rgb(18, 18, 18)
     local MENU_BG_TERTIARY = rgb(22, 22, 22)
     local MENU_BG_ELEMENT = rgb(28, 28, 28)
     local MENU_BORDER = rgb(40, 40, 50)
-    local MENU_BORDER_ACCENT = rgb(50, 50, 60)
     local MENU_TEXT = rgb(240, 240, 240)
     local MENU_TEXT_DIM = rgb(180, 180, 180)
     local MENU_TEXT_DIMMER = rgb(130, 130, 135)
     local MENU_TEXT_DARK = rgb(90, 90, 95)
+    local DARK_GRAY = rgb(20, 20, 20)
     local ACCENT_BLUE = rgb(45, 120, 255)
 --
 
@@ -84,9 +69,9 @@ end
         auto_show = true,
         tooltip = nil,
         keybinds = {},
-        keybind_list_visible = getgenv().AvenirShowKeybindList,
+        keybind_list_visible = true,
         keybind_show_all = false,
-        watermark_visible = getgenv().AvenirShowWatermark,
+        watermark_visible = true,
         watermark_elements = {fps = true, ping = true, time = true},
         dpi_scale = 1,
         is_mobile = uis.TouchEnabled and not uis.KeyboardEnabled,
@@ -100,7 +85,8 @@ end
             accent = {
                 BackgroundColor3 = {},  
                 TextColor3 = {}, 
-                ImageColor3 = {}, 
+                ImageColor3 = {},
+                Color = {},
             },
         }
     }
@@ -395,12 +381,18 @@ end
                 library.dpi_scale = data.dpi_scale or 1
             end
         end)
-        -- Override with getgenv if set
+    end
+
+    -- Apply getgenv overrides after loading settings
+    function library:apply_getgenv_overrides()
         if getgenv().AvenirShowKeybindList ~= nil then
             library.keybind_list_visible = getgenv().AvenirShowKeybindList
         end
         if getgenv().AvenirShowWatermark ~= nil then
             library.watermark_visible = getgenv().AvenirShowWatermark
+        end
+        if getgenv().AvenirAutoShow ~= nil then
+            library.auto_show = getgenv().AvenirAutoShow
         end
     end
 
@@ -500,7 +492,9 @@ end
     end 
 
     function library:apply_theme(instance, theme, property) 
-        insert(themes.utility[theme][property], instance)
+        if themes.utility[theme] and themes.utility[theme][property] then
+            insert(themes.utility[theme][property], instance)
+        end
     end
 
     function library:update_theme(theme, new_color)
@@ -512,6 +506,12 @@ end
             end 
         end 
         themes.preset[theme] = new_color
+        -- Update accent strokes on buttons
+        if library._accent_strokes then
+            for _, stroke in pairs(library._accent_strokes) do
+                pcall(function() stroke.Color = new_color end)
+            end
+        end
         if library.keybind_list_items and library.keybind_list_items["accent_line"] then
             library.keybind_list_items["accent_line"].BackgroundColor3 = new_color
         end
@@ -519,6 +519,13 @@ end
             library.watermark_items["accent_line"].BackgroundColor3 = new_color
         end
     end 
+
+    function library:register_accent_stroke(stroke)
+        if not library._accent_strokes then
+            library._accent_strokes = {}
+        end
+        insert(library._accent_strokes, stroke)
+    end
 
     function library:connection(signal, callback)
         local connection = signal:Connect(callback)
@@ -561,6 +568,7 @@ end
             library.flags = {}
             library.config_flags = {}
             library.keybinds = {}
+            library._accent_strokes = {}
         end)
     end 
 
@@ -676,9 +684,8 @@ end
     end
 --
 
--- Keybind List (Always visible even when UI is closed)
+-- Keybind List
     function library:create_keybind_list()
-        -- Create separate ScreenGui that stays visible
         library["always_on_screen"] = library:create("ScreenGui", {
             Parent = coregui,
             Name = "AvenirAlwaysOn",
@@ -873,7 +880,6 @@ end
 
     function library:toggle_keybind_list(visible)
         library.keybind_list_visible = visible
-        getgenv().AvenirShowKeybindList = visible
         if library.keybind_list_items and library.keybind_list_items["main"] then
             library.keybind_list_items["main"].Visible = visible
         end
@@ -935,7 +941,6 @@ end
 
     function library:toggle_watermark(visible)
         library.watermark_visible = visible
-        getgenv().AvenirShowWatermark = visible
         if library.watermark_items and library.watermark_items["main"] then
             library.watermark_items["main"].Visible = visible
         end
@@ -987,6 +992,7 @@ end
         library.auto_show = properties.auto_show ~= false
         library:init_folders()
         library:load_library_settings()
+        library:apply_getgenv_overrides()
         
         library["items"] = library:create("ScreenGui", {
             Parent = coregui,
@@ -1017,7 +1023,8 @@ end
         items["main"].Position = dim2(0, items["main"].AbsolutePosition.X, 0, items["main"].AbsolutePosition.Y)
         
         library:create("UICorner", {Parent = items["main"], CornerRadius = dim(0, 7)})
-        library:create("UIStroke", {Color = ACCENT_BLUE, Parent = items["main"], Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border})
+        local main_stroke = library:create("UIStroke", {Color = themes.preset.accent, Parent = items["main"], Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border})
+        library:register_accent_stroke(main_stroke)
         
         items["top_bar"] = library:create("Frame", {
             Parent = items["main"],
@@ -1308,7 +1315,7 @@ end
         cfg.items["separator"] = library:create("Frame", {
             Parent = self.items["tab_holder"],
             Size = dim2(0, 1, 0, library:scale(18)),
-            BackgroundColor3 = MENU_BORDER_ACCENT,
+            BackgroundColor3 = MENU_BORDER,
         })
         library:create("UIPadding", {Parent = cfg.items["separator"], PaddingLeft = dim(0, 7), PaddingRight = dim(0, 7)})
         return setmetatable(cfg, library)
@@ -1664,16 +1671,22 @@ end
         })
         library:create("UIPadding", {Parent = items["name"], PaddingLeft = dim(0, 3)})
         
-        items["value"] = library:create("TextLabel", {
+        -- Live value textbox
+        items["value_box"] = library:create("TextBox", {
             FontFace = fonts.small,
-            TextColor3 = MENU_TEXT_DIMMER,
-            Text = "0",
+            Text = tostring(cfg.default) .. cfg.suffix,
             Parent = items["slider_object"],
-            Size = dim2(1, -5, 0, library:scale(20)),
-            BackgroundTransparency = 1,
-            TextXAlignment = Enum.TextXAlignment.Right,
-            TextSize = library:scale(13),
+            AnchorPoint = vec2(1, 0),
+            Position = dim2(1, -3, 0, 0),
+            Size = dim_offset(library:scale(50), library:scale(18)),
+            BackgroundColor3 = MENU_BG_ELEMENT,
+            TextColor3 = MENU_TEXT_DIMMER,
+            TextSize = library:scale(12),
+            TextXAlignment = Enum.TextXAlignment.Center,
+            ClearTextOnFocus = true,
         })
+        library:create("UICorner", {Parent = items["value_box"], CornerRadius = dim(0, 4)})
+        library:create("UIStroke", {Parent = items["value_box"], Color = MENU_BORDER, Thickness = 1})
         
         items["slider"] = library:create("TextButton", {
             Text = "",
@@ -1705,11 +1718,25 @@ end
         function cfg.set(value)
             cfg.value = clamp(library:round(value, cfg.intervals), cfg.min, cfg.max)
             library:tween(items["fill"], {Size = dim2((cfg.value - cfg.min) / (cfg.max - cfg.min), 0, 1, 0)}, Enum.EasingStyle.Linear, 0.05)
-            items["value"].Text = tostring(cfg.value) .. cfg.suffix
+            items["value_box"].Text = tostring(cfg.value) .. cfg.suffix
             flags[cfg.flag] = cfg.value
             cfg.callback(cfg.value)
             library:update_dependencies(cfg.flag, cfg.value)
         end
+
+        items["value_box"].FocusLost:Connect(function(enterPressed)
+            if enterPressed then
+                local text = items["value_box"].Text:gsub(cfg.suffix, "")
+                local num = tonumber(text)
+                if num then
+                    cfg.set(num)
+                else
+                    items["value_box"].Text = tostring(cfg.value) .. cfg.suffix
+                end
+            else
+                items["value_box"].Text = tostring(cfg.value) .. cfg.suffix
+            end
+        end)
 
         items["slider"].InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -2321,23 +2348,17 @@ end
         
         local items = cfg.items
         
-        items["button_element"] = library:create("Frame", {
-            Parent = self.items["elements"],
-            BackgroundTransparency = 1,
-            Size = dim2(1, 0, 0, library:scale(32)),
-        })
-        
         items["button"] = library:create("TextButton", {
             FontFace = fonts.font,
             Text = "",
             AutoButtonColor = false,
-            Parent = items["button_element"],
-            Size = dim2(1, 0, 1, 0),
+            Parent = self.items["elements"],
+            Size = dim2(1, 0, 0, library:scale(32)),
             BackgroundColor3 = MENU_BG_ELEMENT
         })
         library:create("UICorner", {Parent = items["button"], CornerRadius = dim(0, 5)})
-        library:create("UIStroke", {Color = themes.preset.accent, Parent = items["button"], Thickness = 1})
-        library:apply_theme(items["button"]:FindFirstChildOfClass("UIStroke"), "accent", "Color")
+        local btn_stroke = library:create("UIStroke", {Color = themes.preset.accent, Parent = items["button"], Thickness = 1, Transparency = 0.6})
+        library:register_accent_stroke(btn_stroke)
         
         items["name"] = library:create("TextLabel", {
             FontFace = fonts.font,
@@ -2352,28 +2373,31 @@ end
 
         items["button"].MouseButton1Click:Connect(function()
             cfg.callback()
-            items["name"].TextColor3 = themes.preset.accent 
+            library:tween(items["name"], {TextColor3 = themes.preset.accent}, Enum.EasingStyle.Quad, 0.08)
             library:tween(items["button"], {BackgroundColor3 = rgb(38, 38, 45)}, Enum.EasingStyle.Quad, 0.08)
-            task.wait(0.08)
-            library:tween(items["button"], {BackgroundColor3 = MENU_BG_ELEMENT}, Enum.EasingStyle.Quad, 0.1)
-            library:tween(items["name"], {TextColor3 = MENU_TEXT})
+            library:tween(btn_stroke, {Transparency = 0}, Enum.EasingStyle.Quad, 0.08)
+            task.delay(0.15, function()
+                library:tween(items["button"], {BackgroundColor3 = MENU_BG_ELEMENT}, Enum.EasingStyle.Quad, 0.15)
+                library:tween(items["name"], {TextColor3 = MENU_TEXT}, Enum.EasingStyle.Quad, 0.15)
+                library:tween(btn_stroke, {Transparency = 0.6}, Enum.EasingStyle.Quad, 0.15)
+            end)
         end)
         
         items["button"].MouseEnter:Connect(function()
             library:tween(items["button"], {BackgroundColor3 = rgb(35, 35, 42)}, Enum.EasingStyle.Quad, 0.1)
-            library:tween(items["name"], {TextColor3 = WHITE}, Enum.EasingStyle.Quad, 0.1)
+            library:tween(btn_stroke, {Transparency = 0.3}, Enum.EasingStyle.Quad, 0.1)
         end)
         
         items["button"].MouseLeave:Connect(function()
             library:tween(items["button"], {BackgroundColor3 = MENU_BG_ELEMENT}, Enum.EasingStyle.Quad, 0.1)
-            library:tween(items["name"], {TextColor3 = MENU_TEXT}, Enum.EasingStyle.Quad, 0.1)
+            library:tween(btn_stroke, {Transparency = 0.6}, Enum.EasingStyle.Quad, 0.1)
         end)
         
         if cfg.tooltip then
-            items["button_element"].MouseEnter:Connect(function()
-                library:show_tooltip(cfg.tooltip, items["button_element"])
+            items["button"].MouseEnter:Connect(function()
+                library:show_tooltip(cfg.tooltip, items["button"])
             end)
-            items["button_element"].MouseLeave:Connect(function()
+            items["button"].MouseLeave:Connect(function()
                 library:hide_tooltip()
             end)
         end
@@ -2709,6 +2733,7 @@ end
 -- Init Config
     function library:init_config(window) 
         library:load_library_settings()
+        library:apply_getgenv_overrides()
         
         window:seperator({})
         local main, settings_tab = window:tab({name = "Settings", icon = "http://www.roblox.com/asset/?id=6031280882", tabs = {"Configs", "Menu"}})
