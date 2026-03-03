@@ -346,15 +346,13 @@ do
 			}
  
             
-            local menuOpen = Base.AutoShow ~= false
             Library:Connection(game:GetService("UserInputService").InputBegan, function(input, gameProcessed)
-                if gameProcessed then return end
-                if input.KeyCode == Enum.KeyCode.Insert or input.KeyCode == Enum.KeyCode.RightControl then
-                    menuOpen = not menuOpen
-                    Main.Visible = menuOpen
-                    Library.Open = menuOpen
-                end
-            end)
+            if gameProcessed then return end
+            if input.KeyCode == Enum.KeyCode.Insert or input.KeyCode == Enum.KeyCode.RightControl then
+                Library.Open = not Library.Open
+                Main.Visible = Library.Open
+            end
+        end)
            
 
 			local ScreenGui = Instance.new('ScreenGui', game:GetService("RunService"):IsStudio() and game.Players.LocalPlayer.PlayerGui or game.CoreGui)
@@ -1130,9 +1128,7 @@ do
 			AddInstance(Div)
 		end
 
-		-- Keybind (standalone)
-		-- Keybind (standalone)
-        -- Keybind (standalone)
+        
         function Sections:Keybind(Options)
             local Props = Options or {}
             local KB = {
@@ -1244,9 +1240,7 @@ do
                         StateKB = true
                         updateFlagData()
                         if KB.Callback then KB.Callback(true) end
-                        KB.Connection = Library:Connection(game:GetService("RunService").RenderStepped, function() 
-                            -- Keep active state true while held
-                        end)
+                        KB.Connection = Library:Connection(game:GetService("RunService").RenderStepped, function() end)
                     elseif KB.Mode == "Toggle" then
                         StateKB = not StateKB
                         updateFlagData()
@@ -1271,17 +1265,6 @@ do
             function KB:GetState() return StateKB end
             
             Flags[KB.Flag] = setKeyKB
-            Library.ConfigFlags[KB.Flag] = function(v)
-                if type(v) == "table" then
-                    if v.key then setKeyKB(v.key) end
-                    if v.mode then
-                        KB.Mode = v.mode
-                        for m, b in pairs(modeButtons2) do b.TextColor3 = m == v.mode and Library.Accent or Color3.new(0.306,0.306,0.306) end
-                    end
-                elseif typeof(v) == "EnumItem" then
-                    setKeyKB(v)
-                end
-            end
             
             return KB
         end
