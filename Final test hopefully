@@ -79,8 +79,8 @@ do
 		FontSize = 13;
 		Unloaded = false;
 		OnUnloadCallbacks = {};
-		-- NEW: Callback registries for reactive flag watching
 		_flagCallbacks = {};
+		AutoLoadConfigName = nil;
 	}
 
 	local Flags = {}
@@ -95,7 +95,7 @@ do
 		table.insert(Library.Instances, inst)
 	end
 
-	-- NEW: Fire callbacks when a flag changes
+	-- Flag callback system
 	function Library:FireFlagCallbacks(flag, value)
 		if Library._flagCallbacks[flag] then
 			for _, cb in ipairs(Library._flagCallbacks[flag]) do
@@ -104,7 +104,6 @@ do
 		end
 	end
 
-	-- NEW: Register a callback for flag changes
 	function Library:OnFlagChanged(flag, callback)
 		if not Library._flagCallbacks[flag] then
 			Library._flagCallbacks[flag] = {}
@@ -208,6 +207,55 @@ do
 
 	function Library:GetConfigPath()
 		return Library.Folders.configs .. "/" .. Library.ProjectName
+	end
+
+	function Library:GetSettingsPath()
+		return Library:GetConfigPath() .. "/settings.json"
+	end
+
+	function Library:SaveLibrarySettings()
+		pcall(function()
+			Library:InitFolders()
+			local data = {
+				auto_load_config = Library.AutoLoadConfigName,
+			}
+			writefile(Library:GetSettingsPath(), game:GetService("HttpService"):JSONEncode(data))
+		end)
+	end
+
+	function Library:LoadLibrarySettings()
+		pcall(function()
+			local path = Library:GetSettingsPath()
+			if isfile(path) then
+				local data = game:GetService("HttpService"):JSONDecode(readfile(path))
+				Library.AutoLoadConfigName = data.auto_load_config
+			end
+		end)
+	end
+
+	function Library:SetAutoLoad(configName)
+		Library.AutoLoadConfigName = configName
+		Library:SaveLibrarySettings()
+	end
+
+	function Library:ClearAutoLoad()
+		Library.AutoLoadConfigName = nil
+		Library:SaveLibrarySettings()
+	end
+
+	function Library:DoAutoLoad()
+		Library:LoadLibrarySettings()
+		if Library.AutoLoadConfigName then
+			local configPath = Library:GetConfigPath() .. "/" .. Library.AutoLoadConfigName .. ".cfg"
+			pcall(function()
+				if isfile(configPath) then
+					task.spawn(function()
+						task.wait(0.5)
+						Library:LoadConfig(readfile(configPath))
+					end)
+				end
+			end)
+		end
 	end
 
 	function Library:GetConfig()
@@ -384,6 +432,7 @@ do
 
 			Library.ProjectName = Base.Project ~= "" and Base.Project or Base.Title or "default"
 			Library:InitFolders()
+			Library:LoadLibrarySettings()
 
 			local ScreenGui = Instance.new('ScreenGui', game:GetService("RunService"):IsStudio() and game.Players.LocalPlayer.PlayerGui or game.CoreGui)
 			ScreenGui.DisplayOrder = 2
@@ -476,7 +525,7 @@ do
 				end
 			end)
 
-			-- Menu toggle with Insert key
+			-- Menu toggle
 			Library:Connection(game:GetService("UserInputService").InputBegan, function(input, gameProcessed)
 				if gameProcessed then return end
 				if input.KeyCode == Enum.KeyCode.Insert or input.KeyCode == Enum.KeyCode.RightControl then
@@ -684,9 +733,8 @@ do
 
 			function Toggle:Set(bool) ForceSet(bool) end
 
-			-- Initialize
 			if Toggle.State then
-				Toggle.Toggled = false -- will be flipped by SetState
+				Toggle.Toggled = false
 				SetState()
 			else
 				Library.Flags[Toggle.Flag] = false
@@ -752,7 +800,7 @@ do
 			return Slider
 		end
 
-		-- Dropdown (FIXED - supports multi-select and proper default handling)
+		-- Dropdown with multi-select support
 		function Sections:List(Options)
 			local Props = Options or {}
 			local DD = {
@@ -801,7 +849,6 @@ do
 						if DD.Selected[opt] then table.insert(names, opt) end
 					end
 					ValueDD.Text = #names > 0 and table.concat(names, ", ") or "..."
-					-- Store as array for flags
 					local arr = {}
 					for k, v in pairs(DD.Selected) do
 						if v then table.insert(arr, k) end
@@ -838,7 +885,6 @@ do
 						updateOptionColors()
 						updateDisplay()
 					else
-						-- Single select: clear all, select this one
 						for k in pairs(DD.Selected) do DD.Selected[k] = false end
 						DD.Selected[option] = true
 						updateOptionColors()
@@ -865,13 +911,10 @@ do
 			function DD:Set(option)
 				if DD.Multi then
 					if type(option) == "table" then
-						-- Could be array or dict
 						for k in pairs(DD.Selected) do DD.Selected[k] = false end
 						if #option > 0 then
-							-- Array
 							for _, v in ipairs(option) do DD.Selected[v] = true end
 						else
-							-- Dict
 							for k, v in pairs(option) do DD.Selected[k] = v end
 						end
 					end
@@ -894,7 +937,6 @@ do
 				updateDisplay()
 			end
 
-			-- Initialize with default
 			if DD.State then
 				if DD.Multi then
 					if type(DD.State) == "table" then
@@ -1017,7 +1059,7 @@ do
 			Div.Size = UDim2.new(1,0,0,1); Div.BackgroundColor3 = Color3.new(0.1098,0.1098,0.1098); Div.BorderSizePixel = 0
 		end
 
-		-- Keybind - FIXED: proper active state tracking with callbacks
+		-- Keybind
 		function Sections:Keybind(Options)
 			local Props = Options or {}
 			local KB = {
@@ -1032,7 +1074,6 @@ do
 			local StateKB = false
 			local parent = Options.Side == "Right" and KB.Section.Elements.Right or KB.Section.Elements.Left
 
-			-- Store keybind data in flags
 			Library.Flags[KB.Flag] = { key = nil, mode = KB.Mode, active = false }
 
 			local HolderKB = Instance.new('TextButton', parent)
@@ -1111,10 +1152,7 @@ do
 	end
 end
 
-
 -- LOWERCASE API WRAPPER
-
-
 local library = {
 	flags = Library.Flags,
 	_internal = Library,
@@ -1140,12 +1178,6 @@ function library:window(opts)
 		})
 	end
 
-	function wrapper:init_config(w)
-		pcall(function()
-			Library:InitFolders()
-		end)
-	end
-
 	return wrapper
 end
 
@@ -1154,7 +1186,8 @@ function library:unload()
 end
 
 function library:init_config(w)
-	if w and w.init_config then w:init_config(w) end
+	Library:InitFolders()
+	Library:DoAutoLoad()
 end
 
 function library:get_config()
@@ -1181,9 +1214,24 @@ function library:change_accent(color)
 	Library:ChangeAccent(color)
 end
 
-
 function library:on_flag_changed(flag, callback)
 	Library:OnFlagChanged(flag, callback)
+end
+
+function library:get_accent()
+	return Library.Accent
+end
+
+function library:set_auto_load(name)
+	Library:SetAutoLoad(name)
+end
+
+function library:clear_auto_load()
+	Library:ClearAutoLoad()
+end
+
+function library:get_auto_load()
+	return Library.AutoLoadConfigName
 end
 
 Library:OnUnload(function() print("Avenir Unloaded!") end)
