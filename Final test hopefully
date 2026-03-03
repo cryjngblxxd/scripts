@@ -79,6 +79,8 @@ do
 		FontSize = 13;
 		Unloaded = false;
 		OnUnloadCallbacks = {};
+		-- NEW: Callback registries for reactive flag watching
+		_flagCallbacks = {};
 	}
 
 	local Flags = {}
@@ -91,6 +93,23 @@ do
 
 	local function AddInstance(inst)
 		table.insert(Library.Instances, inst)
+	end
+
+	-- NEW: Fire callbacks when a flag changes
+	function Library:FireFlagCallbacks(flag, value)
+		if Library._flagCallbacks[flag] then
+			for _, cb in ipairs(Library._flagCallbacks[flag]) do
+				task.spawn(pcall, cb, value)
+			end
+		end
+	end
+
+	-- NEW: Register a callback for flag changes
+	function Library:OnFlagChanged(flag, callback)
+		if not Library._flagCallbacks[flag] then
+			Library._flagCallbacks[flag] = {}
+		end
+		table.insert(Library._flagCallbacks[flag], callback)
 	end
 
 	function Library:Connection(Signal, Callback)
@@ -237,6 +256,34 @@ do
 		end
 	end
 
+	function Library:SaveConfig(name)
+		pcall(function()
+			Library:InitFolders()
+			writefile(Library:GetConfigPath() .. "/" .. name .. ".cfg", Library:GetConfig())
+		end)
+	end
+
+	function Library:DeleteConfig(name)
+		pcall(function()
+			local path = Library:GetConfigPath() .. "/" .. name .. ".cfg"
+			if isfile(path) then delfile(path) end
+		end)
+	end
+
+	function Library:ListConfigs()
+		local list = {}
+		pcall(function()
+			local path = Library:GetConfigPath()
+			if isfolder(path) then
+				for _, file in ipairs(listfiles(path)) do
+					local name = file:match("([^/\\]+)%.cfg$")
+					if name then table.insert(list, name) end
+				end
+			end
+		end)
+		return list
+	end
+
 	-- COLORPICKER
 	function Library:NewPicker(default, defaultalpha, parent, count, flag, callback)
 		local Icon = Instance.new('TextButton', parent)
@@ -272,7 +319,10 @@ do
 			local hsv = Color3.fromHSV(hue, sat, val)
 			Icon.BackgroundColor3 = hsv
 			Sat.BackgroundColor3 = Color3.fromHSV(hue, 1, 1)
-			if flag then Library.Flags[flag] = hsv end
+			if flag then
+				Library.Flags[flag] = hsv
+				Library:FireFlagCallbacks(flag, hsv)
+			end
 			if callback then callback(hsv) end
 		end
 
@@ -554,18 +604,10 @@ do
 					Content.Name = "Content"; Content.Position = UDim2.new(0, 10, 0, 25)
 					Content.Size = UDim2.new(1, -20, 0, 0); Content.AutomaticSize = Enum.AutomaticSize.Y
 					Content.BackgroundTransparency = 1
-					Instance.new('UIListLayout', Content).SortOrder = Enum.SortOrder.LayoutOrder
-					Instance.new('UIListLayout', Content).Padding = UDim.new(0, 4)
+					local contentLayout = Instance.new('UIListLayout', Content)
+					contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
+					contentLayout.Padding = UDim.new(0, 4)
 					Instance.new('UIPadding', SectionFrame).PaddingBottom = UDim.new(0, 10)
-
-					-- Remove duplicate UIListLayout
-					local layouts = {}
-					for _, child in pairs(Content:GetChildren()) do
-						if child:IsA("UIListLayout") then
-							table.insert(layouts, child)
-						end
-					end
-					for i = 2, #layouts do layouts[i]:Destroy() end
 
 					local sect = {}
 					sect._content = Content
@@ -578,7 +620,7 @@ do
 
 					function sect:toggle(opts) opts = opts or {}; return fakeSection:Toggle({Name = opts.name or opts.Name, Side = "Left", Flag = opts.flag or opts.Flag, State = opts.default or opts.Default or false, Callback = opts.callback or opts.Callback or function() end}) end
 					function sect:slider(opts) opts = opts or {}; return fakeSection:Slider({Name = opts.name or opts.Name, Side = "Left", Flag = opts.flag or opts.Flag, Min = opts.min or 0, Max = opts.max or 100, State = opts.default or opts.Default or 0, Decimals = opts.interval or 1, Suffix = opts.suffix or "", Callback = opts.callback or opts.Callback or function() end}) end
-					function sect:dropdown(opts) opts = opts or {}; return fakeSection:List({Name = opts.name or opts.Name, Side = "Left", Flag = opts.flag or opts.Flag, Options = opts.items or opts.Items or {}, State = opts.default or opts.Default, Callback = opts.callback or opts.Callback or function() end}) end
+					function sect:dropdown(opts) opts = opts or {}; return fakeSection:List({Name = opts.name or opts.Name, Side = "Left", Flag = opts.flag or opts.Flag, Options = opts.items or opts.Items or {}, State = opts.default or opts.Default, Multi = opts.multi or opts.Multi or false, Callback = opts.callback or opts.Callback or function() end}) end
 					function sect:textbox(opts) opts = opts or {}; return fakeSection:Textbox({Name = opts.name or opts.Name, Side = "Left", Flag = opts.flag or opts.Flag, Placeholder = opts.placeholder or "", State = opts.default or opts.Default or "", Callback = opts.callback or opts.Callback or function() end}) end
 					function sect:button(opts) opts = opts or {}; return fakeSection:Button({Name = opts.name or opts.Name, Side = "Left", Callback = opts.callback or opts.Callback or function() end}) end
 					function sect:colorpicker(opts) opts = opts or {}; return fakeSection:Colorpicker({Name = opts.name or opts.Name, Side = "Left", Flag = opts.flag or opts.Flag, State = opts.color or opts.Color or Color3.fromRGB(255,0,0), Callback = opts.callback or opts.Callback or function() end}) end
@@ -632,16 +674,25 @@ do
 				Library.Flags[Toggle.Flag] = Toggle.Toggled
 				Toggle.Callback(Toggle.Toggled)
 				Library:UpdateDependencies(Toggle.Flag, Toggle.Toggled)
+				Library:FireFlagCallbacks(Toggle.Flag, Toggle.Toggled)
 			end
 
-			function Toggle.Set(bool)
+			local function ForceSet(bool)
 				bool = type(bool) == "boolean" and bool or false
 				if Toggle.Toggled ~= bool then SetState() end
 			end
 
-			Toggle.Set(Toggle.State)
-			Library.Flags[Toggle.Flag] = Toggle.State
-			Flags[Toggle.Flag] = Toggle.Set
+			function Toggle:Set(bool) ForceSet(bool) end
+
+			-- Initialize
+			if Toggle.State then
+				Toggle.Toggled = false -- will be flipped by SetState
+				SetState()
+			else
+				Library.Flags[Toggle.Flag] = false
+			end
+
+			Flags[Toggle.Flag] = ForceSet
 			Library:Connection(HolderT.MouseButton1Click, SetState)
 			return Toggle
 		end
@@ -689,6 +740,7 @@ do
 				ValueSL.Text = string.format("%.14g", value) .. Slider.Sub
 				AccentFillSL.Size = UDim2.new((value - Slider.Min) / (Slider.Max - Slider.Min), 0, 1, 0)
 				Library.Flags[Slider.Flag] = value; Slider.Callback(value)
+				Library:FireFlagCallbacks(Slider.Flag, value)
 			end
 			Set(Slider.State)
 			local function Slide(input) Set(((Slider.Max - Slider.Min) * math.clamp((input.Position.X - FrameSL.AbsolutePosition.X) / FrameSL.AbsoluteSize.X, 0, 1)) + Slider.Min) end
@@ -700,14 +752,17 @@ do
 			return Slider
 		end
 
-		-- Dropdown
+		-- Dropdown (FIXED - supports multi-select and proper default handling)
 		function Sections:List(Options)
 			local Props = Options or {}
 			local DD = {
 				Section = self, Open = false, Name = Props.Name or nil,
-				Options = Props.Options or Props.options or {}, State = Props.State or Props.state or Props.default or Props.Default or nil,
+				Options = Props.Options or Props.options or {},
+				State = Props.State or Props.state or Props.default or Props.Default or nil,
+				Multi = Props.Multi or Props.multi or false,
 				Callback = Props.Callback or Props.callback or function() end,
 				Flag = Props.Flag or Props.flag or Library.NextFlag(), OptionInsts = {}, Holder = nil;
+				Selected = {};
 			}
 
 			local parent = Options.Side == "Right" and DD.Section.Elements.Right or DD.Section.Elements.Left
@@ -739,41 +794,122 @@ do
 				end
 			end)
 
+			local function updateDisplay()
+				if DD.Multi then
+					local names = {}
+					for _, opt in ipairs(DD.Options) do
+						if DD.Selected[opt] then table.insert(names, opt) end
+					end
+					ValueDD.Text = #names > 0 and table.concat(names, ", ") or "..."
+					-- Store as array for flags
+					local arr = {}
+					for k, v in pairs(DD.Selected) do
+						if v then table.insert(arr, k) end
+					end
+					Library.Flags[DD.Flag] = arr
+					DD.Callback(DD.Selected)
+					Library:FireFlagCallbacks(DD.Flag, arr)
+				else
+					local sel = nil
+					for k, v in pairs(DD.Selected) do
+						if v then sel = k; break end
+					end
+					ValueDD.Text = sel or ""
+					Library.Flags[DD.Flag] = sel
+					DD.Callback(sel)
+					Library:FireFlagCallbacks(DD.Flag, sel)
+				end
+			end
+
+			local function updateOptionColors()
+				for opt, tbl in pairs(DD.OptionInsts) do
+					if DD.Selected[opt] then
+						tbl.text.TextColor3 = Color3.fromRGB(255,255,255)
+					else
+						tbl.text.TextColor3 = Color3.new(0.306,0.306,0.306)
+					end
+				end
+			end
+
 			local function handleclick(option, button, text)
 				button.MouseButton1Click:Connect(function()
-					for _, tbl in next, DD.OptionInsts do tbl.text.TextColor3 = Color3.new(0.306,0.306,0.306) end
-					ValueDD.Text = option; text.TextColor3 = Color3.fromRGB(255,255,255)
-					Library.Flags[DD.Flag] = option; DD.Callback(option); ContentDD.Visible = false
+					if DD.Multi then
+						DD.Selected[option] = not DD.Selected[option]
+						updateOptionColors()
+						updateDisplay()
+					else
+						-- Single select: clear all, select this one
+						for k in pairs(DD.Selected) do DD.Selected[k] = false end
+						DD.Selected[option] = true
+						updateOptionColors()
+						updateDisplay()
+						ContentDD.Visible = false
+					end
 				end)
 			end
+
 			local function createoptions(tbl)
 				for _, option in next, tbl do
 					DD.OptionInsts[option] = {}
 					local Opt = Instance.new('TextButton', ContentDD)
 					local OptName = Instance.new('TextLabel', Opt)
 					Opt.Size = UDim2.new(1,0,0,16); Opt.BackgroundTransparency = 1; Opt.Text = ""; Opt.AutoButtonColor = false; Opt.ZIndex = 111
-					DD.OptionInsts[option].button = Opt
+					DD.OptionInsts[option] = { button = Opt, text = OptName }
 					OptName.Position = UDim2.new(0,4,0,0); OptName.Size = UDim2.new(1,0,1,0); OptName.BackgroundTransparency = 1
 					OptName.Text = option; OptName.TextColor3 = Color3.new(0.306,0.306,0.306); OptName.FontFace = Library.UIFont; OptName.TextSize = Library.FontSize; OptName.TextXAlignment = Enum.TextXAlignment.Left; OptName.ZIndex = 111
-					DD.OptionInsts[option].text = OptName
 					handleclick(option, Opt, OptName)
 				end
 			end
 			createoptions(DD.Options)
 
 			function DD:Set(option)
-				for _, tbl in next, DD.OptionInsts do tbl.text.TextColor3 = Color3.new(0.306,0.306,0.306) end
-				if option and DD.OptionInsts[option] then
-					ValueDD.Text = option; DD.OptionInsts[option].text.TextColor3 = Color3.fromRGB(255,255,255)
-					Library.Flags[DD.Flag] = option; DD.Callback(option)
-				else ValueDD.Text = ""; Library.Flags[DD.Flag] = nil end
+				if DD.Multi then
+					if type(option) == "table" then
+						-- Could be array or dict
+						for k in pairs(DD.Selected) do DD.Selected[k] = false end
+						if #option > 0 then
+							-- Array
+							for _, v in ipairs(option) do DD.Selected[v] = true end
+						else
+							-- Dict
+							for k, v in pairs(option) do DD.Selected[k] = v end
+						end
+					end
+				else
+					for k in pairs(DD.Selected) do DD.Selected[k] = false end
+					if option and DD.OptionInsts[option] then
+						DD.Selected[option] = true
+					end
+				end
+				updateOptionColors()
+				updateDisplay()
 			end
+
 			function DD:Refresh(tbl)
 				DD.Options = tbl
 				for _, opt in next, DD.OptionInsts do pcall(function() opt.button:Destroy() end) end
-				table.clear(DD.OptionInsts); createoptions(tbl); ValueDD.Text = ""; Library.Flags[DD.Flag] = nil
+				table.clear(DD.OptionInsts)
+				table.clear(DD.Selected)
+				createoptions(tbl)
+				updateDisplay()
 			end
-			Flags[DD.Flag] = DD; DD:Set(DD.State)
+
+			-- Initialize with default
+			if DD.State then
+				if DD.Multi then
+					if type(DD.State) == "table" then
+						for _, v in ipairs(DD.State) do DD.Selected[v] = true end
+					end
+				else
+					if type(DD.State) == "string" then
+						DD.Selected[DD.State] = true
+					end
+				end
+			end
+			updateOptionColors()
+			updateDisplay()
+
+			Flags[DD.Flag] = DD
 			return DD
 		end
 
@@ -807,9 +943,15 @@ do
 			TextBoxTB.PlaceholderText = TB.Placeholder; TextBoxTB.PlaceholderColor3 = Color3.new(0.25,0.25,0.25); TextBoxTB.ClearTextOnFocus = false; TextBoxTB.TextXAlignment = Enum.TextXAlignment.Left
 
 			Library.Flags[TB.Flag] = TB.State
-			TextBoxTB.FocusLost:Connect(function() TB.Callback(TextBoxTB.Text); Library.Flags[TB.Flag] = TextBoxTB.Text end)
-			TextBoxTB:GetPropertyChangedSignal("Text"):Connect(function() Library.Flags[TB.Flag] = TextBoxTB.Text end)
-			local function set(str) TextBoxTB.Text = str; Library.Flags[TB.Flag] = str end
+			TextBoxTB.FocusLost:Connect(function()
+				TB.Callback(TextBoxTB.Text)
+				Library.Flags[TB.Flag] = TextBoxTB.Text
+				Library:FireFlagCallbacks(TB.Flag, TextBoxTB.Text)
+			end)
+			TextBoxTB:GetPropertyChangedSignal("Text"):Connect(function()
+				Library.Flags[TB.Flag] = TextBoxTB.Text
+			end)
+			local function set(str) TextBoxTB.Text = str; Library.Flags[TB.Flag] = str; Library:FireFlagCallbacks(TB.Flag, str) end
 			function TB:Set(str) set(str) end
 			function TB:SetValue(str) set(str) end
 			Flags[TB.Flag] = set
@@ -875,7 +1017,7 @@ do
 			Div.Size = UDim2.new(1,0,0,1); Div.BackgroundColor3 = Color3.new(0.1098,0.1098,0.1098); Div.BorderSizePixel = 0
 		end
 
-		-- Keybind (standalone) - FIXED VERSION
+		-- Keybind - FIXED: proper active state tracking with callbacks
 		function Sections:Keybind(Options)
 			local Props = Options or {}
 			local KB = {
@@ -906,7 +1048,9 @@ do
 			ValueKB.TextSize = Library.FontSize; ValueKB.AutoButtonColor = false; ValueKB.TextXAlignment = Enum.TextXAlignment.Right
 
 			local function updateFlagData()
-				Library.Flags[KB.Flag] = { key = Key, mode = KB.Mode, active = StateKB }
+				local newData = { key = Key, mode = KB.Mode, active = StateKB }
+				Library.Flags[KB.Flag] = newData
+				Library:FireFlagCallbacks(KB.Flag, newData)
 			end
 
 			local function setKeyKB(newkey)
@@ -967,7 +1111,10 @@ do
 	end
 end
 
+
 -- LOWERCASE API WRAPPER
+
+
 local library = {
 	flags = Library.Flags,
 	_internal = Library,
@@ -994,7 +1141,6 @@ function library:window(opts)
 	end
 
 	function wrapper:init_config(w)
-		-- Config auto-load
 		pcall(function()
 			Library:InitFolders()
 		end)
@@ -1020,35 +1166,24 @@ function library:load_config(json)
 end
 
 function library:save_config(name)
-	pcall(function()
-		Library:InitFolders()
-		writefile(Library:GetConfigPath() .. "/" .. name .. ".cfg", Library:GetConfig())
-	end)
+	Library:SaveConfig(name)
 end
 
 function library:delete_config(name)
-	pcall(function()
-		local path = Library:GetConfigPath() .. "/" .. name .. ".cfg"
-		if isfile(path) then delfile(path) end
-	end)
+	Library:DeleteConfig(name)
 end
 
 function library:list_configs()
-	local list = {}
-	pcall(function()
-		local path = Library:GetConfigPath()
-		if isfolder(path) then
-			for _, file in ipairs(listfiles(path)) do
-				local name = file:match("([^/\\]+)%.cfg$")
-				if name then table.insert(list, name) end
-			end
-		end
-	end)
-	return list
+	return Library:ListConfigs()
 end
 
 function library:change_accent(color)
 	Library:ChangeAccent(color)
+end
+
+
+function library:on_flag_changed(flag, callback)
+	Library:OnFlagChanged(flag, callback)
 end
 
 Library:OnUnload(function() print("Avenir Unloaded!") end)
