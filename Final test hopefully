@@ -884,158 +884,308 @@ end
 
         -- Dropdown with multi-select support
         function Sections:List(Options)
-            local Props = Options or {}
-            local DD = {
-                Section = self, Open = false, Name = Props.Name or nil,
-                Options = Props.Options or Props.options or {},
-                State = Props.State or Props.state or Props.default or Props.Default or nil,
-                Multi = Props.Multi or Props.multi or false,
-                Callback = Props.Callback or Props.callback or function() end,
-                Flag = Props.Flag or Props.flag or Library.NextFlag(), OptionInsts = {}, Holder = nil;
-                Selected = {};
-            }
+        local Props = Options or {}
+        local DD = {
+            Section = self, Open = false, Name = Props.Name or nil,
+            Options = Props.Options or Props.options or {},
+            State = Props.State or Props.state or Props.default or Props.Default or nil,
+            Multi = Props.Multi or Props.multi or false,
+            Callback = Props.Callback or Props.callback or function() end,
+            Flag = Props.Flag or Props.flag or Library.NextFlag(), 
+            OptionInsts = {}, 
+            Holder = nil,
+            Selected = {},
+            CurrentIndex = 1,
+        }
 
-            local parent = Options.Side == "Right" and DD.Section.Elements.Right or DD.Section.Elements.Left
-            local HolderDD = Instance.new('Frame', parent); DD.Holder = HolderDD
-            local FrameDD = Instance.new('TextButton', HolderDD)
-            local ValueDD = Instance.new('TextLabel', FrameDD)
-            local ContentDD = Instance.new('Frame', FrameDD)
-            local ListLayoutDD = Instance.new('UIListLayout', ContentDD)
-            local TitleDD = Instance.new('TextLabel', HolderDD)
+        local parent = Options.Side == "Right" and DD.Section.Elements.Right or DD.Section.Elements.Left
+        local HolderDD = Instance.new('Frame', parent)
+        DD.Holder = HolderDD
+        local FrameDD = Instance.new('TextButton', HolderDD)
+        local ValueDD = Instance.new('TextLabel', FrameDD)
+        local ArrowDD = Instance.new('TextLabel', FrameDD)
+        local ContentDD = Instance.new('ScrollingFrame', FrameDD)
+        local ListLayoutDD = Instance.new('UIListLayout', ContentDD)
+        local TitleDD = Instance.new('TextLabel', HolderDD)
 
-            HolderDD.Size = UDim2.new(1,0,0,42); HolderDD.BackgroundTransparency = 1
-            FrameDD.Position = UDim2.new(0,0,0,18); FrameDD.Size = UDim2.new(1,-15,0,20)
-            FrameDD.BackgroundColor3 = Color3.new(0.0784,0.0784,0.0784); FrameDD.BorderColor3 = Color3.new(0,0,0); FrameDD.Text = ""; FrameDD.AutoButtonColor = false
-            Instance.new('UIGradient', FrameDD).Color = ColorSequence.new{ColorSequenceKeypoint.new(0,Color3.new(0.78,0.749,0.8)),ColorSequenceKeypoint.new(1,Color3.new(1,1,1))}
-            ValueDD.Position = UDim2.new(0,4,0,0); ValueDD.Size = UDim2.new(1,-20,1,0); ValueDD.BackgroundTransparency = 1; ValueDD.Text = ""
-            ValueDD.TextColor3 = Color3.new(0.306,0.306,0.306); ValueDD.FontFace = Library.UIFont; ValueDD.TextSize = Library.FontSize; ValueDD.TextXAlignment = Enum.TextXAlignment.Left; ValueDD.ClipsDescendants = true
-            ContentDD.Position = UDim2.new(0,0,0,22); ContentDD.Size = UDim2.new(1,0,0,0)
-            ContentDD.BackgroundColor3 = Color3.new(0.0784,0.0784,0.0784); ContentDD.BorderColor3 = Color3.new(0,0,0)
-            ContentDD.Visible = false; ContentDD.ZIndex = 110; ContentDD.AutomaticSize = Enum.AutomaticSize.Y
-            ListLayoutDD.SortOrder = Enum.SortOrder.LayoutOrder
-            TitleDD.Position = UDim2.new(0,0,0,0); TitleDD.Size = UDim2.new(1,0,0,16); TitleDD.BackgroundTransparency = 1
-            TitleDD.TextColor3 = Color3.new(0.306,0.306,0.306); TitleDD.FontFace = Library.UIFont; TitleDD.TextSize = Library.FontSize; TitleDD.TextXAlignment = Enum.TextXAlignment.Left
-            TitleDD.Text = DD.Name or ""
+        HolderDD.Size = UDim2.new(1, 0, 0, 42)
+        HolderDD.BackgroundTransparency = 1
+        
+        FrameDD.Position = UDim2.new(0, 0, 0, 18)
+        FrameDD.Size = UDim2.new(1, -15, 0, 20)
+        FrameDD.BackgroundColor3 = Color3.new(0.0784, 0.0784, 0.0784)
+        FrameDD.BorderColor3 = Color3.new(0, 0, 0)
+        FrameDD.Text = ""
+        FrameDD.AutoButtonColor = false
+        Instance.new('UIGradient', FrameDD).Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.new(0.78, 0.749, 0.8)),
+            ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1))
+        }
+        
+        ValueDD.Position = UDim2.new(0, 4, 0, 0)
+        ValueDD.Size = UDim2.new(1, -20, 1, 0)
+        ValueDD.BackgroundTransparency = 1
+        ValueDD.Text = ""
+        ValueDD.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+        ValueDD.FontFace = Library.UIFont
+        ValueDD.TextSize = Library.FontSize
+        ValueDD.TextXAlignment = Enum.TextXAlignment.Left
+        ValueDD.ClipsDescendants = true
+        
+        ArrowDD.Position = UDim2.new(1, -15, 0, 0)
+        ArrowDD.Size = UDim2.new(0, 15, 1, 0)
+        ArrowDD.BackgroundTransparency = 1
+        ArrowDD.Text = "▼"
+        ArrowDD.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+        ArrowDD.FontFace = Library.UIFont
+        ArrowDD.TextSize = 10
+        
+        ContentDD.Position = UDim2.new(0, 0, 0, 22)
+        ContentDD.Size = UDim2.new(1, 0, 0, 0)
+        ContentDD.BackgroundColor3 = Color3.new(0.0784, 0.0784, 0.0784)
+        ContentDD.BorderColor3 = Color3.new(0, 0, 0)
+        ContentDD.Visible = false
+        ContentDD.ZIndex = 110
+        ContentDD.ScrollBarThickness = 2
+        ContentDD.ScrollBarImageColor3 = Color3.new(0.4, 0.4, 0.4)
+        ContentDD.CanvasSize = UDim2.new(0, 0, 0, 0)
+        ContentDD.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        
+        ListLayoutDD.SortOrder = Enum.SortOrder.LayoutOrder
+        
+        TitleDD.Position = UDim2.new(0, 0, 0, 0)
+        TitleDD.Size = UDim2.new(1, 0, 0, 16)
+        TitleDD.BackgroundTransparency = 1
+        TitleDD.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+        TitleDD.FontFace = Library.UIFont
+        TitleDD.TextSize = Library.FontSize
+        TitleDD.TextXAlignment = Enum.TextXAlignment.Left
+        TitleDD.Text = DD.Name or ""
 
-            Library:Connection(FrameDD.MouseButton1Click, function() ContentDD.Visible = not ContentDD.Visible end)
-            Library:Connection(game:GetService("UserInputService").InputBegan, function(Input)
-                if ContentDD.Visible and Input.UserInputType == Enum.UserInputType.MouseButton1 then
-                    if not Library:IsMouseOverFrame(ContentDD) and not Library:IsMouseOverFrame(HolderDD) then ContentDD.Visible = false end
+        local function updateContentSize()
+            local optionCount = 0
+            for _ in pairs(DD.OptionInsts) do
+                optionCount = optionCount + 1
+            end
+            local maxVisible = math.min(optionCount, 6)
+            ContentDD.Size = UDim2.new(1, 0, 0, maxVisible * 18)
+        end
+
+        local function openDropdown()
+            ContentDD.Visible = true
+            ArrowDD.Text = "▲"
+            updateContentSize()
+        end
+
+        local function closeDropdown()
+            ContentDD.Visible = false
+            ArrowDD.Text = "▼"
+        end
+
+        FrameDD.MouseButton1Click:Connect(function()
+            if ContentDD.Visible then
+                closeDropdown()
+            else
+                openDropdown()
+            end
+        end)
+
+        Library:Connection(game:GetService("UserInputService").InputBegan, function(Input)
+            if ContentDD.Visible and Input.UserInputType == Enum.UserInputType.MouseButton1 then
+                if not Library:IsMouseOverFrame(ContentDD) and not Library:IsMouseOverFrame(HolderDD) then
+                    closeDropdown()
+                end
+            end
+        end)
+
+        local function updateDisplay()
+            if DD.Multi then
+                local names = {}
+                for _, opt in ipairs(DD.Options) do
+                    if DD.Selected[opt] then
+                        table.insert(names, opt)
+                    end
+                end
+                ValueDD.Text = #names > 0 and table.concat(names, ", ") or "..."
+                local arr = {}
+                for k, v in pairs(DD.Selected) do
+                    if v then
+                        table.insert(arr, k)
+                    end
+                end
+                Library.Flags[DD.Flag] = arr
+                DD.Callback(DD.Selected)
+                Library:FireFlagCallbacks(DD.Flag, arr)
+            else
+                local sel = nil
+                for k, v in pairs(DD.Selected) do
+                    if v then
+                        sel = k
+                        break
+                    end
+                end
+                ValueDD.Text = sel or ""
+                Library.Flags[DD.Flag] = sel
+                DD.Callback(sel)
+                Library:FireFlagCallbacks(DD.Flag, sel)
+            end
+        end
+
+        local function updateOptionColors()
+            for opt, tbl in pairs(DD.OptionInsts) do
+                if DD.Selected[opt] then
+                    tbl.text.TextColor3 = Color3.fromRGB(255, 255, 255)
+                else
+                    tbl.text.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+                end
+            end
+        end
+
+        local function selectByIndex(index)
+            if DD.Multi then return end
+            if #DD.Options == 0 then return end
+            
+            index = ((index - 1) % #DD.Options) + 1
+            DD.CurrentIndex = index
+            
+            local option = DD.Options[index]
+            for k in pairs(DD.Selected) do
+                DD.Selected[k] = false
+            end
+            DD.Selected[option] = true
+            updateOptionColors()
+            updateDisplay()
+        end
+
+        local function handleClick(option, button, text)
+            button.MouseButton1Click:Connect(function()
+                if DD.Multi then
+                    DD.Selected[option] = not DD.Selected[option]
+                    updateOptionColors()
+                    updateDisplay()
+                else
+                    for k in pairs(DD.Selected) do
+                        DD.Selected[k] = false
+                    end
+                    DD.Selected[option] = true
+                    updateOptionColors()
+                    updateDisplay()
+                    closeDropdown()
                 end
             end)
+        end
 
-            local function updateDisplay()
-                if DD.Multi then
-                    local names = {}
-                    for _, opt in ipairs(DD.Options) do
-                        if DD.Selected[opt] then table.insert(names, opt) end
+        local function createOptions(tbl)
+            for i, option in ipairs(tbl) do
+                DD.OptionInsts[option] = {}
+                local Opt = Instance.new('TextButton', ContentDD)
+                local OptName = Instance.new('TextLabel', Opt)
+                
+                Opt.Size = UDim2.new(1, 0, 0, 18)
+                Opt.BackgroundTransparency = 1
+                Opt.Text = ""
+                Opt.AutoButtonColor = false
+                Opt.ZIndex = 111
+                Opt.LayoutOrder = i
+                
+                DD.OptionInsts[option] = { button = Opt, text = OptName, index = i }
+                
+                OptName.Position = UDim2.new(0, 4, 0, 0)
+                OptName.Size = UDim2.new(1, 0, 1, 0)
+                OptName.BackgroundTransparency = 1
+                OptName.Text = option
+                OptName.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+                OptName.FontFace = Library.UIFont
+                OptName.TextSize = Library.FontSize
+                OptName.TextXAlignment = Enum.TextXAlignment.Left
+                OptName.ZIndex = 111
+                
+                handleClick(option, Opt, OptName)
+            end
+            updateContentSize()
+        end
+
+        createOptions(DD.Options)
+
+        -- Scroll wheel support
+        Library:Connection(game:GetService("UserInputService").InputChanged, function(input)
+            if input.UserInputType == Enum.UserInputType.MouseWheel then
+                if Library:IsMouseOverFrame(FrameDD) or Library:IsMouseOverFrame(HolderDD) then
+                    if not DD.Multi then
+                        local direction = input.Position.Z > 0 and -1 or 1
+                        selectByIndex(DD.CurrentIndex + direction)
                     end
-                    ValueDD.Text = #names > 0 and table.concat(names, ", ") or "..."
-                    local arr = {}
-                    for k, v in pairs(DD.Selected) do
-                        if v then table.insert(arr, k) end
-                    end
-                    Library.Flags[DD.Flag] = arr
-                    DD.Callback(DD.Selected)
-                    Library:FireFlagCallbacks(DD.Flag, arr)
-                else
-                    local sel = nil
-                    for k, v in pairs(DD.Selected) do
-                        if v then sel = k; break end
-                    end
-                    ValueDD.Text = sel or ""
-                    Library.Flags[DD.Flag] = sel
-                    DD.Callback(sel)
-                    Library:FireFlagCallbacks(DD.Flag, sel)
                 end
             end
+        end)
 
-            local function updateOptionColors()
-                for opt, tbl in pairs(DD.OptionInsts) do
-                    if DD.Selected[opt] then
-                        tbl.text.TextColor3 = Color3.fromRGB(255,255,255)
+        function DD:Set(option)
+            if DD.Multi then
+                if type(option) == "table" then
+                    for k in pairs(DD.Selected) do
+                        DD.Selected[k] = false
+                    end
+                    if #option > 0 then
+                        for _, v in ipairs(option) do
+                            DD.Selected[v] = true
+                        end
                     else
-                        tbl.text.TextColor3 = Color3.new(0.306,0.306,0.306)
-                    end
-                end
-            end
-
-            local function handleclick(option, button, text)
-                button.MouseButton1Click:Connect(function()
-                    if DD.Multi then
-                        DD.Selected[option] = not DD.Selected[option]
-                        updateOptionColors()
-                        updateDisplay()
-                    else
-                        for k in pairs(DD.Selected) do DD.Selected[k] = false end
-                        DD.Selected[option] = true
-                        updateOptionColors()
-                        updateDisplay()
-                        ContentDD.Visible = false
-                    end
-                end)
-            end
-
-            local function createoptions(tbl)
-                for _, option in next, tbl do
-                    DD.OptionInsts[option] = {}
-                    local Opt = Instance.new('TextButton', ContentDD)
-                    local OptName = Instance.new('TextLabel', Opt)
-                    Opt.Size = UDim2.new(1,0,0,18); Opt.BackgroundTransparency = 1; Opt.Text = ""; Opt.AutoButtonColor = false; Opt.ZIndex = 111
-                    DD.OptionInsts[option] = { button = Opt, text = OptName }
-                    OptName.Position = UDim2.new(0,4,0,0); OptName.Size = UDim2.new(1,0,1,0); OptName.BackgroundTransparency = 1
-                    OptName.Text = option; OptName.TextColor3 = Color3.new(0.306,0.306,0.306); OptName.FontFace = Library.UIFont; OptName.TextSize = Library.FontSize; OptName.TextXAlignment = Enum.TextXAlignment.Left; OptName.ZIndex = 111
-                    handleclick(option, Opt, OptName)
-                end
-            end
-            createoptions(DD.Options)
-
-            function DD:Set(option)
-                if DD.Multi then
-                    if type(option) == "table" then
-                        for k in pairs(DD.Selected) do DD.Selected[k] = false end
-                        if #option > 0 then
-                            for _, v in ipairs(option) do DD.Selected[v] = true end
-                        else
-                            for k, v in pairs(option) do DD.Selected[k] = v end
+                        for k, v in pairs(option) do
+                            DD.Selected[k] = v
                         end
                     end
-                else
-                    for k in pairs(DD.Selected) do DD.Selected[k] = false end
-                    if option and DD.OptionInsts[option] then
-                        DD.Selected[option] = true
-                    end
                 end
-                updateOptionColors()
-                updateDisplay()
-            end
-
-            function DD:Refresh(tbl)
-                DD.Options = tbl
-                for _, opt in next, DD.OptionInsts do pcall(function() opt.button:Destroy() end) end
-                table.clear(DD.OptionInsts)
-                table.clear(DD.Selected)
-                createoptions(tbl)
-                updateDisplay()
-            end
-
-            if DD.State then
-                if DD.Multi then
-                    if type(DD.State) == "table" then
-                        for _, v in ipairs(DD.State) do DD.Selected[v] = true end
-                    end
-                else
-                    if type(DD.State) == "string" then
-                        DD.Selected[DD.State] = true
-                    end
+            else
+                for k in pairs(DD.Selected) do
+                    DD.Selected[k] = false
+                end
+                if option and DD.OptionInsts[option] then
+                    DD.Selected[option] = true
+                    DD.CurrentIndex = DD.OptionInsts[option].index or 1
                 end
             end
             updateOptionColors()
             updateDisplay()
-
-            Flags[DD.Flag] = DD
-            return DD
         end
+
+        function DD:Refresh(tbl)
+            DD.Options = tbl
+            for _, opt in pairs(DD.OptionInsts) do
+                pcall(function() opt.button:Destroy() end)
+            end
+            table.clear(DD.OptionInsts)
+            table.clear(DD.Selected)
+            DD.CurrentIndex = 1
+            createOptions(tbl)
+            updateDisplay()
+        end
+
+        -- Set initial selection
+        if DD.State then
+            if DD.Multi then
+                if type(DD.State) == "table" then
+                    for _, v in ipairs(DD.State) do
+                        DD.Selected[v] = true
+                    end
+                end
+            else
+                if type(DD.State) == "string" then
+                    DD.Selected[DD.State] = true
+                    for i, opt in ipairs(DD.Options) do
+                        if opt == DD.State then
+                            DD.CurrentIndex = i
+                            break
+                        end
+                    end
+                end
+            end
+        end
+        updateOptionColors()
+        updateDisplay()
+
+        Flags[DD.Flag] = DD
+        return DD
+    end
 
         -- Textbox
         function Sections:Textbox(Options)
@@ -1145,17 +1295,23 @@ end
         function Sections:Keybind(Options)
         local Props = Options or {}
         local KB = {
-            Section = self, 
+            Section = self,
             Name = Props.Name or Props.name or "Keybind",
-            State = Props.State or Props.state or Props.key or Props.Key or nil,
             Mode = Props.Mode or Props.mode or "Toggle",
             Callback = Props.Callback or Props.callback or nil,
             Flag = Props.Flag or Props.flag or Library.NextFlag(),
-            Binding = nil,
             Key = nil,
             Active = false,
+            Binding = false,
+            Holder = nil,
         }
-        
+
+        -- Set initial key
+        local initialKey = Props.State or Props.state or Props.key or Props.Key
+        if initialKey and typeof(initialKey) == "EnumItem" then
+            KB.Key = initialKey
+        end
+
         local parent = Options.Side == "Right" and KB.Section.Elements.Right or KB.Section.Elements.Left
 
         local HolderKB = Instance.new('TextButton', parent)
@@ -1164,20 +1320,22 @@ end
         local ModeWindow = Instance.new('Frame', HolderKB)
         local ModeList = Instance.new('UIListLayout', ModeWindow)
 
+        KB.Holder = HolderKB
+
         HolderKB.Size = UDim2.new(1, 0, 0, 16)
         HolderKB.BackgroundTransparency = 1
         HolderKB.Text = ""
         HolderKB.AutoButtonColor = false
-        
+
         TitleKB.Position = UDim2.new(0, 0, 0, 0)
-        TitleKB.Size = UDim2.new(1, -70, 1, 0)
+        TitleKB.Size = UDim2.new(1, -55, 1, 0)
         TitleKB.BackgroundTransparency = 1
         TitleKB.TextColor3 = Color3.new(0.306, 0.306, 0.306)
         TitleKB.FontFace = Library.UIFont
         TitleKB.TextSize = Library.FontSize
         TitleKB.TextXAlignment = Enum.TextXAlignment.Left
         TitleKB.Text = KB.Name
-        
+
         ValueKB.Position = UDim2.new(1, -50, 0, 0)
         ValueKB.Size = UDim2.new(0, 45, 1, 0)
         ValueKB.BackgroundTransparency = 1
@@ -1188,9 +1346,8 @@ end
         ValueKB.AutoButtonColor = false
         ValueKB.TextXAlignment = Enum.TextXAlignment.Right
 
-        -- Mode selection window
-        ModeWindow.Position = UDim2.new(1, -50, 0, 18)
-        ModeWindow.Size = UDim2.new(0, 60, 0, 0)
+        ModeWindow.Position = UDim2.new(1, -60, 0, 18)
+        ModeWindow.Size = UDim2.new(0, 70, 0, 0)
         ModeWindow.BackgroundColor3 = Color3.new(0.0431, 0.0431, 0.0431)
         ModeWindow.BorderColor3 = Color3.new(0.1098, 0.1098, 0.1098)
         ModeWindow.ZIndex = 1220
@@ -1201,15 +1358,49 @@ end
         local modes = {"Toggle", "Hold"}
         local modeButtons = {}
 
+        local function getKeyName(key)
+            if not key then
+                return "-"
+            end
+            if Library.Keys[key] then
+                return Library.Keys[key]
+            end
+            local keyString = tostring(key)
+            keyString = keyString:gsub("Enum.KeyCode.", "")
+            keyString = keyString:gsub("Enum.UserInputType.", "")
+            return keyString
+        end
+
         local function updateFlagData()
-            Library.Flags[KB.Flag] = { 
-                key = KB.Key, 
-                mode = KB.Mode, 
-                active = KB.Active 
+            Library.Flags[KB.Flag] = {
+                key = KB.Key,
+                mode = KB.Mode,
+                active = KB.Active
             }
             Library:FireFlagCallbacks(KB.Flag, Library.Flags[KB.Flag])
         end
 
+        local function updateModeColors()
+            for m, btn in pairs(modeButtons) do
+                btn.TextColor3 = m == KB.Mode and Color3.fromRGB(255, 255, 255) or Color3.new(0.306, 0.306, 0.306)
+            end
+        end
+
+        local function setActive(state)
+            KB.Active = state
+            updateFlagData()
+            
+            if KB.Callback then
+                task.spawn(function()
+                    local success, err = pcall(KB.Callback, KB.Active)
+                    if not success then
+                        warn("Keybind callback error:", err)
+                    end
+                end)
+            end
+        end
+
+        -- Create mode buttons
         for _, mode in ipairs(modes) do
             local ModeBtn = Instance.new('TextButton', ModeWindow)
             ModeBtn.Size = UDim2.new(1, 0, 0, 18)
@@ -1223,64 +1414,65 @@ end
 
             ModeBtn.MouseButton1Click:Connect(function()
                 KB.Mode = mode
-                for m, btn in pairs(modeButtons) do
-                    btn.TextColor3 = m == mode and Color3.fromRGB(255, 255, 255) or Color3.new(0.306, 0.306, 0.306)
-                end
+                updateModeColors()
                 ModeWindow.Visible = false
                 updateFlagData()
             end)
         end
 
-        local function getKeyName(key)
-            if not key then return "-" end
-            return Library.Keys[key] or tostring(key):gsub("Enum.KeyCode.", ""):gsub("Enum.UserInputType.", "")
+        -- Set initial display
+        if KB.Key then
+            ValueKB.Text = getKeyName(KB.Key)
         end
-
-        local function setKey(newKey)
-            if newKey == Enum.KeyCode.Backspace or newKey == Enum.KeyCode.Escape then
-                KB.Key = nil
-                ValueKB.Text = "-"
-            else
-                KB.Key = newKey
-                ValueKB.Text = getKeyName(newKey)
-            end
-            KB.Active = false
-            updateFlagData()
-        end
-
-        -- Set initial key if provided
-        if KB.State then
-            KB.Key = KB.State
-            ValueKB.Text = getKeyName(KB.State)
-        end
-        
-        -- Initialize flag data
         updateFlagData()
+
+        -- Binding connection holder
+        local bindingConnection = nil
 
         -- Left click to bind key
         ValueKB.MouseButton1Click:Connect(function()
-            if KB.Binding then return end
-            
+            if KB.Binding then
+                return
+            end
+
+            KB.Binding = true
             ValueKB.Text = "..."
-            KB.Binding = Library:Connection(game:GetService("UserInputService").InputBegan, function(input, gameProcessed)
-                if gameProcessed then return end
-                
-                local keyToSet
+
+            bindingConnection = game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
+                if not KB.Binding then
+                    return
+                end
+
+                local keyToSet = nil
+
                 if input.UserInputType == Enum.UserInputType.Keyboard then
                     keyToSet = input.KeyCode
-                elseif input.UserInputType == Enum.UserInputType.MouseButton1 or 
-                    input.UserInputType == Enum.UserInputType.MouseButton2 or
-                    input.UserInputType == Enum.UserInputType.MouseButton3 then
-                    keyToSet = input.UserInputType
+                elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    keyToSet = Enum.UserInputType.MouseButton1
+                elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+                    keyToSet = Enum.UserInputType.MouseButton2
+                elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
+                    keyToSet = Enum.UserInputType.MouseButton3
                 end
-                
+
                 if keyToSet then
-                    setKey(keyToSet)
+                    -- Clear key on backspace/escape
+                    if keyToSet == Enum.KeyCode.Backspace or keyToSet == Enum.KeyCode.Escape then
+                        KB.Key = nil
+                        ValueKB.Text = "-"
+                    else
+                        KB.Key = keyToSet
+                        ValueKB.Text = getKeyName(keyToSet)
+                    end
+
+                    KB.Active = false
+                    updateFlagData()
                 end
-                
-                if KB.Binding then
-                    Library:Disconnect(KB.Binding)
-                    KB.Binding = nil
+
+                KB.Binding = false
+                if bindingConnection then
+                    bindingConnection:Disconnect()
+                    bindingConnection = nil
                 end
             end)
         end)
@@ -1291,84 +1483,109 @@ end
         end)
 
         -- Close mode window when clicking outside
-        Library:Connection(game:GetService("UserInputService").InputBegan, function(input)
-            if ModeWindow.Visible and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-                if not Library:IsMouseOverFrame(ModeWindow) and not Library:IsMouseOverFrame(ValueKB) then
-                    ModeWindow.Visible = false
-                end
-            end
-        end)
-
-        -- Handle key press - THIS IS THE MAIN FIX
-        Library:Connection(game:GetService("UserInputService").InputBegan, function(input, gameProcessed)
-            if gameProcessed then return end
-            if not KB.Key then return end
-            if KB.Binding then return end
-            
-            -- Check if input matches our key
-            local inputKey = input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode or input.UserInputType
-            
-            if inputKey ~= KB.Key then return end
-
-            if KB.Mode == "Hold" then
-                KB.Active = true
-                updateFlagData()
-                if KB.Callback then
-                    task.spawn(function()
-                        pcall(KB.Callback, true)
-                    end)
-                end
-            elseif KB.Mode == "Toggle" then
-                KB.Active = not KB.Active
-                updateFlagData()
-                if KB.Callback then
-                    task.spawn(function()
-                        pcall(KB.Callback, KB.Active)
+        game:GetService("UserInputService").InputBegan:Connect(function(input)
+            if ModeWindow.Visible then
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    task.defer(function()
+                        if not Library:IsMouseOverFrame(ModeWindow) and not Library:IsMouseOverFrame(ValueKB) then
+                            ModeWindow.Visible = false
+                        end
                     end)
                 end
             end
         end)
 
-        -- Handle key release (for Hold mode)
-        Library:Connection(game:GetService("UserInputService").InputEnded, function(input)
-            if not KB.Key then return end
-            if KB.Binding then return end
+        -- MAIN KEY DETECTION - Using direct connection
+        game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
+            -- Skip if game is processing or we're binding
+            if gameProcessed then
+                return
+            end
             
-            local inputKey = input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode or input.UserInputType
+            if KB.Binding then
+                return
+            end
             
-            if inputKey ~= KB.Key then return end
+            if not KB.Key then
+                return
+            end
+
+            -- Get the input key
+            local pressedKey = nil
+            if input.UserInputType == Enum.UserInputType.Keyboard then
+                pressedKey = input.KeyCode
+            else
+                pressedKey = input.UserInputType
+            end
+
+            -- Compare keys
+            if pressedKey == KB.Key then
+                if KB.Mode == "Toggle" then
+                    setActive(not KB.Active)
+                elseif KB.Mode == "Hold" then
+                    setActive(true)
+                end
+            end
+        end)
+
+        -- Key release for Hold mode
+        game:GetService("UserInputService").InputEnded:Connect(function(input)
+            if KB.Binding then
+                return
+            end
             
-            if KB.Mode == "Hold" and KB.Active then
-                KB.Active = false
-                updateFlagData()
-                if KB.Callback then
-                    task.spawn(function()
-                        pcall(KB.Callback, false)
-                    end)
+            if not KB.Key then
+                return
+            end
+            
+            if KB.Mode ~= "Hold" then
+                return
+            end
+
+            local releasedKey = nil
+            if input.UserInputType == Enum.UserInputType.Keyboard then
+                releasedKey = input.KeyCode
+            else
+                releasedKey = input.UserInputType
+            end
+
+            if releasedKey == KB.Key then
+                if KB.Active then
+                    setActive(false)
                 end
             end
         end)
 
         function KB:Set(key)
             if typeof(key) == "EnumItem" then
-                setKey(key)
-            end
-        end
-        
-        function KB:GetState()
-            return KB.Active
-        end
-        
-        function KB:SetMode(mode)
-            if mode == "Toggle" or mode == "Hold" then
-                KB.Mode = mode
-                for m, btn in pairs(modeButtons) do
-                    btn.TextColor3 = m == mode and Color3.fromRGB(255, 255, 255) or Color3.new(0.306, 0.306, 0.306)
-                end
+                KB.Key = key
+                ValueKB.Text = getKeyName(key)
+                KB.Active = false
+                updateFlagData()
+            elseif key == nil then
+                KB.Key = nil
+                ValueKB.Text = "-"
+                KB.Active = false
                 updateFlagData()
             end
         end
-        
+
+        function KB:GetState()
+            return KB.Active
+        end
+
+        function KB:SetMode(mode)
+            if mode == "Toggle" or mode == "Hold" then
+                KB.Mode = mode
+                updateModeColors()
+                updateFlagData()
+            end
+        end
+
+        function KB:SetCallback(callback)
+            KB.Callback = callback
+        end
+
         Flags[KB.Flag] = KB
         return KB
     end
