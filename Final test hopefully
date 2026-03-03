@@ -686,80 +686,86 @@ do
             return setmetatable(Page, Library.Pages)
         end
 
-        -- Toggle
         function Sections:Toggle(Options)
-        local Props = Options or {}
-        local Toggle = {
-            Window = self.Window, Page = self.Page, Section = self,
-            State = Props.state or Props.State or Props.default or Props.Default or false,
-            Callback = Props.callback or Props.Callback or function() end,
-            Flag = Props.flag or Props.Flag or Library.NextFlag(),
-            Toggled = false,
-            Colorpickers = 0,
-            Holder = nil,
-        }
+    local Props = Options or {}
+    local Toggle = {
+        Window = self.Window, Page = self.Page, Section = self,
+        State = Props.state or Props.State or Props.default or Props.Default or false,
+        Callback = Props.callback or Props.Callback or function() end,
+        Flag = Props.flag or Props.Flag or Library.NextFlag(),
+        Toggled = false,
+        Colorpickers = 0,
+        Holder = nil,
+    }
 
-        local parent = Options.Side == "Right" and Toggle.Section.Elements.Right or Toggle.Section.Elements.Left
-        local HolderT = Instance.new('TextButton', parent)
-        local FrameT = Instance.new('Frame', HolderT)
-        local AccentFrameT = Instance.new('Frame', FrameT)
-        local GradT = Instance.new('UIGradient', AccentFrameT)
-        local TextLabelT = Instance.new('TextLabel', HolderT)
+    local parent = Options.Side == "Right" and Toggle.Section.Elements.Right or Toggle.Section.Elements.Left
+    local HolderT = Instance.new('TextButton', parent)
+    local FrameT = Instance.new('Frame', HolderT)
+    local InnerFrameT = Instance.new('Frame', FrameT)
+    local AccentFrameT = Instance.new('Frame', InnerFrameT)
+    local GradT = Instance.new('UIGradient', AccentFrameT)
+    local TextLabelT = Instance.new('TextLabel', HolderT)
 
-        Toggle.Holder = HolderT
-        table.insert(Library.ThemeObjects, AccentFrameT)
+    Toggle.Holder = HolderT
+    table.insert(Library.ThemeObjects, AccentFrameT)
 
-        HolderT.Name = "Toggle"
-        HolderT.Size = UDim2.new(1, 0, 0, 16)
-        HolderT.BackgroundTransparency = 1
-        HolderT.Text = ""
-        HolderT.AutoButtonColor = false
-        
-        FrameT.Position = UDim2.new(0, 0, 0, 5)
-        FrameT.Size = UDim2.new(0, 6, 0, 6)
-        FrameT.BackgroundColor3 = Color3.new(0.0784, 0.0784, 0.0784)
-        FrameT.BorderColor3 = Color3.new(0, 0, 0)
-        
-        AccentFrameT.Size = UDim2.new(1, 0, 1, 0)
-        AccentFrameT.BackgroundColor3 = Library.Accent
-        AccentFrameT.BorderSizePixel = 0
-        AccentFrameT.Visible = false
-        
-        GradT.Color = ColorSequence.new{
-            ColorSequenceKeypoint.new(0, Color3.new(0.78, 0.749, 0.8)),
-            ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1))
-        }
-        GradT.Rotation = -90
-        
-        TextLabelT.Position = UDim2.new(0, 15, 0, 0)
-        TextLabelT.Size = UDim2.new(1, -60, 1, 0)
-        TextLabelT.BackgroundTransparency = 1
-        TextLabelT.TextColor3 = Color3.new(0.306, 0.306, 0.306)
-        TextLabelT.FontFace = Library.UIFont
-        TextLabelT.TextSize = Library.FontSize
-        TextLabelT.ZIndex = 105
-        TextLabelT.TextXAlignment = Enum.TextXAlignment.Left
-        TextLabelT.Text = Options.Name or "toggle"
+    HolderT.Name = "Toggle"
+    HolderT.Size = UDim2.new(1, 0, 0, 18)
+    HolderT.BackgroundTransparency = 1
+    HolderT.Text = ""
+    HolderT.AutoButtonColor = false
 
-        local function UpdateVisual()
-            AccentFrameT.Visible = Toggle.Toggled
-            TextLabelT.TextColor3 = Toggle.Toggled and Color3.fromRGB(255, 255, 255) or Color3.new(0.306, 0.306, 0.306)
-        end
+    -- Bigger toggle frame
+    FrameT.Position = UDim2.new(0, 0, 0, 3)
+    FrameT.Size = UDim2.new(0, 12, 0, 12)
+    FrameT.BackgroundColor3 = Color3.new(0.0784, 0.0784, 0.0784)
+    FrameT.BorderColor3 = Color3.new(0, 0, 0)
 
-        local function SetState(newState)
+    InnerFrameT.Position = UDim2.new(0, 2, 0, 2)
+    InnerFrameT.Size = UDim2.new(1, -4, 1, -4)
+    InnerFrameT.BackgroundTransparency = 1
+    InnerFrameT.BorderSizePixel = 0
+
+    AccentFrameT.Size = UDim2.new(1, 0, 1, 0)
+    AccentFrameT.BackgroundColor3 = Library.Accent
+    AccentFrameT.BorderSizePixel = 0
+    AccentFrameT.Visible = false
+
+    GradT.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.new(0.78, 0.749, 0.8)),
+        ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1))
+    }
+    GradT.Rotation = -90
+
+    TextLabelT.Position = UDim2.new(0, 20, 0, 0)
+    TextLabelT.Size = UDim2.new(1, -70, 1, 0)
+    TextLabelT.BackgroundTransparency = 1
+    TextLabelT.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+    TextLabelT.FontFace = Library.UIFont
+    TextLabelT.TextSize = Library.FontSize
+    TextLabelT.ZIndex = 105
+    TextLabelT.TextXAlignment = Enum.TextXAlignment.Left
+    TextLabelT.Text = Options.Name or "toggle"
+
+    local function UpdateVisual()
+        AccentFrameT.Visible = Toggle.Toggled
+        TextLabelT.TextColor3 = Toggle.Toggled and Color3.fromRGB(255, 255, 255) or Color3.new(0.306, 0.306, 0.306)
+    end
+
+    local function SetState(newState)
         if typeof(newState) == "boolean" then
             Toggle.Toggled = newState
         else
             Toggle.Toggled = not Toggle.Toggled
         end
-        
+
         UpdateVisual()
         Library.Flags[Toggle.Flag] = Toggle.Toggled
-        
+
         task.spawn(function()
             pcall(Toggle.Callback, Toggle.Toggled)
         end)
-        
+
         Library:UpdateDependencies(Toggle.Flag, Toggle.Toggled)
         Library:FireFlagCallbacks(Toggle.Flag, Toggle.Toggled)
     end
@@ -771,7 +777,7 @@ do
             Library.Flags[Toggle.Flag] = Toggle.Toggled
             Library:UpdateDependencies(Toggle.Flag, Toggle.Toggled)
             Library:FireFlagCallbacks(Toggle.Flag, Toggle.Toggled)
-            
+
             task.spawn(function()
                 pcall(Toggle.Callback, Toggle.Toggled)
             end)
@@ -782,817 +788,778 @@ do
         return Toggle.Toggled
     end
 
-    -- Initialize with default state
     Toggle.Toggled = Toggle.State
     Library.Flags[Toggle.Flag] = Toggle.Toggled
     UpdateVisual()
 
-    -- Fire initial callback if default is true
     if Toggle.State then
         task.spawn(function()
             pcall(Toggle.Callback, Toggle.Toggled)
         end)
     end
 
-    -- Connect click event
     HolderT.MouseButton1Click:Connect(function()
         SetState()
     end)
 
-    -- Store in Flags for config loading
     Flags[Toggle.Flag] = function(value)
         Toggle:Set(value)
     end
 
     return Toggle
 end
-        -- Slider (FIXED - proper input handling)
-        function Sections:Slider(Options)
-            local Props = Options or {}
-            local Slider = {
-                Section = self, Name = Props.Name or nil,
-                Min = Props.Min or Props.min or 0, Max = Props.Max or Props.max or 100,
-                State = Props.State or Props.state or Props.default or Props.Default or 10,
-                Sub = Props.Suffix or Props.suffix or "", Decimals = Props.Decimals or Props.decimals or Props.interval or 1,
-                Callback = Props.Callback or Props.callback or function() end,
-                Flag = Props.Flag or Props.flag or Library.NextFlag(), Holder = nil;
-            }
 
-            local parent = Options.Side == "Right" and Slider.Section.Elements.Right or Slider.Section.Elements.Left
-            local HolderSL = Instance.new('Frame', parent)
-            Slider.Holder = HolderSL
-            local FrameSL = Instance.new('TextButton', HolderSL)
-            local AccentFillSL = Instance.new('Frame', FrameSL)
-            local TitleSL = Instance.new('TextLabel', HolderSL)
-            local ValueSL = Instance.new('TextLabel', Slider.Name and HolderSL or FrameSL)
+-- Textbox (LIVE UPDATE SUPPORT)
+function Sections:Textbox(Options)
+    local Props = Options or {}
+    local TB = {
+        Section = self, 
+        Name = Props.Name or nil, 
+        Placeholder = Props.Placeholder or Props.placeholder or "",
+        State = Props.State or Props.state or Props.default or Props.Default or "",
+        Callback = Props.Callback or Props.callback or function() end,
+        OnChange = Props.OnChange or Props.onChange or nil,
+        Flag = Props.Flag or Props.flag or Library.NextFlag(), 
+        Holder = nil,
+    }
 
-            Instance.new('UIGradient', AccentFillSL).Color = ColorSequence.new{ColorSequenceKeypoint.new(0,Color3.new(0.78,0.749,0.8)),ColorSequenceKeypoint.new(1,Color3.new(1,1,1))}
-            Instance.new('UIGradient', FrameSL).Color = ColorSequence.new{ColorSequenceKeypoint.new(0,Color3.new(0.78,0.749,0.8)),ColorSequenceKeypoint.new(1,Color3.new(1,1,1))}
-            table.insert(Library.ThemeObjects, AccentFillSL)
+    local parent = Options.Side == "Right" and TB.Section.Elements.Right or TB.Section.Elements.Left
+    local HolderTB = Instance.new('Frame', parent)
+    TB.Holder = HolderTB
+    local TitleTB = Instance.new('TextLabel', HolderTB)
+    local TextFrameTB = Instance.new('Frame', HolderTB)
+    local TextBoxTB = Instance.new('TextBox', TextFrameTB)
+    local PredictionLabel = Instance.new('TextLabel', TextFrameTB)
+    Instance.new('UIGradient', TextFrameTB).Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.new(0.78, 0.749, 0.8)),
+        ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1))
+    }
 
-            HolderSL.Size = Slider.Name and UDim2.new(1,0,0,32) or UDim2.new(1,0,0,18); HolderSL.BackgroundTransparency = 1
-            FrameSL.Position = Slider.Name and UDim2.new(0,0,0,18) or UDim2.new(0,0,0,4)
-            FrameSL.Size = UDim2.new(1,-15,0,10); FrameSL.BackgroundColor3 = Color3.new(0.0784,0.0784,0.0784); FrameSL.BorderColor3 = Color3.new(0,0,0); FrameSL.AutoButtonColor = false; FrameSL.Text = ""
-            AccentFillSL.Size = UDim2.new(0,0,1,0); AccentFillSL.BackgroundColor3 = Library.Accent; AccentFillSL.BorderSizePixel = 0
-            if Slider.Name then
-                TitleSL.Visible = true; TitleSL.Position = UDim2.new(0,0,0,0); TitleSL.Size = UDim2.new(1,0,0,16); TitleSL.BackgroundTransparency = 1
-                TitleSL.TextColor3 = Color3.new(0.306,0.306,0.306); TitleSL.FontFace = Library.UIFont; TitleSL.TextSize = Library.FontSize; TitleSL.TextXAlignment = Enum.TextXAlignment.Left; TitleSL.Text = Slider.Name
-            else TitleSL.Visible = false end
-            ValueSL.Position = Slider.Name and UDim2.new(0,0,0,0) or UDim2.new(0,0,0,-1)
-            ValueSL.Size = Slider.Name and UDim2.new(1,-15,0,16) or UDim2.new(1,0,1,0); ValueSL.BackgroundTransparency = 1
-            ValueSL.TextColor3 = Color3.new(0.306,0.306,0.306); ValueSL.FontFace = Library.UIFont; ValueSL.TextSize = Library.FontSize
-            ValueSL.TextXAlignment = Slider.Name and Enum.TextXAlignment.Right or Enum.TextXAlignment.Center
+    local hasName = TB.Name ~= nil
+    HolderTB.Size = UDim2.new(1, 0, 0, hasName and 42 or 20)
+    HolderTB.BackgroundTransparency = 1
 
-            local Sliding = false
-            local function Set(value)
-                value = math.clamp(Library:Round(value, Slider.Decimals), Slider.Min, Slider.Max)
-                ValueSL.Text = string.format("%.14g", value) .. Slider.Sub
-                AccentFillSL.Size = UDim2.new((value - Slider.Min) / (Slider.Max - Slider.Min), 0, 1, 0)
-                Library.Flags[Slider.Flag] = value; Slider.Callback(value)
-                Library:FireFlagCallbacks(Slider.Flag, value)
-            end
-            Set(Slider.State)
-            
-            local function Slide(input)
-                local percent = math.clamp((input.Position.X - FrameSL.AbsolutePosition.X) / FrameSL.AbsoluteSize.X, 0, 1)
-                Set(Slider.Min + ((Slider.Max - Slider.Min) * percent))
-            end
-            
-            FrameSL.InputBegan:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                    Sliding = true
-                    Slide(input)
-                end
+    if hasName then
+        TitleTB.Position = UDim2.new(0, 0, 0, 0)
+        TitleTB.Size = UDim2.new(1, 0, 0, 16)
+        TitleTB.BackgroundTransparency = 1
+        TitleTB.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+        TitleTB.FontFace = Library.UIFont
+        TitleTB.TextSize = Library.FontSize
+        TitleTB.TextXAlignment = Enum.TextXAlignment.Left
+        TitleTB.Text = TB.Name
+    else
+        TitleTB.Visible = false
+    end
+
+    TextFrameTB.Position = UDim2.new(0, 0, 0, hasName and 18 or 0)
+    TextFrameTB.Size = UDim2.new(1, -15, 0, 20)
+    TextFrameTB.BackgroundColor3 = Color3.new(0.0784, 0.0784, 0.0784)
+    TextFrameTB.BorderColor3 = Color3.new(0, 0, 0)
+    TextFrameTB.ClipsDescendants = true
+
+    TextBoxTB.Size = UDim2.new(1, -8, 1, 0)
+    TextBoxTB.Position = UDim2.new(0, 4, 0, 0)
+    TextBoxTB.BackgroundTransparency = 1
+    TextBoxTB.Text = TB.State
+    TextBoxTB.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TextBoxTB.FontFace = Library.UIFont
+    TextBoxTB.TextSize = Library.FontSize
+    TextBoxTB.PlaceholderText = TB.Placeholder
+    TextBoxTB.PlaceholderColor3 = Color3.new(0.25, 0.25, 0.25)
+    TextBoxTB.ClearTextOnFocus = false
+    TextBoxTB.TextXAlignment = Enum.TextXAlignment.Left
+    TextBoxTB.ZIndex = 2
+
+    -- Prediction label (shows behind/after actual text)
+    PredictionLabel.Size = UDim2.new(1, -8, 1, 0)
+    PredictionLabel.Position = UDim2.new(0, 4, 0, 0)
+    PredictionLabel.BackgroundTransparency = 1
+    PredictionLabel.Text = ""
+    PredictionLabel.TextColor3 = Color3.new(0.4, 0.4, 0.4)
+    PredictionLabel.FontFace = Library.UIFont
+    PredictionLabel.TextSize = Library.FontSize
+    PredictionLabel.TextXAlignment = Enum.TextXAlignment.Left
+    PredictionLabel.ZIndex = 1
+
+    Library.Flags[TB.Flag] = TB.State
+
+    -- Live text change
+    TextBoxTB:GetPropertyChangedSignal("Text"):Connect(function()
+        Library.Flags[TB.Flag] = TextBoxTB.Text
+        
+        if TB.OnChange then
+            task.spawn(function()
+                pcall(TB.OnChange, TextBoxTB.Text)
             end)
-            
-            FrameSL.InputEnded:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                    Sliding = false
-                end
-            end)
-            
-            Library:Connection(game:GetService("UserInputService").InputChanged, function(input)
-                if Sliding and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-                    Slide(input)
-                end
-            end)
-            
-            function Slider:Set(v) Set(v) end
-            Flags[Slider.Flag] = Set
-            return Slider
         end
+        
+        Library:FireFlagCallbacks(TB.Flag, TextBoxTB.Text)
+    end)
 
-        -- Dropdown with multi-select support
-        function Sections:List(Options)
-        local Props = Options or {}
-        local DD = {
-            Section = self, Open = false, Name = Props.Name or nil,
-            Options = Props.Options or Props.options or {},
-            State = Props.State or Props.state or Props.default or Props.Default or nil,
-            Multi = Props.Multi or Props.multi or false,
-            Callback = Props.Callback or Props.callback or function() end,
-            Flag = Props.Flag or Props.flag or Library.NextFlag(), 
-            OptionInsts = {}, 
-            Holder = nil,
-            Selected = {},
-            CurrentIndex = 1,
-        }
+    TextBoxTB.FocusLost:Connect(function(enterPressed)
+        TB.Callback(TextBoxTB.Text, enterPressed)
+        Library.Flags[TB.Flag] = TextBoxTB.Text
+        PredictionLabel.Text = ""
+    end)
 
-        local parent = Options.Side == "Right" and DD.Section.Elements.Right or DD.Section.Elements.Left
-        local HolderDD = Instance.new('Frame', parent)
-        DD.Holder = HolderDD
-        local FrameDD = Instance.new('TextButton', HolderDD)
-        local ValueDD = Instance.new('TextLabel', FrameDD)
-        local ArrowDD = Instance.new('TextLabel', FrameDD)
-        local ContentDD = Instance.new('ScrollingFrame', FrameDD)
-        local ListLayoutDD = Instance.new('UIListLayout', ContentDD)
-        local TitleDD = Instance.new('TextLabel', HolderDD)
+    local function set(str)
+        TextBoxTB.Text = str
+        Library.Flags[TB.Flag] = str
+        Library:FireFlagCallbacks(TB.Flag, str)
+    end
 
-        HolderDD.Size = UDim2.new(1, 0, 0, 42)
-        HolderDD.BackgroundTransparency = 1
-        
-        FrameDD.Position = UDim2.new(0, 0, 0, 18)
-        FrameDD.Size = UDim2.new(1, -15, 0, 20)
-        FrameDD.BackgroundColor3 = Color3.new(0.0784, 0.0784, 0.0784)
-        FrameDD.BorderColor3 = Color3.new(0, 0, 0)
-        FrameDD.Text = ""
-        FrameDD.AutoButtonColor = false
-        Instance.new('UIGradient', FrameDD).Color = ColorSequence.new{
-            ColorSequenceKeypoint.new(0, Color3.new(0.78, 0.749, 0.8)),
-            ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1))
-        }
-        
-        ValueDD.Position = UDim2.new(0, 4, 0, 0)
-        ValueDD.Size = UDim2.new(1, -20, 1, 0)
-        ValueDD.BackgroundTransparency = 1
-        ValueDD.Text = ""
-        ValueDD.TextColor3 = Color3.new(0.306, 0.306, 0.306)
-        ValueDD.FontFace = Library.UIFont
-        ValueDD.TextSize = Library.FontSize
-        ValueDD.TextXAlignment = Enum.TextXAlignment.Left
-        ValueDD.ClipsDescendants = true
-        
-        ArrowDD.Position = UDim2.new(1, -15, 0, 0)
-        ArrowDD.Size = UDim2.new(0, 15, 1, 0)
-        ArrowDD.BackgroundTransparency = 1
-        ArrowDD.Text = "▼"
-        ArrowDD.TextColor3 = Color3.new(0.306, 0.306, 0.306)
-        ArrowDD.FontFace = Library.UIFont
-        ArrowDD.TextSize = 10
-        
-        ContentDD.Position = UDim2.new(0, 0, 0, 22)
-        ContentDD.Size = UDim2.new(1, 0, 0, 0)
-        ContentDD.BackgroundColor3 = Color3.new(0.0784, 0.0784, 0.0784)
-        ContentDD.BorderColor3 = Color3.new(0, 0, 0)
+    function TB:Set(str)
+        set(str)
+    end
+
+    function TB:SetValue(str)
+        set(str)
+    end
+
+    function TB:SetPrediction(prediction)
+        if prediction and prediction ~= "" then
+            PredictionLabel.Text = prediction
+        else
+            PredictionLabel.Text = ""
+        end
+    end
+
+    function TB:GetText()
+        return TextBoxTB.Text
+    end
+
+    function TB:Focus()
+        TextBoxTB:CaptureFocus()
+    end
+
+    Flags[TB.Flag] = set
+    return TB
+end
+
+-- Dropdown (FIXED - scroll only when open, checks visibility)
+function Sections:List(Options)
+    local Props = Options or {}
+    local DD = {
+        Section = self, 
+        Open = false, 
+        Name = Props.Name or nil,
+        Options = Props.Options or Props.options or {},
+        State = Props.State or Props.state or Props.default or Props.Default or nil,
+        Multi = Props.Multi or Props.multi or false,
+        Callback = Props.Callback or Props.callback or function() end,
+        Flag = Props.Flag or Props.flag or Library.NextFlag(),
+        OptionInsts = {},
+        Holder = nil,
+        Selected = {},
+        CurrentIndex = 1,
+    }
+
+    local parent = Options.Side == "Right" and DD.Section.Elements.Right or DD.Section.Elements.Left
+    local HolderDD = Instance.new('Frame', parent)
+    DD.Holder = HolderDD
+    local FrameDD = Instance.new('TextButton', HolderDD)
+    local ValueDD = Instance.new('TextLabel', FrameDD)
+    local ArrowDD = Instance.new('TextLabel', FrameDD)
+    local ContentDD = Instance.new('ScrollingFrame', FrameDD)
+    local ListLayoutDD = Instance.new('UIListLayout', ContentDD)
+    local TitleDD = Instance.new('TextLabel', HolderDD)
+
+    HolderDD.Size = UDim2.new(1, 0, 0, 42)
+    HolderDD.BackgroundTransparency = 1
+
+    FrameDD.Position = UDim2.new(0, 0, 0, 18)
+    FrameDD.Size = UDim2.new(1, -15, 0, 20)
+    FrameDD.BackgroundColor3 = Color3.new(0.0784, 0.0784, 0.0784)
+    FrameDD.BorderColor3 = Color3.new(0, 0, 0)
+    FrameDD.Text = ""
+    FrameDD.AutoButtonColor = false
+    Instance.new('UIGradient', FrameDD).Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.new(0.78, 0.749, 0.8)),
+        ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1))
+    }
+
+    ValueDD.Position = UDim2.new(0, 4, 0, 0)
+    ValueDD.Size = UDim2.new(1, -20, 1, 0)
+    ValueDD.BackgroundTransparency = 1
+    ValueDD.Text = ""
+    ValueDD.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+    ValueDD.FontFace = Library.UIFont
+    ValueDD.TextSize = Library.FontSize
+    ValueDD.TextXAlignment = Enum.TextXAlignment.Left
+    ValueDD.ClipsDescendants = true
+
+    ArrowDD.Position = UDim2.new(1, -15, 0, 0)
+    ArrowDD.Size = UDim2.new(0, 15, 1, 0)
+    ArrowDD.BackgroundTransparency = 1
+    ArrowDD.Text = "▼"
+    ArrowDD.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+    ArrowDD.FontFace = Library.UIFont
+    ArrowDD.TextSize = 10
+
+    ContentDD.Position = UDim2.new(0, 0, 0, 22)
+    ContentDD.Size = UDim2.new(1, 0, 0, 0)
+    ContentDD.BackgroundColor3 = Color3.new(0.0784, 0.0784, 0.0784)
+    ContentDD.BorderColor3 = Color3.new(0, 0, 0)
+    ContentDD.Visible = false
+    ContentDD.ZIndex = 110
+    ContentDD.ScrollBarThickness = 2
+    ContentDD.ScrollBarImageColor3 = Color3.new(0.4, 0.4, 0.4)
+    ContentDD.CanvasSize = UDim2.new(0, 0, 0, 0)
+    ContentDD.AutomaticCanvasSize = Enum.AutomaticSize.Y
+
+    ListLayoutDD.SortOrder = Enum.SortOrder.LayoutOrder
+
+    TitleDD.Position = UDim2.new(0, 0, 0, 0)
+    TitleDD.Size = UDim2.new(1, 0, 0, 16)
+    TitleDD.BackgroundTransparency = 1
+    TitleDD.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+    TitleDD.FontFace = Library.UIFont
+    TitleDD.TextSize = Library.FontSize
+    TitleDD.TextXAlignment = Enum.TextXAlignment.Left
+    TitleDD.Text = DD.Name or ""
+
+    -- Check if this dropdown is actually visible (tab is active)
+    local function isDropdownVisible()
+        local current = HolderDD
+        while current do
+            if current:IsA("GuiObject") then
+                if not current.Visible then
+                    return false
+                end
+            end
+            current = current.Parent
+        end
+        return true
+    end
+
+    local function updateContentSize()
+        local optionCount = 0
+        for _ in pairs(DD.OptionInsts) do
+            optionCount = optionCount + 1
+        end
+        local maxVisible = math.min(optionCount, 6)
+        ContentDD.Size = UDim2.new(1, 0, 0, maxVisible * 18)
+    end
+
+    local function openDropdown()
+        DD.Open = true
+        ContentDD.Visible = true
+        ArrowDD.Text = "▲"
+        updateContentSize()
+    end
+
+    local function closeDropdown()
+        DD.Open = false
         ContentDD.Visible = false
-        ContentDD.ZIndex = 110
-        ContentDD.ScrollBarThickness = 2
-        ContentDD.ScrollBarImageColor3 = Color3.new(0.4, 0.4, 0.4)
-        ContentDD.CanvasSize = UDim2.new(0, 0, 0, 0)
-        ContentDD.AutomaticCanvasSize = Enum.AutomaticSize.Y
-        
-        ListLayoutDD.SortOrder = Enum.SortOrder.LayoutOrder
-        
-        TitleDD.Position = UDim2.new(0, 0, 0, 0)
-        TitleDD.Size = UDim2.new(1, 0, 0, 16)
-        TitleDD.BackgroundTransparency = 1
-        TitleDD.TextColor3 = Color3.new(0.306, 0.306, 0.306)
-        TitleDD.FontFace = Library.UIFont
-        TitleDD.TextSize = Library.FontSize
-        TitleDD.TextXAlignment = Enum.TextXAlignment.Left
-        TitleDD.Text = DD.Name or ""
+        ArrowDD.Text = "▼"
+    end
 
-        local function updateContentSize()
-            local optionCount = 0
-            for _ in pairs(DD.OptionInsts) do
-                optionCount = optionCount + 1
-            end
-            local maxVisible = math.min(optionCount, 6)
-            ContentDD.Size = UDim2.new(1, 0, 0, maxVisible * 18)
+    FrameDD.MouseButton1Click:Connect(function()
+        if DD.Open then
+            closeDropdown()
+        else
+            openDropdown()
         end
+    end)
 
-        local function openDropdown()
-            ContentDD.Visible = true
-            ArrowDD.Text = "▲"
-            updateContentSize()
-        end
-
-        local function closeDropdown()
-            ContentDD.Visible = false
-            ArrowDD.Text = "▼"
-        end
-
-        FrameDD.MouseButton1Click:Connect(function()
-            if ContentDD.Visible then
-                closeDropdown()
-            else
-                openDropdown()
-            end
-        end)
-
-        Library:Connection(game:GetService("UserInputService").InputBegan, function(Input)
-            if ContentDD.Visible and Input.UserInputType == Enum.UserInputType.MouseButton1 then
-                if not Library:IsMouseOverFrame(ContentDD) and not Library:IsMouseOverFrame(HolderDD) then
-                    closeDropdown()
-                end
-            end
-        end)
-
-        local function updateDisplay()
-            if DD.Multi then
-                local names = {}
-                for _, opt in ipairs(DD.Options) do
-                    if DD.Selected[opt] then
-                        table.insert(names, opt)
-                    end
-                end
-                ValueDD.Text = #names > 0 and table.concat(names, ", ") or "..."
-                local arr = {}
-                for k, v in pairs(DD.Selected) do
-                    if v then
-                        table.insert(arr, k)
-                    end
-                end
-                Library.Flags[DD.Flag] = arr
-                DD.Callback(DD.Selected)
-                Library:FireFlagCallbacks(DD.Flag, arr)
-            else
-                local sel = nil
-                for k, v in pairs(DD.Selected) do
-                    if v then
-                        sel = k
-                        break
-                    end
-                end
-                ValueDD.Text = sel or ""
-                Library.Flags[DD.Flag] = sel
-                DD.Callback(sel)
-                Library:FireFlagCallbacks(DD.Flag, sel)
-            end
-        end
-
-        local function updateOptionColors()
-            for opt, tbl in pairs(DD.OptionInsts) do
-                if DD.Selected[opt] then
-                    tbl.text.TextColor3 = Color3.fromRGB(255, 255, 255)
-                else
-                    tbl.text.TextColor3 = Color3.new(0.306, 0.306, 0.306)
-                end
-            end
-        end
-
-        local function selectByIndex(index)
-            if DD.Multi then return end
-            if #DD.Options == 0 then return end
-            
-            index = ((index - 1) % #DD.Options) + 1
-            DD.CurrentIndex = index
-            
-            local option = DD.Options[index]
-            for k in pairs(DD.Selected) do
-                DD.Selected[k] = false
-            end
-            DD.Selected[option] = true
-            updateOptionColors()
-            updateDisplay()
-        end
-
-        local function handleClick(option, button, text)
-            button.MouseButton1Click:Connect(function()
-                if DD.Multi then
-                    DD.Selected[option] = not DD.Selected[option]
-                    updateOptionColors()
-                    updateDisplay()
-                else
-                    for k in pairs(DD.Selected) do
-                        DD.Selected[k] = false
-                    end
-                    DD.Selected[option] = true
-                    updateOptionColors()
-                    updateDisplay()
+    Library:Connection(game:GetService("UserInputService").InputBegan, function(Input)
+        if DD.Open and Input.UserInputType == Enum.UserInputType.MouseButton1 then
+            task.defer(function()
+                if not Library:IsMouseOverFrame(ContentDD) and not Library:IsMouseOverFrame(FrameDD) then
                     closeDropdown()
                 end
             end)
         end
+    end)
 
-        local function createOptions(tbl)
-            for i, option in ipairs(tbl) do
-                DD.OptionInsts[option] = {}
-                local Opt = Instance.new('TextButton', ContentDD)
-                local OptName = Instance.new('TextLabel', Opt)
-                
-                Opt.Size = UDim2.new(1, 0, 0, 18)
-                Opt.BackgroundTransparency = 1
-                Opt.Text = ""
-                Opt.AutoButtonColor = false
-                Opt.ZIndex = 111
-                Opt.LayoutOrder = i
-                
-                DD.OptionInsts[option] = { button = Opt, text = OptName, index = i }
-                
-                OptName.Position = UDim2.new(0, 4, 0, 0)
-                OptName.Size = UDim2.new(1, 0, 1, 0)
-                OptName.BackgroundTransparency = 1
-                OptName.Text = option
-                OptName.TextColor3 = Color3.new(0.306, 0.306, 0.306)
-                OptName.FontFace = Library.UIFont
-                OptName.TextSize = Library.FontSize
-                OptName.TextXAlignment = Enum.TextXAlignment.Left
-                OptName.ZIndex = 111
-                
-                handleClick(option, Opt, OptName)
+    local function updateDisplay()
+        if DD.Multi then
+            local names = {}
+            for _, opt in ipairs(DD.Options) do
+                if DD.Selected[opt] then
+                    table.insert(names, opt)
+                end
             end
-            updateContentSize()
+            ValueDD.Text = #names > 0 and table.concat(names, ", ") or "..."
+            local arr = {}
+            for k, v in pairs(DD.Selected) do
+                if v then
+                    table.insert(arr, k)
+                end
+            end
+            Library.Flags[DD.Flag] = arr
+            DD.Callback(DD.Selected)
+            Library:FireFlagCallbacks(DD.Flag, arr)
+        else
+            local sel = nil
+            for k, v in pairs(DD.Selected) do
+                if v then
+                    sel = k
+                    break
+                end
+            end
+            ValueDD.Text = sel or ""
+            Library.Flags[DD.Flag] = sel
+            DD.Callback(sel)
+            Library:FireFlagCallbacks(DD.Flag, sel)
         end
+    end
 
-        createOptions(DD.Options)
-
-        -- Scroll wheel support
-        Library:Connection(game:GetService("UserInputService").InputChanged, function(input)
-            if input.UserInputType == Enum.UserInputType.MouseWheel then
-                if Library:IsMouseOverFrame(FrameDD) or Library:IsMouseOverFrame(HolderDD) then
-                    if not DD.Multi then
-                        local direction = input.Position.Z > 0 and -1 or 1
-                        selectByIndex(DD.CurrentIndex + direction)
-                    end
-                end
+    local function updateOptionColors()
+        for opt, tbl in pairs(DD.OptionInsts) do
+            if DD.Selected[opt] then
+                tbl.text.TextColor3 = Color3.fromRGB(255, 255, 255)
+            else
+                tbl.text.TextColor3 = Color3.new(0.306, 0.306, 0.306)
             end
-        end)
+        end
+    end
 
-        function DD:Set(option)
+    local function selectByIndex(index)
+        if DD.Multi then return end
+        if #DD.Options == 0 then return end
+
+        index = ((index - 1) % #DD.Options) + 1
+        DD.CurrentIndex = index
+
+        local option = DD.Options[index]
+        for k in pairs(DD.Selected) do
+            DD.Selected[k] = false
+        end
+        DD.Selected[option] = true
+        updateOptionColors()
+        updateDisplay()
+    end
+
+    local function handleClick(option, button, text)
+        button.MouseButton1Click:Connect(function()
             if DD.Multi then
-                if type(option) == "table" then
-                    for k in pairs(DD.Selected) do
-                        DD.Selected[k] = false
-                    end
-                    if #option > 0 then
-                        for _, v in ipairs(option) do
-                            DD.Selected[v] = true
-                        end
-                    else
-                        for k, v in pairs(option) do
-                            DD.Selected[k] = v
-                        end
-                    end
-                end
+                DD.Selected[option] = not DD.Selected[option]
+                updateOptionColors()
+                updateDisplay()
             else
                 for k in pairs(DD.Selected) do
                     DD.Selected[k] = false
                 end
-                if option and DD.OptionInsts[option] then
-                    DD.Selected[option] = true
-                    DD.CurrentIndex = DD.OptionInsts[option].index or 1
+                DD.Selected[option] = true
+                updateOptionColors()
+                updateDisplay()
+                closeDropdown()
+            end
+        end)
+    end
+
+    local function createOptions(tbl)
+        for i, option in ipairs(tbl) do
+            DD.OptionInsts[option] = {}
+            local Opt = Instance.new('TextButton', ContentDD)
+            local OptName = Instance.new('TextLabel', Opt)
+
+            Opt.Size = UDim2.new(1, 0, 0, 18)
+            Opt.BackgroundTransparency = 1
+            Opt.Text = ""
+            Opt.AutoButtonColor = false
+            Opt.ZIndex = 111
+            Opt.LayoutOrder = i
+
+            DD.OptionInsts[option] = { button = Opt, text = OptName, index = i }
+
+            OptName.Position = UDim2.new(0, 4, 0, 0)
+            OptName.Size = UDim2.new(1, 0, 1, 0)
+            OptName.BackgroundTransparency = 1
+            OptName.Text = option
+            OptName.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+            OptName.FontFace = Library.UIFont
+            OptName.TextSize = Library.FontSize
+            OptName.TextXAlignment = Enum.TextXAlignment.Left
+            OptName.ZIndex = 111
+
+            handleClick(option, Opt, OptName)
+        end
+        updateContentSize()
+    end
+
+    createOptions(DD.Options)
+
+    -- NO SCROLL WHEEL on closed dropdown - removed that feature entirely
+    -- User must click to open, then click to select
+
+    function DD:Set(option)
+        if DD.Multi then
+            if type(option) == "table" then
+                for k in pairs(DD.Selected) do
+                    DD.Selected[k] = false
                 end
-            end
-            updateOptionColors()
-            updateDisplay()
-        end
-
-        function DD:Refresh(tbl)
-            DD.Options = tbl
-            for _, opt in pairs(DD.OptionInsts) do
-                pcall(function() opt.button:Destroy() end)
-            end
-            table.clear(DD.OptionInsts)
-            table.clear(DD.Selected)
-            DD.CurrentIndex = 1
-            createOptions(tbl)
-            updateDisplay()
-        end
-
-        -- Set initial selection
-        if DD.State then
-            if DD.Multi then
-                if type(DD.State) == "table" then
-                    for _, v in ipairs(DD.State) do
+                if #option > 0 then
+                    for _, v in ipairs(option) do
                         DD.Selected[v] = true
                     end
-                end
-            else
-                if type(DD.State) == "string" then
-                    DD.Selected[DD.State] = true
-                    for i, opt in ipairs(DD.Options) do
-                        if opt == DD.State then
-                            DD.CurrentIndex = i
-                            break
-                        end
+                else
+                    for k, v in pairs(option) do
+                        DD.Selected[k] = v
                     end
                 end
+            end
+        else
+            for k in pairs(DD.Selected) do
+                DD.Selected[k] = false
+            end
+            if option and DD.OptionInsts[option] then
+                DD.Selected[option] = true
+                DD.CurrentIndex = DD.OptionInsts[option].index or 1
             end
         end
         updateOptionColors()
         updateDisplay()
-
-        Flags[DD.Flag] = DD
-        return DD
     end
 
-        -- Textbox
-        function Sections:Textbox(Options)
-            local Props = Options or {}
-            local TB = {
-                Section = self, Name = Props.Name or nil, Placeholder = Props.Placeholder or Props.placeholder or "",
-                State = Props.State or Props.state or Props.default or Props.Default or "",
-                Callback = Props.Callback or Props.callback or function() end,
-                Flag = Props.Flag or Props.flag or Library.NextFlag(), Holder = nil;
-            }
-
-            local parent = Options.Side == "Right" and TB.Section.Elements.Right or TB.Section.Elements.Left
-            local HolderTB = Instance.new('Frame', parent); TB.Holder = HolderTB
-            local TitleTB = Instance.new('TextLabel', HolderTB)
-            local TextFrameTB = Instance.new('Frame', HolderTB)
-            local TextBoxTB = Instance.new('TextBox', TextFrameTB)
-            Instance.new('UIGradient', TextFrameTB).Color = ColorSequence.new{ColorSequenceKeypoint.new(0,Color3.new(0.78,0.749,0.8)),ColorSequenceKeypoint.new(1,Color3.new(1,1,1))}
-
-            local hasName = TB.Name ~= nil
-            HolderTB.Size = UDim2.new(1,0,0,hasName and 42 or 20); HolderTB.BackgroundTransparency = 1
-            if hasName then
-                TitleTB.Position = UDim2.new(0,0,0,0); TitleTB.Size = UDim2.new(1,0,0,16); TitleTB.BackgroundTransparency = 1
-                TitleTB.TextColor3 = Color3.new(0.306,0.306,0.306); TitleTB.FontFace = Library.UIFont; TitleTB.TextSize = Library.FontSize; TitleTB.TextXAlignment = Enum.TextXAlignment.Left; TitleTB.Text = TB.Name
-            else TitleTB.Visible = false end
-            TextFrameTB.Position = UDim2.new(0,0,0,hasName and 18 or 0); TextFrameTB.Size = UDim2.new(1,-15,0,20)
-            TextFrameTB.BackgroundColor3 = Color3.new(0.0784,0.0784,0.0784); TextFrameTB.BorderColor3 = Color3.new(0,0,0)
-            TextBoxTB.Size = UDim2.new(1,-8,1,0); TextBoxTB.Position = UDim2.new(0,4,0,0); TextBoxTB.BackgroundTransparency = 1
-            TextBoxTB.Text = TB.State; TextBoxTB.TextColor3 = Color3.new(0.306,0.306,0.306); TextBoxTB.FontFace = Library.UIFont; TextBoxTB.TextSize = Library.FontSize
-            TextBoxTB.PlaceholderText = TB.Placeholder; TextBoxTB.PlaceholderColor3 = Color3.new(0.25,0.25,0.25); TextBoxTB.ClearTextOnFocus = false; TextBoxTB.TextXAlignment = Enum.TextXAlignment.Left
-
-            Library.Flags[TB.Flag] = TB.State
-            TextBoxTB.FocusLost:Connect(function()
-                TB.Callback(TextBoxTB.Text)
-                Library.Flags[TB.Flag] = TextBoxTB.Text
-                Library:FireFlagCallbacks(TB.Flag, TextBoxTB.Text)
-            end)
-            TextBoxTB:GetPropertyChangedSignal("Text"):Connect(function()
-                Library.Flags[TB.Flag] = TextBoxTB.Text
-            end)
-            local function set(str) TextBoxTB.Text = str; Library.Flags[TB.Flag] = str; Library:FireFlagCallbacks(TB.Flag, str) end
-            function TB:Set(str) set(str) end
-            function TB:SetValue(str) set(str) end
-            Flags[TB.Flag] = set
-            return TB
+    function DD:Refresh(tbl)
+        DD.Options = tbl
+        for _, opt in pairs(DD.OptionInsts) do
+            pcall(function() opt.button:Destroy() end)
         end
+        table.clear(DD.OptionInsts)
+        table.clear(DD.Selected)
+        DD.CurrentIndex = 1
+        createOptions(tbl)
+        updateDisplay()
+    end
 
-        -- Button (BIGGER)
-        function Sections:Button(Options)
-            local Props = Options or {}
-            local Btn = { Section = self, Name = Props.Name or "button", Callback = Props.Callback or Props.callback or function() end }
-            local parent = Options.Side == "Right" and Btn.Section.Elements.Right or Btn.Section.Elements.Left
-            local HolderBT = Instance.new('Frame', parent)
-            local TextFrameBT = Instance.new('Frame', HolderBT)
-            local TextbuttonBT = Instance.new('TextButton', TextFrameBT)
-            Instance.new('UIGradient', TextFrameBT).Color = ColorSequence.new{ColorSequenceKeypoint.new(0,Color3.new(0.78,0.749,0.8)),ColorSequenceKeypoint.new(1,Color3.new(1,1,1))}
-
-            HolderBT.Size = UDim2.new(1,0,0,24); HolderBT.BackgroundTransparency = 1
-            TextFrameBT.Position = UDim2.new(0,0,0,0); TextFrameBT.Size = UDim2.new(1,-15,1,0)
-            TextFrameBT.BackgroundColor3 = Color3.new(0.0784,0.0784,0.0784); TextFrameBT.BorderColor3 = Color3.new(0,0,0)
-            TextbuttonBT.Size = UDim2.new(1,0,1,0); TextbuttonBT.BackgroundTransparency = 1; TextbuttonBT.Text = Btn.Name
-            TextbuttonBT.TextColor3 = Color3.new(0.306,0.306,0.306); TextbuttonBT.FontFace = Library.UIFont; TextbuttonBT.TextSize = Library.FontSize
-            TextbuttonBT.MouseButton1Click:Connect(function() Btn.Callback() end)
-            return Btn
+    function DD:GetValue()
+        if DD.Multi then
+            local arr = {}
+            for k, v in pairs(DD.Selected) do
+                if v then table.insert(arr, k) end
+            end
+            return arr
+        else
+            for k, v in pairs(DD.Selected) do
+                if v then return k end
+            end
+            return nil
         end
+    end
 
-        -- Colorpicker
-        function Sections:Colorpicker(Options)
-            local Props = Options or {}
-            local CP = {
-                Section = self, Name = Props.Name or "Color",
-                State = Props.State or Props.state or Props.color or Props.Color or Color3.fromRGB(255,0,0),
-                Callback = Props.Callback or Props.callback or function() end,
-                Flag = Props.Flag or Props.flag or Library.NextFlag(),
-            }
-            local parent = Options.Side == "Right" and CP.Section.Elements.Right or CP.Section.Elements.Left
-            local ColorBtn = Instance.new('TextButton', parent)
-            local TextLabelCP = Instance.new('TextLabel', ColorBtn)
-            ColorBtn.Size = UDim2.new(1,0,0,16); ColorBtn.BackgroundTransparency = 1; ColorBtn.Text = ""; ColorBtn.AutoButtonColor = false
-            TextLabelCP.Position = UDim2.new(0,0,0,0); TextLabelCP.Size = UDim2.new(1,0,1,0); TextLabelCP.BackgroundTransparency = 1
-            TextLabelCP.TextColor3 = Color3.new(0.306,0.306,0.306); TextLabelCP.FontFace = Library.UIFont; TextLabelCP.TextSize = Library.FontSize; TextLabelCP.TextXAlignment = Enum.TextXAlignment.Left; TextLabelCP.Text = CP.Name
-            local cpt = Library:NewPicker(CP.State, 1, ColorBtn, 0, CP.Flag, CP.Callback)
-            function CP:Set(color) cpt:Set(color) end
-            return CP
+    -- Set initial selection
+    if DD.State then
+        if DD.Multi then
+            if type(DD.State) == "table" then
+                for _, v in ipairs(DD.State) do
+                    DD.Selected[v] = true
+                end
+            end
+        else
+            if type(DD.State) == "string" then
+                DD.Selected[DD.State] = true
+                for i, opt in ipairs(DD.Options) do
+                    if opt == DD.State then
+                        DD.CurrentIndex = i
+                        break
+                    end
+                end
+            end
         end
+    end
+    updateOptionColors()
+    updateDisplay()
 
-        -- Label
-        function Sections:Label(Options)
-            local Props = Options or {}
-            local Lbl = { Section = self, Text = Props.Name or Props.name or "Label" }
-            local parent = Options.Side == "Right" and Lbl.Section.Elements.Right or Lbl.Section.Elements.Left
-            local LabelInst = Instance.new('TextLabel', parent)
-            LabelInst.Size = UDim2.new(1,0,0,16); LabelInst.BackgroundTransparency = 1; LabelInst.Position = UDim2.new(0,0,0,0)
-            LabelInst.TextColor3 = Color3.new(0.306,0.306,0.306); LabelInst.FontFace = Library.UIFont; LabelInst.TextSize = Library.FontSize
-            LabelInst.TextXAlignment = Enum.TextXAlignment.Left; LabelInst.Text = Lbl.Text; LabelInst.TextWrapped = true
-            function Lbl:SetText(text) LabelInst.Text = text end
-            return Lbl
+    Flags[DD.Flag] = DD
+    return DD
+end
+
+-- Keybind (COMPLETELY FIXED)
+function Sections:Keybind(Options)
+    local Props = Options or {}
+    local KB = {
+        Section = self,
+        Name = Props.Name or Props.name or "Keybind",
+        Mode = Props.Mode or Props.mode or "Toggle",
+        Callback = Props.Callback or Props.callback or nil,
+        Flag = Props.Flag or Props.flag or Library.NextFlag(),
+        Key = nil,
+        Active = false,
+        Binding = false,
+        Holder = nil,
+    }
+
+    local initialKey = Props.State or Props.state or Props.key or Props.Key
+    if initialKey and typeof(initialKey) == "EnumItem" then
+        KB.Key = initialKey
+    end
+
+    local parent = Options.Side == "Right" and KB.Section.Elements.Right or KB.Section.Elements.Left
+
+    local HolderKB = Instance.new('TextButton', parent)
+    local TitleKB = Instance.new('TextLabel', HolderKB)
+    local ValueKB = Instance.new('TextButton', HolderKB)
+    local ModeWindow = Instance.new('Frame', HolderKB)
+    local ModeList = Instance.new('UIListLayout', ModeWindow)
+
+    KB.Holder = HolderKB
+
+    HolderKB.Size = UDim2.new(1, 0, 0, 16)
+    HolderKB.BackgroundTransparency = 1
+    HolderKB.Text = ""
+    HolderKB.AutoButtonColor = false
+
+    TitleKB.Position = UDim2.new(0, 0, 0, 0)
+    TitleKB.Size = UDim2.new(1, -55, 1, 0)
+    TitleKB.BackgroundTransparency = 1
+    TitleKB.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+    TitleKB.FontFace = Library.UIFont
+    TitleKB.TextSize = Library.FontSize
+    TitleKB.TextXAlignment = Enum.TextXAlignment.Left
+    TitleKB.Text = KB.Name
+
+    ValueKB.Position = UDim2.new(1, -50, 0, 0)
+    ValueKB.Size = UDim2.new(0, 45, 1, 0)
+    ValueKB.BackgroundTransparency = 1
+    ValueKB.Text = "-"
+    ValueKB.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+    ValueKB.FontFace = Library.UIFont
+    ValueKB.TextSize = Library.FontSize
+    ValueKB.AutoButtonColor = false
+    ValueKB.TextXAlignment = Enum.TextXAlignment.Right
+
+    ModeWindow.Position = UDim2.new(1, -60, 0, 18)
+    ModeWindow.Size = UDim2.new(0, 70, 0, 0)
+    ModeWindow.BackgroundColor3 = Color3.new(0.0431, 0.0431, 0.0431)
+    ModeWindow.BorderColor3 = Color3.new(0.1098, 0.1098, 0.1098)
+    ModeWindow.ZIndex = 1220
+    ModeWindow.Visible = false
+    ModeWindow.AutomaticSize = Enum.AutomaticSize.Y
+    ModeList.SortOrder = Enum.SortOrder.LayoutOrder
+
+    local modes = {"Toggle", "Hold"}
+    local modeButtons = {}
+
+    local function getKeyName(key)
+        if not key then
+            return "-"
         end
-
-        -- Divider
-        function Sections:Divider(Options)
-            local parent = (Options and Options.Side == "Right") and self.Elements.Right or self.Elements.Left
-            local Div = Instance.new('Frame', parent)
-            Div.Size = UDim2.new(1,0,0,1); Div.BackgroundColor3 = Color3.new(0.1098,0.1098,0.1098); Div.BorderSizePixel = 0
+        if Library.Keys[key] then
+            return Library.Keys[key]
         end
+        local keyString = tostring(key)
+        keyString = keyString:gsub("Enum.KeyCode.", "")
+        keyString = keyString:gsub("Enum.UserInputType.", "")
+        return keyString
+    end
 
-      
-        function Sections:Keybind(Options)
-        local Props = Options or {}
-        local KB = {
-            Section = self,
-            Name = Props.Name or Props.name or "Keybind",
-            Mode = Props.Mode or Props.mode or "Toggle",
-            Callback = Props.Callback or Props.callback or nil,
-            Flag = Props.Flag or Props.flag or Library.NextFlag(),
-            Key = nil,
-            Active = false,
-            Binding = false,
-            Holder = nil,
+    local function updateFlagData()
+        Library.Flags[KB.Flag] = {
+            key = KB.Key,
+            mode = KB.Mode,
+            active = KB.Active
         }
+        Library:FireFlagCallbacks(KB.Flag, Library.Flags[KB.Flag])
+    end
 
-        -- Set initial key
-        local initialKey = Props.State or Props.state or Props.key or Props.Key
-        if initialKey and typeof(initialKey) == "EnumItem" then
-            KB.Key = initialKey
+    local function updateModeColors()
+        for m, btn in pairs(modeButtons) do
+            btn.TextColor3 = m == KB.Mode and Color3.fromRGB(255, 255, 255) or Color3.new(0.306, 0.306, 0.306)
         end
+    end
 
-        local parent = Options.Side == "Right" and KB.Section.Elements.Right or KB.Section.Elements.Left
-
-        local HolderKB = Instance.new('TextButton', parent)
-        local TitleKB = Instance.new('TextLabel', HolderKB)
-        local ValueKB = Instance.new('TextButton', HolderKB)
-        local ModeWindow = Instance.new('Frame', HolderKB)
-        local ModeList = Instance.new('UIListLayout', ModeWindow)
-
-        KB.Holder = HolderKB
-
-        HolderKB.Size = UDim2.new(1, 0, 0, 16)
-        HolderKB.BackgroundTransparency = 1
-        HolderKB.Text = ""
-        HolderKB.AutoButtonColor = false
-
-        TitleKB.Position = UDim2.new(0, 0, 0, 0)
-        TitleKB.Size = UDim2.new(1, -55, 1, 0)
-        TitleKB.BackgroundTransparency = 1
-        TitleKB.TextColor3 = Color3.new(0.306, 0.306, 0.306)
-        TitleKB.FontFace = Library.UIFont
-        TitleKB.TextSize = Library.FontSize
-        TitleKB.TextXAlignment = Enum.TextXAlignment.Left
-        TitleKB.Text = KB.Name
-
-        ValueKB.Position = UDim2.new(1, -50, 0, 0)
-        ValueKB.Size = UDim2.new(0, 45, 1, 0)
-        ValueKB.BackgroundTransparency = 1
-        ValueKB.Text = "-"
-        ValueKB.TextColor3 = Color3.new(0.306, 0.306, 0.306)
-        ValueKB.FontFace = Library.UIFont
-        ValueKB.TextSize = Library.FontSize
-        ValueKB.AutoButtonColor = false
-        ValueKB.TextXAlignment = Enum.TextXAlignment.Right
-
-        ModeWindow.Position = UDim2.new(1, -60, 0, 18)
-        ModeWindow.Size = UDim2.new(0, 70, 0, 0)
-        ModeWindow.BackgroundColor3 = Color3.new(0.0431, 0.0431, 0.0431)
-        ModeWindow.BorderColor3 = Color3.new(0.1098, 0.1098, 0.1098)
-        ModeWindow.ZIndex = 1220
-        ModeWindow.Visible = false
-        ModeWindow.AutomaticSize = Enum.AutomaticSize.Y
-        ModeList.SortOrder = Enum.SortOrder.LayoutOrder
-
-        local modes = {"Toggle", "Hold"}
-        local modeButtons = {}
-
-        local function getKeyName(key)
-            if not key then
-                return "-"
-            end
-            if Library.Keys[key] then
-                return Library.Keys[key]
-            end
-            local keyString = tostring(key)
-            keyString = keyString:gsub("Enum.KeyCode.", "")
-            keyString = keyString:gsub("Enum.UserInputType.", "")
-            return keyString
+    local function fireCallback()
+        if KB.Callback then
+            task.spawn(function()
+                local success, err = pcall(KB.Callback, KB.Active)
+                if not success then
+                    warn("[Keybind] Callback error for " .. KB.Name .. ":", err)
+                end
+            end)
         end
+    end
 
-        local function updateFlagData()
-            Library.Flags[KB.Flag] = {
-                key = KB.Key,
-                mode = KB.Mode,
-                active = KB.Active
-            }
-            Library:FireFlagCallbacks(KB.Flag, Library.Flags[KB.Flag])
-        end
+    local function setActive(state)
+        if KB.Active == state then return end
+        KB.Active = state
+        updateFlagData()
+        fireCallback()
+    end
 
-        local function updateModeColors()
-            for m, btn in pairs(modeButtons) do
-                btn.TextColor3 = m == KB.Mode and Color3.fromRGB(255, 255, 255) or Color3.new(0.306, 0.306, 0.306)
-            end
-        end
+    for _, mode in ipairs(modes) do
+        local ModeBtn = Instance.new('TextButton', ModeWindow)
+        ModeBtn.Size = UDim2.new(1, 0, 0, 18)
+        ModeBtn.BackgroundTransparency = 1
+        ModeBtn.Text = mode
+        ModeBtn.TextColor3 = KB.Mode == mode and Color3.fromRGB(255, 255, 255) or Color3.new(0.306, 0.306, 0.306)
+        ModeBtn.FontFace = Library.UIFont
+        ModeBtn.TextSize = Library.FontSize
+        ModeBtn.ZIndex = 1221
+        modeButtons[mode] = ModeBtn
 
-        local function setActive(state)
-            KB.Active = state
+        ModeBtn.MouseButton1Click:Connect(function()
+            KB.Mode = mode
+            KB.Active = false
+            updateModeColors()
+            ModeWindow.Visible = false
             updateFlagData()
-            
-            if KB.Callback then
-                task.spawn(function()
-                    local success, err = pcall(KB.Callback, KB.Active)
-                    if not success then
-                        warn("Keybind callback error:", err)
+        end)
+    end
+
+    if KB.Key then
+        ValueKB.Text = getKeyName(KB.Key)
+    end
+    updateFlagData()
+
+    local bindingConnection = nil
+
+    ValueKB.MouseButton1Click:Connect(function()
+        if KB.Binding then
+            return
+        end
+
+        KB.Binding = true
+        ValueKB.Text = "..."
+
+        bindingConnection = game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
+            if not KB.Binding then
+                return
+            end
+
+            local keyToSet = nil
+
+            if input.UserInputType == Enum.UserInputType.Keyboard then
+                keyToSet = input.KeyCode
+            elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+                keyToSet = Enum.UserInputType.MouseButton1
+            elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+                keyToSet = Enum.UserInputType.MouseButton2
+            elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
+                keyToSet = Enum.UserInputType.MouseButton3
+            end
+
+            if keyToSet then
+                if keyToSet == Enum.KeyCode.Backspace or keyToSet == Enum.KeyCode.Escape then
+                    KB.Key = nil
+                    ValueKB.Text = "-"
+                else
+                    KB.Key = keyToSet
+                    ValueKB.Text = getKeyName(keyToSet)
+                end
+
+                KB.Active = false
+                updateFlagData()
+            end
+
+            KB.Binding = false
+            if bindingConnection then
+                bindingConnection:Disconnect()
+                bindingConnection = nil
+            end
+        end)
+    end)
+
+    ValueKB.MouseButton2Click:Connect(function()
+        ModeWindow.Visible = not ModeWindow.Visible
+    end)
+
+    game:GetService("UserInputService").InputBegan:Connect(function(input)
+        if ModeWindow.Visible then
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                task.defer(function()
+                    if not Library:IsMouseOverFrame(ModeWindow) and not Library:IsMouseOverFrame(ValueKB) then
+                        ModeWindow.Visible = false
                     end
                 end)
             end
         end
+    end)
 
-        -- Create mode buttons
-        for _, mode in ipairs(modes) do
-            local ModeBtn = Instance.new('TextButton', ModeWindow)
-            ModeBtn.Size = UDim2.new(1, 0, 0, 18)
-            ModeBtn.BackgroundTransparency = 1
-            ModeBtn.Text = mode
-            ModeBtn.TextColor3 = KB.Mode == mode and Color3.fromRGB(255, 255, 255) or Color3.new(0.306, 0.306, 0.306)
-            ModeBtn.FontFace = Library.UIFont
-            ModeBtn.TextSize = Library.FontSize
-            ModeBtn.ZIndex = 1221
-            modeButtons[mode] = ModeBtn
+    -- Main input detection
+    local UIS = game:GetService("UserInputService")
+    
+    UIS.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if KB.Binding then return end
+        if not KB.Key then return end
 
-            ModeBtn.MouseButton1Click:Connect(function()
-                KB.Mode = mode
-                updateModeColors()
-                ModeWindow.Visible = false
-                updateFlagData()
-            end)
+        local pressedKey
+        if input.UserInputType == Enum.UserInputType.Keyboard then
+            pressedKey = input.KeyCode
+        elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+            pressedKey = Enum.UserInputType.MouseButton1
+        elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+            pressedKey = Enum.UserInputType.MouseButton2
+        elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
+            pressedKey = Enum.UserInputType.MouseButton3
         end
 
-        -- Set initial display
-        if KB.Key then
-            ValueKB.Text = getKeyName(KB.Key)
+        if not pressedKey then return end
+        if pressedKey ~= KB.Key then return end
+
+        if KB.Mode == "Toggle" then
+            setActive(not KB.Active)
+        elseif KB.Mode == "Hold" then
+            setActive(true)
         end
-        updateFlagData()
+    end)
 
-        -- Binding connection holder
-        local bindingConnection = nil
+    UIS.InputEnded:Connect(function(input)
+        if KB.Binding then return end
+        if not KB.Key then return end
+        if KB.Mode ~= "Hold" then return end
 
-        -- Left click to bind key
-        ValueKB.MouseButton1Click:Connect(function()
-            if KB.Binding then
-                return
-            end
-
-            KB.Binding = true
-            ValueKB.Text = "..."
-
-            bindingConnection = game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
-                if not KB.Binding then
-                    return
-                end
-
-                local keyToSet = nil
-
-                if input.UserInputType == Enum.UserInputType.Keyboard then
-                    keyToSet = input.KeyCode
-                elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
-                    keyToSet = Enum.UserInputType.MouseButton1
-                elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
-                    keyToSet = Enum.UserInputType.MouseButton2
-                elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
-                    keyToSet = Enum.UserInputType.MouseButton3
-                end
-
-                if keyToSet then
-                    -- Clear key on backspace/escape
-                    if keyToSet == Enum.KeyCode.Backspace or keyToSet == Enum.KeyCode.Escape then
-                        KB.Key = nil
-                        ValueKB.Text = "-"
-                    else
-                        KB.Key = keyToSet
-                        ValueKB.Text = getKeyName(keyToSet)
-                    end
-
-                    KB.Active = false
-                    updateFlagData()
-                end
-
-                KB.Binding = false
-                if bindingConnection then
-                    bindingConnection:Disconnect()
-                    bindingConnection = nil
-                end
-            end)
-        end)
-
-        -- Right click to open mode selector
-        ValueKB.MouseButton2Click:Connect(function()
-            ModeWindow.Visible = not ModeWindow.Visible
-        end)
-
-        -- Close mode window when clicking outside
-        game:GetService("UserInputService").InputBegan:Connect(function(input)
-            if ModeWindow.Visible then
-                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                    task.defer(function()
-                        if not Library:IsMouseOverFrame(ModeWindow) and not Library:IsMouseOverFrame(ValueKB) then
-                            ModeWindow.Visible = false
-                        end
-                    end)
-                end
-            end
-        end)
-
-        -- MAIN KEY DETECTION - Using direct connection
-        game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
-            -- Skip if game is processing or we're binding
-            if gameProcessed then
-                return
-            end
-            
-            if KB.Binding then
-                return
-            end
-            
-            if not KB.Key then
-                return
-            end
-
-            -- Get the input key
-            local pressedKey = nil
-            if input.UserInputType == Enum.UserInputType.Keyboard then
-                pressedKey = input.KeyCode
-            else
-                pressedKey = input.UserInputType
-            end
-
-            -- Compare keys
-            if pressedKey == KB.Key then
-                if KB.Mode == "Toggle" then
-                    setActive(not KB.Active)
-                elseif KB.Mode == "Hold" then
-                    setActive(true)
-                end
-            end
-        end)
-
-        -- Key release for Hold mode
-        game:GetService("UserInputService").InputEnded:Connect(function(input)
-            if KB.Binding then
-                return
-            end
-            
-            if not KB.Key then
-                return
-            end
-            
-            if KB.Mode ~= "Hold" then
-                return
-            end
-
-            local releasedKey = nil
-            if input.UserInputType == Enum.UserInputType.Keyboard then
-                releasedKey = input.KeyCode
-            else
-                releasedKey = input.UserInputType
-            end
-
-            if releasedKey == KB.Key then
-                if KB.Active then
-                    setActive(false)
-                end
-            end
-        end)
-
-        function KB:Set(key)
-            if typeof(key) == "EnumItem" then
-                KB.Key = key
-                ValueKB.Text = getKeyName(key)
-                KB.Active = false
-                updateFlagData()
-            elseif key == nil then
-                KB.Key = nil
-                ValueKB.Text = "-"
-                KB.Active = false
-                updateFlagData()
-            end
+        local releasedKey
+        if input.UserInputType == Enum.UserInputType.Keyboard then
+            releasedKey = input.KeyCode
+        elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+            releasedKey = Enum.UserInputType.MouseButton1
+        elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+            releasedKey = Enum.UserInputType.MouseButton2
+        elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
+            releasedKey = Enum.UserInputType.MouseButton3
         end
 
-        function KB:GetState()
-            return KB.Active
-        end
+        if not releasedKey then return end
+        if releasedKey ~= KB.Key then return end
 
-        function KB:SetMode(mode)
-            if mode == "Toggle" or mode == "Hold" then
-                KB.Mode = mode
-                updateModeColors()
-                updateFlagData()
-            end
+        if KB.Active then
+            setActive(false)
         end
+    end)
 
-        function KB:SetCallback(callback)
-            KB.Callback = callback
+    function KB:Set(key)
+        if typeof(key) == "EnumItem" then
+            KB.Key = key
+            ValueKB.Text = getKeyName(key)
+            KB.Active = false
+            updateFlagData()
+        elseif key == nil then
+            KB.Key = nil
+            ValueKB.Text = "-"
+            KB.Active = false
+            updateFlagData()
         end
-
-        Flags[KB.Flag] = KB
-        return KB
     end
+
+    function KB:GetState()
+        return KB.Active
+    end
+
+    function KB:SetMode(mode)
+        if mode == "Toggle" or mode == "Hold" then
+            KB.Mode = mode
+            KB.Active = false
+            updateModeColors()
+            updateFlagData()
+        end
+    end
+
+    function KB:SetCallback(callback)
+        KB.Callback = callback
+    end
+
+    Flags[KB.Flag] = KB
+    return KB
+        end
     end
 end
 
--- LOWERCASE API WRAPPER
+
 local library = {
     flags = Library.Flags,
     _internal = Library,
