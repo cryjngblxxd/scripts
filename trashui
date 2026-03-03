@@ -1,0 +1,696 @@
+                TitleTB.Position = UDim2.new(0, 0, 0, 0)
+                TitleTB.Size = UDim2.new(1, 0, 0, 16)
+                TitleTB.BackgroundTransparency = 1
+                TitleTB.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+                TitleTB.FontFace = Library.UIFont
+                TitleTB.TextSize = Library.FontSize
+                TitleTB.TextXAlignment = Enum.TextXAlignment.Left
+                TitleTB.Text = TB.Name
+            else
+                TitleTB.Visible = false
+            end
+
+            TextFrameTB.Position = UDim2.new(0, 0, 0, hasName and 18 or 0)
+            TextFrameTB.Size = UDim2.new(1, -15, 0, 20)
+            TextFrameTB.BackgroundColor3 = Color3.new(0.0784, 0.0784, 0.0784)
+            TextFrameTB.BorderColor3 = Color3.new(0, 0, 0)
+            TextFrameTB.ClipsDescendants = true
+
+            TextBoxTB.Size = UDim2.new(1, -8, 1, 0)
+            TextBoxTB.Position = UDim2.new(0, 4, 0, 0)
+            TextBoxTB.BackgroundTransparency = 1
+            TextBoxTB.Text = TB.State
+            TextBoxTB.TextColor3 = Color3.fromRGB(255, 255, 255)
+            TextBoxTB.FontFace = Library.UIFont
+            TextBoxTB.TextSize = Library.FontSize
+            TextBoxTB.PlaceholderText = TB.Placeholder
+            TextBoxTB.PlaceholderColor3 = Color3.new(0.25, 0.25, 0.25)
+            TextBoxTB.ClearTextOnFocus = false
+            TextBoxTB.TextXAlignment = Enum.TextXAlignment.Left
+            TextBoxTB.ZIndex = 2
+
+            PredictionLabel.Size = UDim2.new(1, -8, 1, 0)
+            PredictionLabel.Position = UDim2.new(0, 4, 0, 0)
+            PredictionLabel.BackgroundTransparency = 1
+            PredictionLabel.Text = ""
+            PredictionLabel.TextColor3 = Color3.new(0.4, 0.4, 0.4)
+            PredictionLabel.FontFace = Library.UIFont
+            PredictionLabel.TextSize = Library.FontSize
+            PredictionLabel.TextXAlignment = Enum.TextXAlignment.Left
+            PredictionLabel.ZIndex = 1
+
+            Library.Flags[TB.Flag] = TB.State
+
+            TextBoxTB:GetPropertyChangedSignal("Text"):Connect(function()
+                Library.Flags[TB.Flag] = TextBoxTB.Text
+
+                if TB.OnChange then
+                    task.spawn(function()
+                        pcall(TB.OnChange, TextBoxTB.Text)
+                    end)
+                end
+
+                Library:FireFlagCallbacks(TB.Flag, TextBoxTB.Text)
+            end)
+
+            TextBoxTB.FocusLost:Connect(function(enterPressed)
+                TB.Callback(TextBoxTB.Text, enterPressed)
+                Library.Flags[TB.Flag] = TextBoxTB.Text
+                PredictionLabel.Text = ""
+            end)
+
+            local function set(str)
+                TextBoxTB.Text = str
+                Library.Flags[TB.Flag] = str
+                Library:FireFlagCallbacks(TB.Flag, str)
+            end
+
+            function TB:Set(str)
+                set(str)
+            end
+
+            function TB:SetValue(str)
+                set(str)
+            end
+
+            function TB:SetPrediction(prediction)
+                if prediction and prediction ~= "" then
+                    PredictionLabel.Text = prediction
+                else
+                    PredictionLabel.Text = ""
+                end
+            end
+
+            function TB:GetText()
+                return TextBoxTB.Text
+            end
+
+            function TB:Focus()
+                TextBoxTB:CaptureFocus()
+            end
+
+            Flags[TB.Flag] = set
+            return TB
+        end
+
+        function Sections:Button(Options)
+            local Props = Options or {}
+            local Btn = {
+                Section = self,
+                Name = Props.Name or "button",
+                Callback = Props.Callback or Props.callback or function() end
+            }
+
+            local parent = Options.Side == "Right" and Btn.Section.Elements.Right or Btn.Section.Elements.Left
+            local HolderBT = Instance.new('Frame', parent)
+            local TextFrameBT = Instance.new('Frame', HolderBT)
+            local TextbuttonBT = Instance.new('TextButton', TextFrameBT)
+
+            Instance.new('UIGradient', TextFrameBT).Color = ColorSequence.new{ColorSequenceKeypoint.new(0, Color3.new(0.78, 0.749, 0.8)), ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1))}
+
+            HolderBT.Size = UDim2.new(1, 0, 0, 24)
+            HolderBT.BackgroundTransparency = 1
+
+            TextFrameBT.Position = UDim2.new(0, 0, 0, 0)
+            TextFrameBT.Size = UDim2.new(1, -15, 1, 0)
+            TextFrameBT.BackgroundColor3 = Color3.new(0.0784, 0.0784, 0.0784)
+            TextFrameBT.BorderColor3 = Color3.new(0, 0, 0)
+
+            TextbuttonBT.Size = UDim2.new(1, 0, 1, 0)
+            TextbuttonBT.BackgroundTransparency = 1
+            TextbuttonBT.Text = Btn.Name
+            TextbuttonBT.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+            TextbuttonBT.FontFace = Library.UIFont
+            TextbuttonBT.TextSize = Library.FontSize
+
+            TextbuttonBT.MouseButton1Click:Connect(function()
+                Btn.Callback()
+            end)
+
+            return Btn
+        end
+
+        function Sections:Colorpicker(Options)
+            local Props = Options or {}
+            local CP = {
+                Section = self,
+                Name = Props.Name or "Color",
+                State = Props.State or Props.state or Props.color or Props.Color or Color3.fromRGB(255, 0, 0),
+                Callback = Props.Callback or Props.callback or function() end,
+                Flag = Props.Flag or Props.flag or Library.NextFlag(),
+            }
+
+            local parent = Options.Side == "Right" and CP.Section.Elements.Right or CP.Section.Elements.Left
+            local ColorBtn = Instance.new('TextButton', parent)
+            local TextLabelCP = Instance.new('TextLabel', ColorBtn)
+
+            ColorBtn.Size = UDim2.new(1, 0, 0, 16)
+            ColorBtn.BackgroundTransparency = 1
+            ColorBtn.Text = ""
+            ColorBtn.AutoButtonColor = false
+
+            TextLabelCP.Position = UDim2.new(0, 0, 0, 0)
+            TextLabelCP.Size = UDim2.new(1, 0, 1, 0)
+            TextLabelCP.BackgroundTransparency = 1
+            TextLabelCP.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+            TextLabelCP.FontFace = Library.UIFont
+            TextLabelCP.TextSize = Library.FontSize
+            TextLabelCP.TextXAlignment = Enum.TextXAlignment.Left
+            TextLabelCP.Text = CP.Name
+
+            local cpt = Library:NewPicker(CP.State, 1, ColorBtn, 0, CP.Flag, CP.Callback)
+
+            function CP:Set(color)
+                cpt:Set(color)
+            end
+
+            return CP
+        end
+
+        function Sections:Label(Options)
+            local Props = Options or {}
+            local Lbl = {
+                Section = self,
+                Text = Props.Name or Props.name or "Label"
+            }
+
+            local parent = Options.Side == "Right" and Lbl.Section.Elements.Right or Lbl.Section.Elements.Left
+            local LabelInst = Instance.new('TextLabel', parent)
+
+            LabelInst.Size = UDim2.new(1, 0, 0, 16)
+            LabelInst.BackgroundTransparency = 1
+            LabelInst.Position = UDim2.new(0, 0, 0, 0)
+            LabelInst.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+            LabelInst.FontFace = Library.UIFont
+            LabelInst.TextSize = Library.FontSize
+            LabelInst.TextXAlignment = Enum.TextXAlignment.Left
+            LabelInst.Text = Lbl.Text
+            LabelInst.TextWrapped = true
+
+            function Lbl:SetText(text)
+                LabelInst.Text = text
+            end
+
+            return Lbl
+        end
+
+        function Sections:Divider(Options)
+            local parent = (Options and Options.Side == "Right") and self.Elements.Right or self.Elements.Left
+            local Div = Instance.new('Frame', parent)
+            Div.Size = UDim2.new(1, 0, 0, 1)
+            Div.BackgroundColor3 = Color3.new(0.1098, 0.1098, 0.1098)
+            Div.BorderSizePixel = 0
+        end
+
+        -- KEYBIND - USES GLOBAL HANDLER
+        function Sections:Keybind(Options)
+            local Props = Options or {}
+            local KB = {
+                Section = self,
+                Name = Props.Name or Props.name or "Keybind",
+                Mode = Props.Mode or Props.mode or "Toggle",
+                Callback = Props.Callback or Props.callback or nil,
+                Flag = Props.Flag or Props.flag or Library.NextFlag(),
+                Key = nil,
+                Active = false,
+                Binding = false,
+                Holder = nil,
+                _keyDown = false,
+            }
+
+            local initialKey = Props.State or Props.state or Props.key or Props.Key
+            if initialKey and typeof(initialKey) == "EnumItem" then
+                KB.Key = initialKey
+            end
+
+            local parent = Options.Side == "Right" and KB.Section.Elements.Right or KB.Section.Elements.Left
+
+            local HolderKB = Instance.new('TextButton', parent)
+            local TitleKB = Instance.new('TextLabel', HolderKB)
+            local ValueKB = Instance.new('TextButton', HolderKB)
+            local ModeWindow = Instance.new('Frame', HolderKB)
+            local ModeList = Instance.new('UIListLayout', ModeWindow)
+
+            KB.Holder = HolderKB
+
+            HolderKB.Size = UDim2.new(1, 0, 0, 16)
+            HolderKB.BackgroundTransparency = 1
+            HolderKB.Text = ""
+            HolderKB.AutoButtonColor = false
+
+            TitleKB.Position = UDim2.new(0, 0, 0, 0)
+            TitleKB.Size = UDim2.new(1, -55, 1, 0)
+            TitleKB.BackgroundTransparency = 1
+            TitleKB.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+            TitleKB.FontFace = Library.UIFont
+            TitleKB.TextSize = Library.FontSize
+            TitleKB.TextXAlignment = Enum.TextXAlignment.Left
+            TitleKB.Text = KB.Name
+
+            ValueKB.Position = UDim2.new(1, -50, 0, 0)
+            ValueKB.Size = UDim2.new(0, 45, 1, 0)
+            ValueKB.BackgroundTransparency = 1
+            ValueKB.Text = "-"
+            ValueKB.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+            ValueKB.FontFace = Library.UIFont
+            ValueKB.TextSize = Library.FontSize
+            ValueKB.AutoButtonColor = false
+            ValueKB.TextXAlignment = Enum.TextXAlignment.Right
+
+            ModeWindow.Position = UDim2.new(1, -60, 0, 18)
+            ModeWindow.Size = UDim2.new(0, 70, 0, 0)
+            ModeWindow.BackgroundColor3 = Color3.new(0.0431, 0.0431, 0.0431)
+            ModeWindow.BorderColor3 = Color3.new(0.1098, 0.1098, 0.1098)
+            ModeWindow.ZIndex = 1220
+            ModeWindow.Visible = false
+            ModeWindow.AutomaticSize = Enum.AutomaticSize.Y
+            ModeList.SortOrder = Enum.SortOrder.LayoutOrder
+
+            local modes = {"Toggle", "Hold"}
+            local modeButtons = {}
+
+            local function getKeyName(key)
+                if not key then
+                    return "-"
+                end
+                if Library.Keys[key] then
+                    return Library.Keys[key]
+                end
+                local keyString = tostring(key)
+                keyString = keyString:gsub("Enum.KeyCode.", "")
+                keyString = keyString:gsub("Enum.UserInputType.", "")
+                return keyString
+            end
+
+            function KB:_updateFlag()
+                Library.Flags[KB.Flag] = {
+                    key = KB.Key,
+                    mode = KB.Mode,
+                    active = KB.Active
+                }
+                Library:FireFlagCallbacks(KB.Flag, Library.Flags[KB.Flag])
+            end
+
+            local function updateModeColors()
+                for m, btn in pairs(modeButtons) do
+                    btn.TextColor3 = m == KB.Mode and Color3.fromRGB(255, 255, 255) or Color3.new(0.306, 0.306, 0.306)
+                end
+            end
+
+            for _, mode in ipairs(modes) do
+                local ModeBtn = Instance.new('TextButton', ModeWindow)
+                ModeBtn.Size = UDim2.new(1, 0, 0, 18)
+                ModeBtn.BackgroundTransparency = 1
+                ModeBtn.Text = mode
+                ModeBtn.TextColor3 = KB.Mode == mode and Color3.fromRGB(255, 255, 255) or Color3.new(0.306, 0.306, 0.306)
+                ModeBtn.FontFace = Library.UIFont
+                ModeBtn.TextSize = Library.FontSize
+                ModeBtn.ZIndex = 1221
+                modeButtons[mode] = ModeBtn
+
+                ModeBtn.MouseButton1Click:Connect(function()
+                    KB.Mode = mode
+                    KB.Active = false
+                    updateModeColors()
+                    ModeWindow.Visible = false
+                    KB:_updateFlag()
+                end)
+            end
+
+            if KB.Key then
+                ValueKB.Text = getKeyName(KB.Key)
+            end
+            KB:_updateFlag()
+
+            -- Click to bind
+            ValueKB.MouseButton1Click:Connect(function()
+                if KB.Binding then return end
+                KB.Binding = true
+                ValueKB.Text = "..."
+            end)
+
+            -- Right click for mode
+            ValueKB.MouseButton2Click:Connect(function()
+                ModeWindow.Visible = not ModeWindow.Visible
+            end)
+
+            -- Handle binding input
+            Library:Connection(game:GetService("UserInputService").InputBegan, function(input, gameProcessed)
+                -- Close mode window
+                if ModeWindow.Visible and input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    task.defer(function()
+                        if not Library:IsMouseOverFrame(ModeWindow) and not Library:IsMouseOverFrame(ValueKB) then
+                            ModeWindow.Visible = false
+                        end
+                    end)
+                end
+
+                -- Handle binding
+                if KB.Binding then
+                    local keyToSet = nil
+                    if input.UserInputType == Enum.UserInputType.Keyboard then
+                        keyToSet = input.KeyCode
+                    elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+                        keyToSet = Enum.UserInputType.MouseButton1
+                    elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+                        keyToSet = Enum.UserInputType.MouseButton2
+                    elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
+                        keyToSet = Enum.UserInputType.MouseButton3
+                    end
+
+                    if keyToSet then
+                        if keyToSet == Enum.KeyCode.Backspace or keyToSet == Enum.KeyCode.Escape then
+                            KB.Key = nil
+                            ValueKB.Text = "-"
+                        else
+                            KB.Key = keyToSet
+                            ValueKB.Text = getKeyName(keyToSet)
+                        end
+                        KB.Active = false
+                        KB._keyDown = false
+                        KB:_updateFlag()
+                        KB.Binding = false
+                    end
+                end
+            end)
+
+            function KB:Set(key)
+                if typeof(key) == "EnumItem" then
+                    KB.Key = key
+                    ValueKB.Text = getKeyName(key)
+                    KB.Active = false
+                    KB._keyDown = false
+                    KB:_updateFlag()
+                elseif key == nil then
+                    KB.Key = nil
+                    ValueKB.Text = "-"
+                    KB.Active = false
+                    KB._keyDown = false
+                    KB:_updateFlag()
+                end
+            end
+
+            function KB:GetState()
+                return KB.Active
+            end
+
+            function KB:SetMode(mode)
+                if mode == "Toggle" or mode == "Hold" then
+                    KB.Mode = mode
+                    KB.Active = false
+                    KB._keyDown = false
+                    updateModeColors()
+                    KB:_updateFlag()
+                end
+            end
+
+            function KB:SetCallback(callback)
+                KB.Callback = callback
+            end
+
+            -- Register this keybind with the global system
+            table.insert(Library._keybinds, KB)
+            print("[KEYBIND] Registered keybind:", KB.Name, "Key:", KB.Key, "Mode:", KB.Mode)
+
+            Flags[KB.Flag] = KB
+            return KB
+        end
+    end
+end
+
+local library = {
+    flags = Library.Flags,
+    _internal = Library,
+}
+
+function library:window(opts)
+    local win = Library:Window({
+        Name = opts.name or opts.Name or "Avenir",
+        Suffix = opts.suffix or opts.Suffix or "",
+        GameInfo = opts.gameInfo or opts.GameInfo or "",
+        Project = opts.project or opts.Project or "",
+        Size = opts.size or opts.Size or UDim2.fromOffset(650, 550),
+        auto_show = opts.auto_show,
+    })
+
+    local wrapper = {}
+    wrapper._win = win
+
+    function wrapper:tab(opts2)
+        return win:Page({
+            Name = opts2.name or opts2.Name or "tab",
+            Icon = opts2.icon or opts2.Icon,
+        })
+    end
+
+    return wrapper
+end
+
+function library:unload()
+    Library:Unload()
+end
+
+function library:init_config(w)
+    Library:InitFolders()
+    Library:DoAutoLoad()
+end
+
+function library:get_config()
+    return Library:GetConfig()
+end
+
+function library:load_config(json)
+    Library:LoadConfig(json)
+end
+
+function library:save_config(name)
+    Library:SaveConfig(name)
+end
+
+function library:delete_config(name)
+    Library:DeleteConfig(name)
+end
+
+function library:list_configs()
+    return Library:ListConfigs()
+end
+
+function library:change_accent(color)
+    Library:ChangeAccent(color)
+end
+
+function library:on_flag_changed(flag, callback)
+    Library:OnFlagChanged(flag, callback)
+end
+
+function library:get_accent()
+    return Library.Accent
+end
+
+function library:set_auto_load(name)
+    Library:SetAutoLoad(name)
+end
+
+function library:clear_auto_load()
+    Library:ClearAutoLoad()
+end
+
+function library:get_auto_load()
+    return Library.AutoLoadConfigName
+end
+
+Library:OnUnload(function() end)
+
+local LibraryInternal = library._internal
+
+Toggles = setmetatable({}, {
+    __index = function(self, key)
+        local val = library.flags[key]
+
+        return {
+            Value = (typeof(val) == "boolean") and val or false,
+            SetValue = function(_, newVal)
+                if typeof(newVal) == "boolean" then
+                    local flagSetter = LibraryInternal.Flags[key]
+                    if flagSetter then
+                        if typeof(flagSetter) == "function" then
+                            flagSetter(newVal)
+                        elseif typeof(flagSetter) == "table" and flagSetter.Set then
+                            flagSetter:Set(newVal)
+                        end
+                    else
+                        library.flags[key] = newVal
+                    end
+                end
+            end,
+            OnChanged = function(_, cb)
+                if LibraryInternal then
+                    LibraryInternal:OnFlagChanged(key, function(newVal)
+                        pcall(cb, newVal)
+                    end)
+                end
+            end
+        }
+    end
+})
+
+Options = setmetatable({}, {
+    __index = function(self, key)
+        local val = library.flags[key]
+
+        local isKeybind = typeof(val) == "table" and val.mode ~= nil
+        local isColor = typeof(val) == "Color3"
+        local isTable = typeof(val) == "table" and not isKeybind
+
+        if isKeybind then
+            return {
+                Value = val.key,
+                GetState = function()
+                    local d = library.flags[key]
+                    return d and d.active or false
+                end,
+                OnClick = function(_, cb)
+                    if LibraryInternal then
+                        LibraryInternal:OnFlagChanged(key, function(newData)
+                            if typeof(newData) == "table" and newData.active then
+                                pcall(cb)
+                            end
+                        end)
+                    end
+                end,
+                OnChanged = function(_, cb)
+                    if LibraryInternal then
+                        LibraryInternal:OnFlagChanged(key, function(newData)
+                            pcall(cb, newData)
+                        end)
+                    end
+                end,
+                SetValue = function(_, newVal)
+                    local flagSetter = LibraryInternal.Flags[key]
+                    if flagSetter and typeof(flagSetter) == "table" and flagSetter.Set then
+                        flagSetter:Set(newVal)
+                    else
+                        library.flags[key] = newVal
+                    end
+                end
+            }
+        elseif isColor then
+            return {
+                Value = val or Color3.fromRGB(255, 255, 255),
+                OnChanged = function(_, cb)
+                    if LibraryInternal then
+                        LibraryInternal:OnFlagChanged(key, function(newColor)
+                            pcall(cb, newColor)
+                        end)
+                    end
+                end,
+                SetValue = function(_, newVal)
+                    local flagSetter = LibraryInternal.Flags[key]
+                    if flagSetter and typeof(flagSetter) == "function" then
+                        flagSetter(newVal)
+                    else
+                        library.flags[key] = newVal
+                    end
+                end
+            }
+        elseif isTable then
+            local dictVal = {}
+            if type(val) == "table" then
+                for _, item in ipairs(val) do
+                    dictVal[item] = true
+                end
+            end
+            return {
+                Value = dictVal,
+                SetValue = function(_, newVal)
+                    local flagSetter = LibraryInternal.Flags[key]
+                    if flagSetter and typeof(flagSetter) == "table" and flagSetter.Set then
+                        flagSetter:Set(newVal)
+                    else
+                        if typeof(newVal) == "table" then
+                            local arr = {}
+                            for k, v in pairs(newVal) do
+                                if v then
+                                    table.insert(arr, k)
+                                end
+                            end
+                            library.flags[key] = arr
+                        else
+                            library.flags[key] = newVal
+                        end
+                    end
+                end,
+                OnChanged = function(_, cb)
+                    if LibraryInternal then
+                        LibraryInternal:OnFlagChanged(key, function(newVal)
+                            pcall(cb, newVal)
+                        end)
+                    end
+                end
+            }
+        else
+            return {
+                Value = val,
+                SetValue = function(_, newVal)
+                    local flagSetter = LibraryInternal.Flags[key]
+                    if flagSetter then
+                        if typeof(flagSetter) == "function" then
+                            flagSetter(newVal)
+                        elseif typeof(flagSetter) == "table" and flagSetter.Set then
+                            flagSetter:Set(newVal)
+                        end
+                    else
+                        library.flags[key] = newVal
+                    end
+                end,
+                OnChanged = function(_, cb)
+                    if LibraryInternal then
+                        LibraryInternal:OnFlagChanged(key, function(newVal)
+                            pcall(cb, newVal)
+                        end)
+                    end
+                end
+            }
+        end
+    end
+})
+
+LibCompat = {
+    Unloaded = false,
+    ToggleKeybind = nil,
+    _onUnloadCallbacks = {},
+    OnUnload = function(self, cb)
+        table.insert(self._onUnloadCallbacks, cb)
+    end,
+    Notify = function(self, msg, dur)
+    end,
+    Unload = function(self)
+        for _, cb in ipairs(self._onUnloadCallbacks) do
+            pcall(cb)
+        end
+        self.Unloaded = true
+        pcall(function()
+            library:unload()
+        end)
+    end
+}
+
+ThemeManager = {
+    SetLibrary = function() end,
+    SetFolder = function() end,
+    ApplyToTab = function() end,
+    ApplyTheme = function() end,
+}
+
+SaveManager = {
+    SetLibrary = function() end,
+    IgnoreThemeSettings = function() end,
+    SetIgnoreIndexes = function() end,
+    SetFolder = function() end,
+    BuildConfigSection = function() end,
+    LoadAutoloadConfig = function() end,
+}
+
+Tabs = {Combat = {}, Visuals = {}, Misc = {}, Settings = {}}
+
+return library
