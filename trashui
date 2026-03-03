@@ -684,7 +684,7 @@ do
                 PagesFrame.Size = UDim2.new(1, -tabOffset, 1, 0)
             end)
 
-            local versionText = '<font color="#4e4e4e">build: </font>live'
+            local versionText = '<font color="#4e4e4e">build: </font>Beta Version'
             if Base.GameInfo and Base.GameInfo ~= "" then
                 versionText = versionText .. '  <font color="#4e4e4e">| </font>' .. Base.GameInfo
             end
