@@ -747,63 +747,65 @@ do
         end
 
         local function SetState(newState)
-            if typeof(newState) == "boolean" then
-                Toggle.Toggled = newState
-            else
-                Toggle.Toggled = not Toggle.Toggled
-            end
-            
-            UpdateVisual()
-            Library.Flags[Toggle.Flag] = Toggle.Toggled
-            
-            task.spawn(function()
-                pcall(Toggle.Callback, Toggle.Toggled)
-            end)
-            
-            Library:UpdateDependencies(Toggle.Flag, Toggle.Toggled)
-            Library:FireFlagCallbacks(Toggle.Flag, Toggle.Toggled)
+        if typeof(newState) == "boolean" then
+            Toggle.Toggled = newState
+        else
+            Toggle.Toggled = not Toggle.Toggled
         end
-
-        function Toggle:Set(bool)
-            if typeof(bool) == "boolean" and Toggle.Toggled ~= bool then
-                SetState(bool)
-            elseif typeof(bool) == "boolean" then
-                -- Force update even if same value (for loading configs)
-                Toggle.Toggled = bool
-                UpdateVisual()
-                Library.Flags[Toggle.Flag] = Toggle.Toggled
-            end
-        end
-
-        function Toggle:GetState()
-            return Toggle.Toggled
-        end
-
-        -- Initialize with default state
-        Toggle.Toggled = Toggle.State
-        Library.Flags[Toggle.Flag] = Toggle.Toggled
-        UpdateVisual()
         
-        -- Fire initial callback if default is true
-        if Toggle.State then
-            task.spawn(function()
-                pcall(Toggle.Callback, Toggle.Toggled)
-            end)
-        end
-
-        -- Connect click event
-        HolderT.MouseButton1Click:Connect(function()
-            SetState()
+        UpdateVisual()
+        Library.Flags[Toggle.Flag] = Toggle.Toggled
+        
+        task.spawn(function()
+            pcall(Toggle.Callback, Toggle.Toggled)
         end)
-
-        -- Store in Flags for config loading
-        Flags[Toggle.Flag] = function(value)
-            Toggle:Set(value)
-        end
-
-        return Toggle
+        
+        Library:UpdateDependencies(Toggle.Flag, Toggle.Toggled)
+        Library:FireFlagCallbacks(Toggle.Flag, Toggle.Toggled)
     end
 
+    function Toggle:Set(bool)
+        if typeof(bool) == "boolean" then
+            Toggle.Toggled = bool
+            UpdateVisual()
+            Library.Flags[Toggle.Flag] = Toggle.Toggled
+            Library:UpdateDependencies(Toggle.Flag, Toggle.Toggled)
+            Library:FireFlagCallbacks(Toggle.Flag, Toggle.Toggled)
+            
+            task.spawn(function()
+                pcall(Toggle.Callback, Toggle.Toggled)
+            end)
+        end
+    end
+
+    function Toggle:GetState()
+        return Toggle.Toggled
+    end
+
+    -- Initialize with default state
+    Toggle.Toggled = Toggle.State
+    Library.Flags[Toggle.Flag] = Toggle.Toggled
+    UpdateVisual()
+
+    -- Fire initial callback if default is true
+    if Toggle.State then
+        task.spawn(function()
+            pcall(Toggle.Callback, Toggle.Toggled)
+        end)
+    end
+
+    -- Connect click event
+    HolderT.MouseButton1Click:Connect(function()
+        SetState()
+    end)
+
+    -- Store in Flags for config loading
+    Flags[Toggle.Flag] = function(value)
+        Toggle:Set(value)
+    end
+
+    return Toggle
+end
         -- Slider (FIXED - proper input handling)
         function Sections:Slider(Options)
             local Props = Options or {}
