@@ -1079,7 +1079,7 @@ do
             Div.Size = UDim2.new(1,0,0,1); Div.BackgroundColor3 = Color3.new(0.1098,0.1098,0.1098); Div.BorderSizePixel = 0
         end
 
-        -- Keybind (FIXED - with mode selector dropdown like colorpicker)
+        -- Keybind (FIXED - with mode selector dropdown and proper callback firing)
         function Sections:Keybind(Options)
             local Props = Options or {}
             local KB = {
@@ -1089,12 +1089,14 @@ do
                 Callback = Props.Callback or Props.callback or nil,
                 Flag = Props.Flag or Props.flag or Library.NextFlag(),
                 Binding = nil, Connection = nil,
+                Key = nil,
+                Active = false,
             }
-            local Key = nil
-            local StateKB = false
+            
             local parent = Options.Side == "Right" and KB.Section.Elements.Right or KB.Section.Elements.Left
 
-            Library.Flags[KB.Flag] = { key = nil, mode = KB.Mode, active = false }
+            -- Initialize flag data
+            Library.Flags[KB.Flag] = { key = KB.State, mode = KB.Mode, active = false }
 
             local HolderKB = Instance.new('TextButton', parent)
             local TitleKB = Instance.new('TextLabel', HolderKB)
@@ -1132,39 +1134,48 @@ do
                         btn.TextColor3 = m == mode and Color3.fromRGB(255,255,255) or Color3.new(0.306,0.306,0.306)
                     end
                     ModeWindow.Visible = false
-                    Library.Flags[KB.Flag] = { key = Key, mode = KB.Mode, active = StateKB }
+                    Library.Flags[KB.Flag] = { key = KB.Key, mode = KB.Mode, active = KB.Active }
                     Library:FireFlagCallbacks(KB.Flag, Library.Flags[KB.Flag])
                 end)
             end
 
             local function updateFlagData()
-                local newData = { key = Key, mode = KB.Mode, active = StateKB }
+                local newData = { key = KB.Key, mode = KB.Mode, active = KB.Active }
                 Library.Flags[KB.Flag] = newData
                 Library:FireFlagCallbacks(KB.Flag, newData)
             end
 
             local function setKeyKB(newkey)
                 if typeof(newkey) == "EnumItem" then
-                    if KB.Connection then KB.Connection:Disconnect(); KB.Connection = nil end
                     if newkey == Enum.KeyCode.Backspace or newkey == Enum.KeyCode.Escape then
-                        Key = nil; ValueKB.Text = "-"
+                        KB.Key = nil
+                        ValueKB.Text = "-"
                     else
-                        Key = newkey; ValueKB.Text = Library.Keys[newkey] or tostring(newkey):gsub("Enum.KeyCode.",""):gsub("Enum.UserInputType.","")
+                        KB.Key = newkey
+                        ValueKB.Text = Library.Keys[newkey] or tostring(newkey):gsub("Enum.KeyCode.",""):gsub("Enum.UserInputType.","")
                     end
-                    StateKB = false
+                    KB.Active = false
                     updateFlagData()
                 end
             end
 
-            if KB.State and KB.State ~= Enum.KeyCode.Unknown then setKeyKB(KB.State) end
+            -- Set initial key if provided
+            if KB.State and KB.State ~= Enum.KeyCode.Unknown then
+                setKeyKB(KB.State)
+            end
 
             -- Left click to bind key
             ValueKB.MouseButton1Click:Connect(function()
                 if not KB.Binding then
                     ValueKB.Text = "..."
-                    KB.Binding = Library:Connection(game:GetService("UserInputService").InputBegan, function(input)
-                        setKeyKB(input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode or input.UserInputType)
-                        Library:Disconnect(KB.Binding); task.wait(); KB.Binding = nil
+                    KB.Binding = Library:Connection(game:GetService("UserInputService").InputBegan, function(input, gameProcessed)
+                        if gameProcessed then return end
+                        local keyToSet = input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode or input.UserInputType
+                        setKeyKB(keyToSet)
+                        if KB.Binding then
+                            Library:Disconnect(KB.Binding)
+                            KB.Binding = nil
+                        end
                     end)
                 end
             end)
@@ -1183,34 +1194,71 @@ do
                 end
             end)
 
+            -- Handle key press
             Library:Connection(game:GetService("UserInputService").InputBegan, function(inp, gameProcessed)
                 if gameProcessed then return end
-                if not Key then return end
+                if not KB.Key then return end
                 if KB.Binding then return end
-                if inp.KeyCode ~= Key and inp.UserInputType ~= Key then return end
+                
+                local isMatch = (inp.KeyCode == KB.Key) or (inp.UserInputType == KB.Key)
+                if not isMatch then return end
 
                 if KB.Mode == "Hold" then
-                    StateKB = true
+                    KB.Active = true
                     updateFlagData()
-                    if KB.Callback then KB.Callback(true) end
+                    if KB.Callback then
+                        task.spawn(function()
+                            KB.Callback(true)
+                        end)
+                    end
                 elseif KB.Mode == "Toggle" then
-                    StateKB = not StateKB
+                    KB.Active = not KB.Active
                     updateFlagData()
-                    if KB.Callback then KB.Callback(StateKB) end
+                    if KB.Callback then
+                        task.spawn(function()
+                            KB.Callback(KB.Active)
+                        end)
+                    end
                 end
             end)
 
+            -- Handle key release (for Hold mode)
             Library:Connection(game:GetService("UserInputService").InputEnded, function(inp)
-                if KB.Mode == "Hold" and Key and (inp.KeyCode == Key or inp.UserInputType == Key) then
-                    StateKB = false
+                if not KB.Key then return end
+                
+                local isMatch = (inp.KeyCode == KB.Key) or (inp.UserInputType == KB.Key)
+                if not isMatch then return end
+                
+                if KB.Mode == "Hold" and KB.Active then
+                    KB.Active = false
                     updateFlagData()
-                    if KB.Callback then KB.Callback(false) end
+                    if KB.Callback then
+                        task.spawn(function()
+                            KB.Callback(false)
+                        end)
+                    end
                 end
             end)
 
-            function KB:Set(key) setKeyKB(key) end
-            function KB:GetState() return StateKB end
-            Flags[KB.Flag] = setKeyKB
+            function KB:Set(key)
+                setKeyKB(key)
+            end
+            
+            function KB:GetState()
+                return KB.Active
+            end
+            
+            function KB:SetMode(mode)
+                if mode == "Toggle" or mode == "Hold" then
+                    KB.Mode = mode
+                    for m, btn in pairs(modeButtons) do
+                        btn.TextColor3 = m == mode and Color3.fromRGB(255,255,255) or Color3.new(0.306,0.306,0.306)
+                    end
+                    updateFlagData()
+                end
+            end
+            
+            Flags[KB.Flag] = KB
             return KB
         end
     end
