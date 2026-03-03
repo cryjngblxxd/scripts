@@ -328,7 +328,7 @@ do
 		end
 	end
 
-	-- Main UI Elements
+	
 	do
 		local Pages = Library.Pages
 		local Sections = Library.Sections
@@ -344,6 +344,18 @@ do
 				Size = Options.Size or Options.size or UDim2.fromOffset(620, 480);
 				AutoShow = Options.auto_show;
 			}
+ 
+            
+            local menuOpen = Base.AutoShow ~= false
+            Library:Connection(game:GetService("UserInputService").InputBegan, function(input, gameProcessed)
+                if gameProcessed then return end
+                if input.KeyCode == Enum.KeyCode.Insert or input.KeyCode == Enum.KeyCode.RightControl then
+                    menuOpen = not menuOpen
+                    Main.Visible = menuOpen
+                    Library.Open = menuOpen
+                end
+            end)
+           
 
 			local ScreenGui = Instance.new('ScreenGui', game:GetService("RunService"):IsStudio() and game.Players.LocalPlayer.PlayerGui or game.CoreGui)
 			local Main = Instance.new('Frame', ScreenGui)
@@ -1120,120 +1132,161 @@ do
 
 		-- Keybind (standalone)
 		-- Keybind (standalone)
-function Sections:Keybind(Options)
-    local Props = Options or {}
-    local KB = {
-        Section = self, Name = Props.Name or Props.Title or Props.name or "Keybind",
-        State = Props.default or Props.Default or Props.state or Props.State or Props.key or Props.Key or nil,
-        Mode = Props.mode or Props.Mode or "Toggle",
-        Callback = Props.callback or Props.Callback or nil,
-        Flag = Props.flag or Props.Flag or Library.NextFlag(),
-        Binding = nil, Connection = nil,
-    }
-    local Key; local StateKB = false
-    local parent = Options.Side == "Right" and KB.Section.Elements.Right or KB.Section.Elements.Left
+        -- Keybind (standalone)
+        function Sections:Keybind(Options)
+            local Props = Options or {}
+            local KB = {
+                Section = self, Name = Props.Name or Props.Title or Props.name or "Keybind",
+                State = Props.default or Props.Default or Props.state or Props.State or Props.key or Props.Key or nil,
+                Mode = Props.mode or Props.Mode or "Toggle",
+                Callback = Props.callback or Props.Callback or nil,
+                Flag = Props.flag or Props.Flag or Library.NextFlag(),
+                Binding = nil, Connection = nil,
+            }
+            local Key = nil
+            local StateKB = false
+            local parent = Options.Side == "Right" and KB.Section.Elements.Right or KB.Section.Elements.Left
 
-    local HolderKB = Instance.new('TextButton', parent)
-    local TitleKB = Instance.new('TextLabel', HolderKB)
-    local ValueKB = Instance.new('TextButton', HolderKB)
-    local ModeDDKB = Instance.new('Frame', HolderKB)
-    local ModeListKB2 = Instance.new('UIListLayout', ModeDDKB)
+            -- Initialize flag data structure
+            Library.Flags[KB.Flag] = {
+                key = KB.State,
+                mode = KB.Mode,
+                active = false
+            }
 
-    AddInstance(TitleKB); AddInstance(ValueKB)
+            local HolderKB = Instance.new('TextButton', parent)
+            local TitleKB = Instance.new('TextLabel', HolderKB)
+            local ValueKB = Instance.new('TextButton', HolderKB)
+            local ModeDDKB = Instance.new('Frame', HolderKB)
+            local ModeListKB2 = Instance.new('UIListLayout', ModeDDKB)
 
-    HolderKB.Size = UDim2.new(1,0,0,14); HolderKB.BackgroundTransparency = 1; HolderKB.Text = ""; HolderKB.AutoButtonColor = false
-    TitleKB.Position = UDim2.new(0,15,0,0); TitleKB.Size = UDim2.new(1,-70,1,0); TitleKB.BackgroundTransparency = 1
-    TitleKB.TextColor3 = Color3.new(0.306,0.306,0.306); TitleKB.FontFace = Library.UIFont; TitleKB.TextSize = Library.FontSize
-    TitleKB.ZIndex = 105; TitleKB.TextXAlignment = Enum.TextXAlignment.Left; TitleKB.Text = KB.Name
-    ValueKB.Position = UDim2.new(1,-50,0,0); ValueKB.Size = UDim2.new(0,45,1,0); ValueKB.BackgroundTransparency = 1
-    ValueKB.Text = "-"; ValueKB.TextColor3 = Color3.new(0.306,0.306,0.306); ValueKB.FontFace = Library.UIFont
-    ValueKB.TextSize = Library.FontSize; ValueKB.ZIndex = 105; ValueKB.AutoButtonColor = false; ValueKB.TextXAlignment = Enum.TextXAlignment.Right
-    ModeDDKB.Size = UDim2.new(0,55,0,0); ModeDDKB.Position = UDim2.new(1,-55,0,16)
-    ModeDDKB.BackgroundColor3 = Color3.new(0.0431,0.0431,0.0431); ModeDDKB.BorderColor3 = Color3.new(0.1098,0.1098,0.1098)
-    ModeDDKB.ZIndex = 200; ModeDDKB.Visible = false; ModeDDKB.ClipsDescendants = true
-    ModeListKB2.SortOrder = Enum.SortOrder.LayoutOrder
+            AddInstance(TitleKB); AddInstance(ValueKB)
 
-    local modeOpenKB2 = false; local modes2 = {"Hold", "Toggle", "Always"}; local modeButtons2 = {}
-    for _, mode in ipairs(modes2) do
-        local btn = Instance.new('TextButton', ModeDDKB)
-        btn.Size = UDim2.new(1,0,0,16); btn.BackgroundTransparency = 1; btn.Text = mode
-        btn.TextColor3 = mode == KB.Mode and Library.Accent or Color3.new(0.306,0.306,0.306)
-        btn.FontFace = Library.UIFont; btn.TextSize = Library.FontSize - 1; btn.ZIndex = 201; btn.AutoButtonColor = false
-        modeButtons2[mode] = btn
-        btn.MouseButton1Click:Connect(function()
-            KB.Mode = mode
-            for m, b in pairs(modeButtons2) do b.TextColor3 = m == mode and Library.Accent or Color3.new(0.306,0.306,0.306) end
-            if mode == "Always" then 
-                StateKB = true
-                Library.Flags[KB.Flag] = true
-                if KB.Callback then KB.Callback(true) end
+            HolderKB.Size = UDim2.new(1,0,0,14); HolderKB.BackgroundTransparency = 1; HolderKB.Text = ""; HolderKB.AutoButtonColor = false
+            TitleKB.Position = UDim2.new(0,15,0,0); TitleKB.Size = UDim2.new(1,-70,1,0); TitleKB.BackgroundTransparency = 1
+            TitleKB.TextColor3 = Color3.new(0.306,0.306,0.306); TitleKB.FontFace = Library.UIFont; TitleKB.TextSize = Library.FontSize
+            TitleKB.ZIndex = 105; TitleKB.TextXAlignment = Enum.TextXAlignment.Left; TitleKB.Text = KB.Name
+            ValueKB.Position = UDim2.new(1,-50,0,0); ValueKB.Size = UDim2.new(0,45,1,0); ValueKB.BackgroundTransparency = 1
+            ValueKB.Text = "-"; ValueKB.TextColor3 = Color3.new(0.306,0.306,0.306); ValueKB.FontFace = Library.UIFont
+            ValueKB.TextSize = Library.FontSize; ValueKB.ZIndex = 105; ValueKB.AutoButtonColor = false; ValueKB.TextXAlignment = Enum.TextXAlignment.Right
+            ModeDDKB.Size = UDim2.new(0,55,0,0); ModeDDKB.Position = UDim2.new(1,-55,0,16)
+            ModeDDKB.BackgroundColor3 = Color3.new(0.0431,0.0431,0.0431); ModeDDKB.BorderColor3 = Color3.new(0.1098,0.1098,0.1098)
+            ModeDDKB.ZIndex = 200; ModeDDKB.Visible = false; ModeDDKB.ClipsDescendants = true
+            ModeListKB2.SortOrder = Enum.SortOrder.LayoutOrder
+
+            local function updateFlagData()
+                Library.Flags[KB.Flag] = {
+                    key = Key,
+                    mode = KB.Mode,
+                    active = StateKB
+                }
             end
-            modeOpenKB2 = false; ModeDDKB.Visible = false; ModeDDKB.Size = UDim2.new(0,55,0,0)
-        end)
-    end
 
-    local function setKeyKB(newkey)
-        if typeof(newkey) == "EnumItem" then
-            if KB.Connection then 
-                KB.Connection:Disconnect()
-                Library.Flags[KB.Flag] = false
-                if KB.Callback then KB.Callback(false) end
-            end
-            if newkey == Enum.KeyCode.Backspace or newkey == Enum.KeyCode.Escape then 
-                Key = nil
-                ValueKB.Text = "-"
-            else 
-                Key = newkey
-                ValueKB.Text = Library.Keys[newkey] or tostring(newkey):gsub("Enum.KeyCode.",""):gsub("Enum.UserInputType.","") 
-            end
-        end
-    end
-    if KB.State then setKeyKB(KB.State) end
-
-    ValueKB.MouseButton1Click:Connect(function()
-        if not KB.Binding then
-            ValueKB.Text = "..."
-            KB.Binding = Library:Connection(game:GetService("UserInputService").InputBegan, function(input)
-                setKeyKB(input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode or input.UserInputType)
-                Library:Disconnect(KB.Binding); task.wait(); KB.Binding = nil
-            end)
-        end
-    end)
-    ValueKB.MouseButton2Click:Connect(function()
-        modeOpenKB2 = not modeOpenKB2; ModeDDKB.Visible = modeOpenKB2
-        ModeDDKB.Size = modeOpenKB2 and UDim2.new(0,55,0,48) or UDim2.new(0,55,0,0)
-    end)
-    Library:Connection(game:GetService("UserInputService").InputBegan, function(inp)
-        if (inp.KeyCode == Key or inp.UserInputType == Key) and not KB.Binding then
-            if KB.Mode == "Hold" then
-                Library.Flags[KB.Flag] = true
-                KB.Connection = Library:Connection(game:GetService("RunService").RenderStepped, function() 
-                    if KB.Callback then KB.Callback(true) end
+            local modeOpenKB2 = false; local modes2 = {"Hold", "Toggle", "Always"}; local modeButtons2 = {}
+            for _, mode in ipairs(modes2) do
+                local btn = Instance.new('TextButton', ModeDDKB)
+                btn.Size = UDim2.new(1,0,0,16); btn.BackgroundTransparency = 1; btn.Text = mode
+                btn.TextColor3 = mode == KB.Mode and Library.Accent or Color3.new(0.306,0.306,0.306)
+                btn.FontFace = Library.UIFont; btn.TextSize = Library.FontSize - 1; btn.ZIndex = 201; btn.AutoButtonColor = false
+                modeButtons2[mode] = btn
+                btn.MouseButton1Click:Connect(function()
+                    KB.Mode = mode
+                    for m, b in pairs(modeButtons2) do b.TextColor3 = m == mode and Library.Accent or Color3.new(0.306,0.306,0.306) end
+                    if mode == "Always" then 
+                        StateKB = true
+                        updateFlagData()
+                        if KB.Callback then KB.Callback(true) end
+                    else
+                        updateFlagData()
+                    end
+                    modeOpenKB2 = false; ModeDDKB.Visible = false; ModeDDKB.Size = UDim2.new(0,55,0,0)
                 end)
-            elseif KB.Mode == "Toggle" then
-                StateKB = not StateKB
-                Library.Flags[KB.Flag] = StateKB
-                if KB.Callback then KB.Callback(StateKB) end
             end
-        end
-    end)
-    Library:Connection(game:GetService("UserInputService").InputEnded, function(inp)
-        if KB.Mode == "Hold" and Key and (inp.KeyCode == Key or inp.UserInputType == Key) then
-            if KB.Connection then 
-                KB.Connection:Disconnect()
-                Library.Flags[KB.Flag] = false
-                if KB.Callback then KB.Callback(false) end
+
+            local function setKeyKB(newkey)
+                if typeof(newkey) == "EnumItem" then
+                    if KB.Connection then 
+                        KB.Connection:Disconnect()
+                        StateKB = false
+                        updateFlagData()
+                        if KB.Callback then KB.Callback(false) end
+                    end
+                    if newkey == Enum.KeyCode.Backspace or newkey == Enum.KeyCode.Escape then 
+                        Key = nil
+                        ValueKB.Text = "-"
+                    else 
+                        Key = newkey
+                        ValueKB.Text = Library.Keys[newkey] or tostring(newkey):gsub("Enum.KeyCode.",""):gsub("Enum.UserInputType.","") 
+                    end
+                    updateFlagData()
+                end
             end
+            if KB.State then setKeyKB(KB.State) end
+
+            ValueKB.MouseButton1Click:Connect(function()
+                if not KB.Binding then
+                    ValueKB.Text = "..."
+                    KB.Binding = Library:Connection(game:GetService("UserInputService").InputBegan, function(input)
+                        setKeyKB(input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode or input.UserInputType)
+                        Library:Disconnect(KB.Binding); task.wait(); KB.Binding = nil
+                    end)
+                end
+            end)
+            ValueKB.MouseButton2Click:Connect(function()
+                modeOpenKB2 = not modeOpenKB2; ModeDDKB.Visible = modeOpenKB2
+                ModeDDKB.Size = modeOpenKB2 and UDim2.new(0,55,0,48) or UDim2.new(0,55,0,0)
+            end)
+            
+            Library:Connection(game:GetService("UserInputService").InputBegan, function(inp, gameProcessed)
+                if gameProcessed then return end
+                if Key and (inp.KeyCode == Key or inp.UserInputType == Key) and not KB.Binding then
+                    if KB.Mode == "Hold" then
+                        StateKB = true
+                        updateFlagData()
+                        if KB.Callback then KB.Callback(true) end
+                        KB.Connection = Library:Connection(game:GetService("RunService").RenderStepped, function() 
+                            -- Keep active state true while held
+                        end)
+                    elseif KB.Mode == "Toggle" then
+                        StateKB = not StateKB
+                        updateFlagData()
+                        if KB.Callback then KB.Callback(StateKB) end
+                    end
+                end
+            end)
+            
+            Library:Connection(game:GetService("UserInputService").InputEnded, function(inp)
+                if KB.Mode == "Hold" and Key and (inp.KeyCode == Key or inp.UserInputType == Key) then
+                    if KB.Connection then 
+                        KB.Connection:Disconnect()
+                        KB.Connection = nil
+                    end
+                    StateKB = false
+                    updateFlagData()
+                    if KB.Callback then KB.Callback(false) end
+                end
+            end)
+            
+            function KB:Set(key) setKeyKB(key) end
+            function KB:GetState() return StateKB end
+            
+            Flags[KB.Flag] = setKeyKB
+            Library.ConfigFlags[KB.Flag] = function(v)
+                if type(v) == "table" then
+                    if v.key then setKeyKB(v.key) end
+                    if v.mode then
+                        KB.Mode = v.mode
+                        for m, b in pairs(modeButtons2) do b.TextColor3 = m == v.mode and Library.Accent or Color3.new(0.306,0.306,0.306) end
+                    end
+                elseif typeof(v) == "EnumItem" then
+                    setKeyKB(v)
+                end
+            end
+            
+            return KB
         end
-    end)
-    function KB:Set(key) setKeyKB(key) end
-    Flags[KB.Flag] = setKeyKB
-    return KB
+    end
 end
-	end
-end
-
-
 
 local library = {
 	flags = Library.Flags,
