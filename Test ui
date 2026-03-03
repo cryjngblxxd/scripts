@@ -1,4 +1,4 @@
--- $$$$
+
 local Library = {};
 do
 	Library = {
@@ -391,15 +391,25 @@ do
 				displayTitle = displayTitle .. '<font color="#4e4e4e">' .. Base.Suffix .. '</font>'
 			end
 
-			Title.Position = UDim2.new(0,4,0,0); Title.Size = UDim2.new(1,-4,1,0); Title.BackgroundTransparency = 1; Title.BorderSizePixel = 0
+			Title.Position = UDim2.new(0,4,0,0); Title.Size = UDim2.new(0,0,1,0); Title.BackgroundTransparency = 1; Title.BorderSizePixel = 0
 			Title.Text = displayTitle; Title.TextColor3 = Library.Accent; Title.FontFace = Library.UIFont; Title.TextSize = Library.FontSize
-			Title.TextXAlignment = Enum.TextXAlignment.Left; Title.RichText = true
+			Title.TextXAlignment = Enum.TextXAlignment.Left; Title.RichText = true; Title.AutomaticSize = Enum.AutomaticSize.X
 			Bottom.Position = UDim2.new(0,0,1,-22); Bottom.Size = UDim2.new(1,0,0,22); Bottom.BackgroundTransparency = 1; Bottom.BorderSizePixel = 0
 			SectionsFrame.Name = "Sections"; SectionsFrame.Position = UDim2.new(0,10,0,13); SectionsFrame.Size = UDim2.new(0,110,1,-26)
 			SectionsFrame.BackgroundColor3 = Color3.new(0.0314,0.0314,0.0314); SectionsFrame.BorderColor3 = Color3.new(0.1098,0.1098,0.1098)
-			PagesFrame.Name = "Pages"; PagesFrame.Position = UDim2.new(0,60,0,0); PagesFrame.Size = UDim2.new(1,-60,1,0)
+
+			-- Pages frame pushed further right with padding from title
+			PagesFrame.Name = "Pages"
 			PagesFrame.BackgroundTransparency = 1; PagesFrame.BorderSizePixel = 0; PagesFrame.ZIndex = 52; Library.PageHolder = PagesFrame
 			UIListLayout.FillDirection = Enum.FillDirection.Horizontal; UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder; UIListLayout.Padding = UDim.new(0,6)
+
+			-- Position pages after title with gap
+			task.defer(function()
+				local titleWidth = Title.TextBounds.X
+				local tabOffset = titleWidth + 20 -- 20px gap between title and first tab
+				PagesFrame.Position = UDim2.new(0, tabOffset, 0, 0)
+				PagesFrame.Size = UDim2.new(1, -tabOffset, 1, 0)
+			end)
 
 			local versionText = '<font color="#4e4e4e">build: </font>live'
 			if Base.GameInfo and Base.GameInfo ~= "" then
@@ -568,10 +578,8 @@ do
 					local sect = {}
 					sect._content = Content; sect._page = Page
 
-					-- Create a fake section object that the Sections methods can use
 					local fakeSection = {
-						Window = Page.Window,
-						Page = Page,
+						Window = Page.Window, Page = Page,
 						Elements = { Left = Content, Right = Content },
 					}
 					setmetatable(fakeSection, Library.Sections)
@@ -585,7 +593,6 @@ do
 							Callback = opts.callback or opts.Callback or function() end,
 						})
 					end
-
 					function sect:slider(opts)
 						opts = opts or {}
 						return fakeSection:Slider({
@@ -598,7 +605,6 @@ do
 							Callback = opts.callback or opts.Callback or function() end,
 						})
 					end
-
 					function sect:dropdown(opts)
 						opts = opts or {}
 						local items = opts.items or opts.Items or opts.options or opts.Options or {}
@@ -612,7 +618,6 @@ do
 							Callback = opts.callback or opts.Callback or function() end,
 						})
 					end
-
 					function sect:textbox(opts)
 						opts = opts or {}
 						return fakeSection:Textbox({
@@ -623,7 +628,6 @@ do
 							Callback = opts.callback or opts.Callback or function() end,
 						})
 					end
-
 					function sect:button(opts)
 						opts = opts or {}
 						return fakeSection:Button({
@@ -631,7 +635,6 @@ do
 							Callback = opts.callback or opts.Callback or function() end,
 						})
 					end
-
 					function sect:colorpicker(opts)
 						opts = opts or {}
 						return fakeSection:Colorpicker({
@@ -642,7 +645,6 @@ do
 							Callback = opts.callback or opts.Callback or function() end,
 						})
 					end
-
 					function sect:keybind(opts)
 						opts = opts or {}
 						return fakeSection:Keybind({
@@ -653,14 +655,12 @@ do
 							Callback = opts.callback or opts.Callback or function() end,
 						})
 					end
-
 					function sect:label(opts)
 						opts = opts or {}
 						return fakeSection:Label({
 							Name = opts.name or opts.Name or opts.text or opts.Text or "Label", Side = "Left",
 						})
 					end
-
 					function sect:divider(opts)
 						return fakeSection:Divider({Side = "Left"})
 					end
@@ -672,107 +672,7 @@ do
 				return col
 			end
 
-			-- Alias
-			function Page:tab(Options) return self:Page(Options) end
-
 			return setmetatable(Page, Library.Pages)
-		end
-
-		function Pages:Section(Options)
-			local Section = {
-				Window = self.Window, Page = self, Open = false, Elements = {};
-				Title = Options.Name or Options.name or "section";
-				LeftName = Options.LeftTitle or Options.leftTitle or "general";
-				RightName = Options.RightTitle or Options.rightTitle or "general";
-			}
-
-			local ButtonS = Instance.new('TextButton', Section.Page.Elements.ButtonHolder)
-			local AccentS = Instance.new('Frame', ButtonS)
-			local FrameS = Instance.new('Frame', ButtonS)
-			local UIGradS = Instance.new('UIGradient', FrameS)
-			local TitleS = Instance.new('TextLabel', FrameS)
-			local NewSection = Instance.new('Frame', Section.Page.Elements.RealHold)
-			local LeftS = Instance.new('Frame', NewSection)
-			local BarLS = Instance.new('Frame', LeftS)
-			local GradBarLS = Instance.new('UIGradient', BarLS)
-			local GradLineLS = Instance.new('Frame', BarLS)
-			local GradLineUILS = Instance.new('UIGradient', GradLineLS)
-			local LeftTitleS = Instance.new('TextLabel', BarLS)
-			local RightS = Instance.new('Frame', NewSection)
-			local BarRS = Instance.new('Frame', RightS)
-			local GradBarRS = Instance.new('UIGradient', BarRS)
-			local GradLineRS = Instance.new('Frame', BarRS)
-			local GradLineUIRS = Instance.new('UIGradient', GradLineRS)
-			local RightTitleS = Instance.new('TextLabel', BarRS)
-			local LeftContentS = Instance.new('ScrollingFrame', LeftS)
-			local LeftUIListS = Instance.new('UIListLayout', LeftContentS)
-			local RightContentS = Instance.new('ScrollingFrame', RightS)
-			local RightUIListS = Instance.new('UIListLayout', RightContentS)
-
-			AddInstance(AccentS); AddInstance(FrameS); AddInstance(TitleS)
-			AddInstance(LeftS); AddInstance(BarLS); AddInstance(GradLineLS); AddInstance(LeftTitleS)
-			AddInstance(RightS); AddInstance(BarRS); AddInstance(GradLineRS); AddInstance(RightTitleS)
-			table.insert(Library.ThemeObjects, AccentS)
-
-			ButtonS.Name = "Button"; ButtonS.Size = UDim2.new(1,0,0,22); ButtonS.BackgroundTransparency = 1; ButtonS.BorderSizePixel = 0; ButtonS.ZIndex = 54; ButtonS.AutoButtonColor = false; ButtonS.Text = ""
-			AccentS.Size = UDim2.new(0,1,1,0); AccentS.BackgroundColor3 = Library.Accent; AccentS.BorderSizePixel = 0; AccentS.ZIndex = 54; AccentS.BackgroundTransparency = 0.5
-			FrameS.Position = UDim2.new(0,1,0,0); FrameS.Size = UDim2.new(1,-2,1,0); FrameS.BackgroundColor3 = Color3.new(0.149,0.149,0.149); FrameS.BorderSizePixel = 0; FrameS.ZIndex = 54
-			UIGradS.Color = ColorSequence.new{ColorSequenceKeypoint.new(0,Color3.new(0.741,0.741,0.741)),ColorSequenceKeypoint.new(1,Color3.new(0.204,0.204,0.204))}
-			UIGradS.Transparency = NumberSequence.new{NumberSequenceKeypoint.new(0,0.5,0),NumberSequenceKeypoint.new(1,0.5,0)}
-			TitleS.Position = UDim2.new(0,4,0,0); TitleS.Size = UDim2.new(1,-4,0,20); TitleS.BackgroundTransparency = 1
-			TitleS.Text = Section.Title; TitleS.TextColor3 = Color3.fromRGB(78,78,78); TitleS.FontFace = Library.UIFont; TitleS.TextSize = Library.FontSize; TitleS.ZIndex = 54; TitleS.TextXAlignment = Enum.TextXAlignment.Left
-			NewSection.Size = UDim2.new(1,0,1,0); NewSection.BackgroundTransparency = 1; NewSection.BorderSizePixel = 0; NewSection.Visible = false
-			LeftS.Position = UDim2.new(0,2,0,0); LeftS.Size = UDim2.new(0.5,-10,1,0); LeftS.BackgroundColor3 = Color3.new(0.0314,0.0314,0.0314); LeftS.BorderColor3 = Color3.new(0.1098,0.1098,0.1098)
-			BarLS.Size = UDim2.new(1,0,0,20); BarLS.BackgroundColor3 = Color3.new(0.0431,0.0431,0.0431); BarLS.BorderColor3 = Color3.new(0.1098,0.1098,0.1098)
-			GradBarLS.Color = ColorSequence.new{ColorSequenceKeypoint.new(0,Color3.new(0.78,0.749,0.8)),ColorSequenceKeypoint.new(1,Color3.new(1,1,1))}; GradBarLS.Rotation = -90
-			GradLineLS.Position = UDim2.new(0,0,1,0); GradLineLS.Size = UDim2.new(1,0,0,1); GradLineLS.BackgroundColor3 = Color3.new(1,1,1); GradLineLS.BorderSizePixel = 0
-			GradLineUILS.Color = ColorSequence.new{ColorSequenceKeypoint.new(0,Color3.new(0.11,0.11,0.11)),ColorSequenceKeypoint.new(0.48,Color3.new(0.043,0.043,0.043)),ColorSequenceKeypoint.new(1,Color3.new(0.11,0.11,0.11))}
-			LeftTitleS.Position = UDim2.new(0,4,0,0); LeftTitleS.Size = UDim2.new(1,-4,1,0); LeftTitleS.BackgroundTransparency = 1; LeftTitleS.BorderSizePixel = 0
-			LeftTitleS.Text = Section.LeftName; LeftTitleS.TextColor3 = Color3.new(0.306,0.306,0.306); LeftTitleS.FontFace = Library.UIFont; LeftTitleS.TextSize = Library.FontSize; LeftTitleS.TextXAlignment = Enum.TextXAlignment.Left
-			RightS.Position = UDim2.new(0.5,8,0,0); RightS.Size = UDim2.new(0.5,-10,1,0); RightS.BackgroundColor3 = Color3.new(0.0314,0.0314,0.0314); RightS.BorderColor3 = Color3.new(0.1098,0.1098,0.1098)
-			BarRS.Size = UDim2.new(1,0,0,20); BarRS.BackgroundColor3 = Color3.new(0.0431,0.0431,0.0431); BarRS.BorderColor3 = Color3.new(0.1098,0.1098,0.1098)
-			GradBarRS.Color = ColorSequence.new{ColorSequenceKeypoint.new(0,Color3.new(0.78,0.749,0.8)),ColorSequenceKeypoint.new(1,Color3.new(1,1,1))}; GradBarRS.Rotation = -90
-			GradLineRS.Position = UDim2.new(0,0,1,0); GradLineRS.Size = UDim2.new(1,0,0,1); GradLineRS.BackgroundColor3 = Color3.new(1,1,1); GradLineRS.BorderSizePixel = 0
-			GradLineUIRS.Color = ColorSequence.new{ColorSequenceKeypoint.new(0,Color3.new(0.11,0.11,0.11)),ColorSequenceKeypoint.new(0.48,Color3.new(0.043,0.043,0.043)),ColorSequenceKeypoint.new(1,Color3.new(0.11,0.11,0.11))}
-			RightTitleS.Position = UDim2.new(0,4,0,0); RightTitleS.Size = UDim2.new(1,-4,1,0); RightTitleS.BackgroundTransparency = 1; RightTitleS.BorderSizePixel = 0
-			RightTitleS.Text = Section.RightName; RightTitleS.TextColor3 = Color3.new(0.306,0.306,0.306); RightTitleS.FontFace = Library.UIFont; RightTitleS.TextSize = Library.FontSize; RightTitleS.TextXAlignment = Enum.TextXAlignment.Left
-			LeftContentS.Position = UDim2.new(0,10,0,30); LeftContentS.Size = UDim2.new(1,-20,1,-40)
-			LeftContentS.BackgroundTransparency = 1; LeftContentS.BorderSizePixel = 0
-			LeftContentS.ScrollBarThickness = 2; LeftContentS.ScrollBarImageColor3 = Color3.new(0.3,0.3,0.3)
-			LeftContentS.CanvasSize = UDim2.new(0,0,0,0); LeftContentS.AutomaticCanvasSize = Enum.AutomaticSize.Y
-			LeftUIListS.SortOrder = Enum.SortOrder.LayoutOrder; LeftUIListS.Padding = UDim.new(0,4)
-			RightContentS.Position = UDim2.new(0,10,0,30); RightContentS.Size = UDim2.new(1,-20,1,-40)
-			RightContentS.BackgroundTransparency = 1; RightContentS.BorderSizePixel = 0
-			RightContentS.ScrollBarThickness = 2; RightContentS.ScrollBarImageColor3 = Color3.new(0.3,0.3,0.3)
-			RightContentS.CanvasSize = UDim2.new(0,0,0,0); RightContentS.AutomaticCanvasSize = Enum.AutomaticSize.Y
-			RightUIListS.SortOrder = Enum.SortOrder.LayoutOrder; RightUIListS.Padding = UDim.new(0,4)
-
-			function Section:Turn(bool)
-				Section.Open = bool; NewSection.Visible = bool
-				if bool then
-					if not table.find(Library.ThemeObjects, TitleS) then table.insert(Library.ThemeObjects, TitleS) end
-					TitleS.TextColor3 = Library.Accent
-				else
-					local idx = table.find(Library.ThemeObjects, TitleS)
-					if idx then table.remove(Library.ThemeObjects, idx) end
-					TitleS.TextColor3 = Color3.fromRGB(78,78,78)
-				end
-				AccentS.BackgroundTransparency = bool and 0 or 0.5
-			end
-
-			ButtonS.MouseButton1Click:Connect(function()
-				if not Section.Open then
-					Section:Turn(true)
-					for _, other in pairs(Section.Page.Sections) do
-						if other.Open and other ~= Section then other:Turn(false) end
-					end
-				end
-			end)
-
-			if #Section.Page.Sections == 0 then Section:Turn(true) end
-			Section.Elements = {Left = LeftContentS, Right = RightContentS}
-			Section.Page.Sections[#Section.Page.Sections + 1] = Section
-			return setmetatable(Section, Library.Sections)
 		end
 
 		-- Toggle
@@ -1060,7 +960,7 @@ do
 			local Chosen = nil
 			local function handleclick(option, button, text)
 				button.MouseButton1Click:Connect(function()
-					for opt, tbl in next, DD.OptionInsts do tbl.text.TextColor3 = Color3.new(0.306,0.306,0.306) end
+					for _, tbl in next, DD.OptionInsts do tbl.text.TextColor3 = Color3.new(0.306,0.306,0.306) end
 					Chosen = option; ValueDD.Text = option; text.TextColor3 = Color3.fromRGB(255,255,255)
 					Library.Flags[DD.Flag] = option; DD.Callback(option); ContentDD.Visible = false
 				end)
@@ -1083,7 +983,7 @@ do
 			createoptions(DD.Options)
 
 			function DD:Set(option)
-				for opt, tbl in next, DD.OptionInsts do tbl.text.TextColor3 = Color3.new(0.306,0.306,0.306) end
+				for _, tbl in next, DD.OptionInsts do tbl.text.TextColor3 = Color3.new(0.306,0.306,0.306) end
 				if option and DD.OptionInsts[option] then
 					Chosen = option; ValueDD.Text = option; DD.OptionInsts[option].text.TextColor3 = Color3.fromRGB(255,255,255)
 					Library.Flags[DD.Flag] = option; DD.Callback(option)
@@ -1311,12 +1211,13 @@ do
 	end
 end
 
-
+-- ══════════════════════════════════════════════════════════════
 -- LOWERCASE API WRAPPER
-
+-- ══════════════════════════════════════════════════════════════
 
 local library = {
 	flags = Library.Flags,
+	_internal = Library,
 }
 
 function library:window(opts)
@@ -1367,26 +1268,30 @@ function library:init_config(w)
 	end
 end
 
+function library:notify(msg, dur)
+	print("[Avenir]", msg)
+end
 
--- COMPATIBILITY GLOBALS
+Library:OnUnload(function() print("Avenir Unloaded!") end)
 
+return library
+
+--[[ 
+══════════════════════════════════════════════════════════════
+LOADSTRING USAGE EXAMPLE:
+══════════════════════════════════════════════════════════════
+
+local library = loadstring(game:HttpGet("YOUR_RAW_URL_HERE"))()
 
 local DefaultColor = Color3.fromRGB(45, 120, 255)
 
-local function Cleanup() end
-local function notify(msg, dur) print("[Avenir]", msg) end
-
-
--- EXAMPLE USAGE
-
-
 local window = library:window({
-	name = "Avenir",
-	suffix = ".CC",
-	gameInfo = ".Gg/Avenir",
-	project = "AvenirCC",
-	size = UDim2.fromOffset(550, 500),
-	auto_show = true,
+    name = "Avenir",
+    suffix = ".CC",
+    gameInfo = ".Gg/Avenir",
+    project = "AvenirCC",
+    size = UDim2.fromOffset(550, 500),
+    auto_show = true,
 })
 
 local combat_tab = window:tab({ name = "Combat", icon = "rbxassetid://6034509993" })
@@ -1394,453 +1299,43 @@ local visuals_tab = window:tab({ name = "Visuals", icon = "rbxassetid://60345099
 local misc_tab = window:tab({ name = "Misc", icon = "rbxassetid://6026568198" })
 local settings_tab = window:tab({ name = "Settings", icon = "rbxassetid://6031280882" })
 
-
 -- COMBAT TAB
-
-
 do
-	local left = combat_tab:column({size = 1})
-	local right = combat_tab:column({size = 1})
+    local left = combat_tab:column({size = 1})
+    local right = combat_tab:column({size = 1})
 
-	local left_section = left:section({name = "Silent Aim", size = 1})
+    local left_section = left:section({name = "Silent Aim"})
+    
+    left_section:toggle({name = "Enabled", flag = "Silent_Enabled", default = true})
+    left_section:keybind({name = "Toggle Key", flag = "Silent_Keybind", key = Enum.KeyCode.Unknown, mode = "Toggle"})
+    left_section:dropdown({name = "Target Mode", flag = "Silent_TargetMode", items = {"FOV", "Target"}, default = "FOV"})
+    left_section:slider({name = "Hit Chance", flag = "Silent_HitChance", min = 0, max = 100, default = 100, interval = 1, suffix = "%"})
+    left_section:textbox({name = "Prediction", flag = "Silent_PredictionX", default = "0.12932", placeholder = "0.12932"})
+    left_section:colorpicker({name = "FOV Color", flag = "Silent_FOVColor", color = DefaultColor})
+    left_section:label({name = "── Section ──"})
+    left_section:button({name = "Reset", callback = function() print("reset!") end})
 
-	left_section:toggle({name = "Enabled", flag = "Silent_Enabled", default = true})
-	left_section:keybind({name = "Toggle Key", flag = "Silent_Keybind", key = Enum.KeyCode.Unknown, mode = "Toggle", default = false})
-	left_section:toggle({name = "Sticky Mode", flag = "Silent_StickyMode", default = false})
-	left_section:toggle({name = "Target Sync", flag = "Silent_TargetSync", default = true})
-	left_section:dropdown({name = "Target Mode", flag = "Silent_TargetMode", items = {"FOV", "Target"}, default = "FOV"})
-	left_section:dropdown({name = "Hit Mode", flag = "Silent_HitMode", items = {"Circle", "Box"}, default = "Circle"})
-	left_section:dropdown({name = "Hit Type", flag = "Silent_HitType", items = {"Nearest Point", "Nearest Part", "HitBones"}, default = "Nearest Point"})
-	left_section:dropdown({name = "Nearest Point Type", flag = "Silent_NearestPointType", items = {"Generic", "Full", "Partial", "Scalar", "Absolute"}, default = "Partial"})
-	left_section:dropdown({name = "Hit Bones", flag = "Silent_HitBones", items = {"Head", "HumanoidRootPart", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg"}, multi = true, default = {"HumanoidRootPart"}})
-	left_section:slider({name = "Hit Chance", flag = "Silent_HitChance", min = 0, max = 100, default = 100, interval = 1, suffix = "%"})
-	left_section:toggle({name = "Anti Floor", flag = "Silent_AntiFloor", default = false})
-
-	left_section:label({name = "── Prediction ──"})
-	left_section:toggle({name = "Auto Prediction", flag = "Silent_AutoPrediction", default = true})
-	left_section:toggle({name = "Ping Based", flag = "Silent_PingBased", default = true})
-	left_section:dropdown({name = "Velocity Type", flag = "Silent_VelocityType", items = {"Regular", "Linear", "Rot", "Angular"}, default = "Regular"})
-	left_section:textbox({name = "X Prediction", flag = "Silent_PredictionX", default = "0.12932", placeholder = "0.12932"})
-	left_section:textbox({name = "Y Prediction", flag = "Silent_PredictionY", default = "0.1254", placeholder = "0.1254"})
-	left_section:textbox({name = "Z Prediction", flag = "Silent_PredictionZ", default = "0.12932", placeholder = "0.12932"})
-
-	left_section:label({name = "── FOV ──"})
-	left_section:toggle({name = "FOV Visible", flag = "Silent_FOVVisible", default = false})
-	left_section:slider({name = "FOV Radius", flag = "Silent_FOVRadius", min = 0, max = 1100, default = 50, interval = 1})
-	left_section:slider({name = "FOV Thickness", flag = "Silent_FOVThickness", min = 1, max = 5, default = 1, interval = 1})
-	left_section:toggle({name = "FOV Filled", flag = "Silent_FOVFilled", default = false})
-	left_section:slider({name = "FOV Transparency", flag = "Silent_FOVTransparency", min = 0, max = 100, default = 25, interval = 1, suffix = "%"})
-	left_section:colorpicker({name = "FOV Color", flag = "Silent_FOVColor", color = DefaultColor})
-
-	left_section:label({name = "── Gun FOV (Static) ──"})
-	left_section:toggle({name = "Enable Gun FOV", flag = "GunFOV_Enabled", default = false})
-	left_section:textbox({name = "Double Barrel FOV", flag = "GunFOV_DoubleBarrel", default = "25", placeholder = "25"})
-	left_section:textbox({name = "Revolver FOV", flag = "GunFOV_Revolver", default = "20", placeholder = "20"})
-	left_section:textbox({name = "Shotgun FOV", flag = "GunFOV_Shotgun", default = "30", placeholder = "30"})
-	left_section:textbox({name = "Tactical SG FOV", flag = "GunFOV_TacticalSG", default = "28", placeholder = "28"})
-	left_section:textbox({name = "Silencer FOV", flag = "GunFOV_Silencer", default = "18", placeholder = "18"})
-	left_section:textbox({name = "USP/Pistol FOV", flag = "GunFOV_USP", default = "22", placeholder = "22"})
-	left_section:textbox({name = "SMG FOV", flag = "GunFOV_SMG", default = "24", placeholder = "24"})
-	left_section:textbox({name = "Default FOV", flag = "GunFOV_Default", default = "50", placeholder = "50"})
-
-	left_section:label({name = "── Gun Range FOV (Dynamic) ──"})
-	left_section:toggle({name = "Enable Range FOV", flag = "GunRangeFOV_Enabled", default = false})
-	left_section:textbox({name = "Close Range (<) studs", flag = "GunRangeFOV_CloseDistance", default = "15", placeholder = "15"})
-	left_section:textbox({name = "Medium Range (<) studs", flag = "GunRangeFOV_MediumDistance", default = "30", placeholder = "30"})
-	left_section:textbox({name = "Far Range (<) studs", flag = "GunRangeFOV_FarDistance", default = "90", placeholder = "90"})
-
-	left_section:label({name = "DB Range"})
-	left_section:textbox({name = "DB Close", flag = "GunRangeFOV_DB_Close", default = "30", placeholder = "30"})
-	left_section:textbox({name = "DB Medium", flag = "GunRangeFOV_DB_Medium", default = "20", placeholder = "20"})
-	left_section:textbox({name = "DB Far", flag = "GunRangeFOV_DB_Far", default = "10", placeholder = "10"})
-	left_section:textbox({name = "DB Very Far", flag = "GunRangeFOV_DB_VeryFar", default = "5", placeholder = "5"})
-
-	left_section:label({name = "Rev Range"})
-	left_section:textbox({name = "Rev Close", flag = "GunRangeFOV_Rev_Close", default = "25", placeholder = "25"})
-	left_section:textbox({name = "Rev Medium", flag = "GunRangeFOV_Rev_Medium", default = "18", placeholder = "18"})
-	left_section:textbox({name = "Rev Far", flag = "GunRangeFOV_Rev_Far", default = "12", placeholder = "12"})
-	left_section:textbox({name = "Rev Very Far", flag = "GunRangeFOV_Rev_VeryFar", default = "8", placeholder = "8"})
-
-	left_section:label({name = "SG Range"})
-	left_section:textbox({name = "SG Close", flag = "GunRangeFOV_SG_Close", default = "35", placeholder = "35"})
-	left_section:textbox({name = "SG Medium", flag = "GunRangeFOV_SG_Medium", default = "25", placeholder = "25"})
-	left_section:textbox({name = "SG Far", flag = "GunRangeFOV_SG_Far", default = "15", placeholder = "15"})
-	left_section:textbox({name = "SG Very Far", flag = "GunRangeFOV_SG_VeryFar", default = "8", placeholder = "8"})
-
-	left_section:label({name = "Tac Range"})
-	left_section:textbox({name = "Tac Close", flag = "GunRangeFOV_Tac_Close", default = "33", placeholder = "33"})
-	left_section:textbox({name = "Tac Medium", flag = "GunRangeFOV_Tac_Medium", default = "23", placeholder = "23"})
-	left_section:textbox({name = "Tac Far", flag = "GunRangeFOV_Tac_Far", default = "13", placeholder = "13"})
-	left_section:textbox({name = "Tac Very Far", flag = "GunRangeFOV_Tac_VeryFar", default = "7", placeholder = "7"})
-
-	left_section:label({name = "Sil Range"})
-	left_section:textbox({name = "Sil Close", flag = "GunRangeFOV_Sil_Close", default = "22", placeholder = "22"})
-	left_section:textbox({name = "Sil Medium", flag = "GunRangeFOV_Sil_Medium", default = "16", placeholder = "16"})
-	left_section:textbox({name = "Sil Far", flag = "GunRangeFOV_Sil_Far", default = "10", placeholder = "10"})
-	left_section:textbox({name = "Sil Very Far", flag = "GunRangeFOV_Sil_VeryFar", default = "6", placeholder = "6"})
-
-	left_section:label({name = "USP Range"})
-	left_section:textbox({name = "USP Close", flag = "GunRangeFOV_USP_Close", default = "26", placeholder = "26"})
-	left_section:textbox({name = "USP Medium", flag = "GunRangeFOV_USP_Medium", default = "19", placeholder = "19"})
-	left_section:textbox({name = "USP Far", flag = "GunRangeFOV_USP_Far", default = "13", placeholder = "13"})
-	left_section:textbox({name = "USP Very Far", flag = "GunRangeFOV_USP_VeryFar", default = "9", placeholder = "9"})
-
-	left_section:label({name = "SMG Range"})
-	left_section:textbox({name = "SMG Close", flag = "GunRangeFOV_SMG_Close", default = "28", placeholder = "28"})
-	left_section:textbox({name = "SMG Medium", flag = "GunRangeFOV_SMG_Medium", default = "21", placeholder = "21"})
-	left_section:textbox({name = "SMG Far", flag = "GunRangeFOV_SMG_Far", default = "14", placeholder = "14"})
-	left_section:textbox({name = "SMG Very Far", flag = "GunRangeFOV_SMG_VeryFar", default = "10", placeholder = "10"})
-
-	left_section:label({name = "Default Range"})
-	left_section:textbox({name = "Default Close", flag = "GunRangeFOV_Default_Close", default = "50", placeholder = "50"})
-	left_section:textbox({name = "Default Medium", flag = "GunRangeFOV_Default_Medium", default = "40", placeholder = "40"})
-	left_section:textbox({name = "Default Far", flag = "GunRangeFOV_Default_Far", default = "30", placeholder = "30"})
-	left_section:textbox({name = "Default Very Far", flag = "GunRangeFOV_Default_VeryFar", default = "20", placeholder = "20"})
-
-	left_section:label({name = "── Box/Tracer ──"})
-	left_section:toggle({name = "Box Visible", flag = "Silent_BoxVisible", default = false})
-	left_section:toggle({name = "Box Prediction", flag = "Silent_BoxPrediction", default = false})
-	left_section:slider({name = "Box Width", flag = "Silent_BoxWidth", min = 0.5, max = 3, default = 1, interval = 0.1})
-	left_section:slider({name = "Box Height", flag = "Silent_BoxHeight", min = 1, max = 5, default = 2, interval = 0.1})
-	left_section:slider({name = "Box Thickness", flag = "Silent_BoxThickness", min = 1, max = 5, default = 3, interval = 1})
-	left_section:colorpicker({name = "Box Color", flag = "Silent_BoxColor", color = DefaultColor})
-	left_section:colorpicker({name = "Focused Color", flag = "Silent_BoxFocusedColor", color = Color3.fromRGB(100, 150, 180)})
-	left_section:toggle({name = "Tracer Visible", flag = "Silent_TracerVisible", default = true})
-	left_section:slider({name = "Tracer Thickness", flag = "Silent_TracerThickness", min = 1, max = 5, default = 1, interval = 1})
-	left_section:colorpicker({name = "Tracer Color", flag = "Silent_TracerColor", color = DefaultColor})
-
-	left_section:label({name = "── Anti Curve ──"})
-	left_section:toggle({name = "Enabled", flag = "Silent_AntiCurve", default = false})
-	left_section:slider({name = "Max Angle", flag = "Silent_MaxCurveAngle", min = 5, max = 90, default = 45, interval = 1, suffix = "°"})
-	left_section:toggle({name = "Show Label", flag = "Silent_AntiCurveShowLabel", default = true})
-
-	left_section:label({name = "── Resolver ──"})
-	left_section:toggle({name = "Enabled", flag = "Resolver_Enabled", default = false})
-	left_section:toggle({name = "Show Menu Label", flag = "Resolver_ShowLabel", default = false})
-	left_section:toggle({name = "Force Resolver", flag = "Resolver_Force", default = false})
-	left_section:toggle({name = "On Key", flag = "Resolver_OnKey", default = false})
-	left_section:keybind({name = "Resolver Key", flag = "Resolver_Keybind", key = Enum.KeyCode.Unknown, mode = "Toggle", default = false})
-
-	left_section:label({name = "── FrameSkip (MouseTP) ──"})
-	left_section:toggle({name = "Enabled", flag = "FrameSkip_Enabled", default = false})
-	left_section:keybind({name = "Hold Key", flag = "FrameSkip_Keybind", key = Enum.KeyCode.Unknown, mode = "Hold", default = false})
-	left_section:toggle({name = "Use Target Part", flag = "FrameSkip_TargetPart", default = true})
-	left_section:dropdown({name = "Target Part", flag = "FrameSkip_Part", items = {"Head", "HumanoidRootPart", "Torso"}, default = "HumanoidRootPart"})
-	left_section:toggle({name = "Use Prediction", flag = "FrameSkip_UsePrediction", default = true})
-	left_section:slider({name = "Power", flag = "FrameSkip_Power", min = 0.1, max = 2, default = 1, interval = 0.01})
-
-	local right_section = right:section({name = "Camlock", size = 1})
-
-	right_section:toggle({name = "Enabled", flag = "Camlock_Enabled", default = false})
-	right_section:keybind({name = "Toggle Key", flag = "Camlock_Keybind", key = Enum.KeyCode.Unknown, mode = "Toggle", default = false})
-	right_section:toggle({name = "Sticky Mode", flag = "Camlock_StickyMode", default = true})
-	right_section:toggle({name = "Deadzone", flag = "Camlock_Deadzone", default = false})
-	right_section:toggle({name = "Anti Floor", flag = "Camlock_AntiFloor", default = true})
-	right_section:toggle({name = "Closest Part", flag = "Camlock_ClosestPart", default = false})
-	right_section:dropdown({name = "Hit Bones", flag = "Camlock_HitBones", items = {"Head", "HumanoidRootPart", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg"}, multi = true, default = {"HumanoidRootPart"}})
-	right_section:toggle({name = "Smart FOV", flag = "Camlock_SmartFOV", default = false})
-
-	right_section:label({name = "── Smoothness ──"})
-	right_section:textbox({name = "Smooth X", flag = "Camlock_SmoothX", default = "14", placeholder = "14"})
-	right_section:textbox({name = "Smooth Y", flag = "Camlock_SmoothY", default = "14", placeholder = "14"})
-	right_section:textbox({name = "Stickiness X", flag = "Camlock_StickinessX", default = "5", placeholder = "5"})
-	right_section:textbox({name = "Stickiness Y", flag = "Camlock_StickinessY", default = "5", placeholder = "5"})
-	right_section:textbox({name = "Air Offset Y", flag = "Camlock_AirOffsetY", default = "0", placeholder = "0"})
-
-	right_section:label({name = "── Camera Shake ──"})
-	right_section:toggle({name = "Enable Shake", flag = "Camlock_Shake", default = false})
-	right_section:textbox({name = "Shake X", flag = "Camlock_ShakeX", default = "0", placeholder = "0"})
-	right_section:textbox({name = "Shake Y", flag = "Camlock_ShakeY", default = "0", placeholder = "0"})
-	right_section:textbox({name = "Shake Z", flag = "Camlock_ShakeZ", default = "0", placeholder = "0"})
-
-	right_section:label({name = "── Prediction ──"})
-	right_section:toggle({name = "Prediction Enabled", flag = "Camlock_PredictEnabled", default = true})
-	right_section:toggle({name = "Auto Prediction", flag = "Camlock_AutoPrediction", default = true})
-	right_section:toggle({name = "Ping Based", flag = "Camlock_PingBased", default = false})
-	right_section:dropdown({name = "Velocity Type", flag = "Camlock_VelocityType", items = {"Regular", "Linear", "Rot", "Angular"}, default = "Regular"})
-	right_section:textbox({name = "X Prediction", flag = "Camlock_PredictionX", default = "0.1345", placeholder = "0.1345"})
-	right_section:textbox({name = "Y Prediction", flag = "Camlock_PredictionY", default = "0.1342", placeholder = "0.1342"})
-	right_section:textbox({name = "Z Prediction", flag = "Camlock_PredictionZ", default = "0.1345", placeholder = "0.1345"})
-
-	right_section:label({name = "── FOV ──"})
-	right_section:toggle({name = "FOV Visible", flag = "Camlock_FOVVisible", default = false})
-	right_section:slider({name = "FOV Radius", flag = "Camlock_FOVRadius", min = 0, max = 1000, default = 300, interval = 1})
-	right_section:slider({name = "FOV Thickness", flag = "Camlock_FOVThickness", min = 1, max = 5, default = 1, interval = 1})
-	right_section:toggle({name = "FOV Filled", flag = "Camlock_FOVFilled", default = false})
-	right_section:slider({name = "FOV Transparency", flag = "Camlock_FOVTransparency", min = 0, max = 100, default = 25, interval = 1, suffix = "%"})
-	right_section:colorpicker({name = "FOV Color", flag = "Camlock_FOVColor", color = DefaultColor})
-	right_section:toggle({name = "Deadzone Visible", flag = "Camlock_DeadzoneVisible", default = false})
-	right_section:slider({name = "Deadzone Radius", flag = "Camlock_DeadzoneRadius", min = 0, max = 100, default = 15, interval = 1})
-
-	right_section:label({name = "── Triggerbot ──"})
-	right_section:toggle({name = "Enabled", flag = "Triggerbot_Enabled", default = false})
-	right_section:keybind({name = "Hold Key", flag = "Triggerbot_Keybind", key = Enum.KeyCode.Unknown, mode = "Hold", default = false})
-	right_section:dropdown({name = "Hit Mode", flag = "Triggerbot_HitMode", items = {"Circle", "Box"}, default = "Circle"})
-	right_section:toggle({name = "Auto Sync", flag = "Triggerbot_AutoSync", default = true})
-	right_section:textbox({name = "Prediction", flag = "Triggerbot_Prediction", default = "0.016922", placeholder = "0.016922"})
-	right_section:slider({name = "Sensitivity", flag = "Triggerbot_Sensitivity", min = 1, max = 10, default = 2, interval = 0.1})
-	right_section:slider({name = "Cooldown (ms)", flag = "Triggerbot_Cooldown", min = 0, max = 500, default = 30, interval = 1})
-
-	right_section:label({name = "── Triggerbot FOV ──"})
-	right_section:toggle({name = "FOV Visible", flag = "Triggerbot_FOVVisible", default = false})
-	right_section:slider({name = "FOV Radius", flag = "Triggerbot_FOVRadius", min = 5, max = 100, default = 10, interval = 1})
-	right_section:colorpicker({name = "FOV Color", flag = "Triggerbot_FOVColor", color = DefaultColor})
-	right_section:toggle({name = "Box Visible", flag = "Triggerbot_BoxVisible", default = false})
-	right_section:slider({name = "Box Width", flag = "Triggerbot_BoxWidth", min = 0.5, max = 3, default = 1, interval = 0.1})
-	right_section:slider({name = "Box Height", flag = "Triggerbot_BoxHeight", min = 1, max = 5, default = 2, interval = 0.1})
-	right_section:slider({name = "Box Thickness", flag = "Triggerbot_BoxThickness", min = 1, max = 5, default = 3, interval = 1})
-	right_section:colorpicker({name = "Box Color", flag = "Triggerbot_BoxColor", color = DefaultColor})
-	right_section:colorpicker({name = "Active Box Color", flag = "Triggerbot_BoxActiveColor", color = Color3.fromRGB(100, 150, 180)})
-	right_section:toggle({name = "Tracer Visible", flag = "Triggerbot_TracerVisible", default = false})
-	right_section:dropdown({name = "Tracer Origin", flag = "Triggerbot_TracerOrigin", items = {"Mouse"}, default = "Mouse"})
-	right_section:slider({name = "Tracer Thickness", flag = "Triggerbot_TracerThickness", min = 1, max = 5, default = 1, interval = 1})
-	right_section:colorpicker({name = "Tracer Color", flag = "Triggerbot_TracerColor", color = DefaultColor})
-
-	right_section:label({name = "── Global Checks ──"})
-	right_section:toggle({name = "Wall Check", flag = "Global_WallCheck", default = true})
-	right_section:toggle({name = "Friend Check", flag = "Global_FriendCheck", default = false})
-	right_section:toggle({name = "ForceField Check", flag = "Global_ForceFieldCheck", default = true})
-	right_section:toggle({name = "Knock Check", flag = "Global_KnockCheck", default = true})
-	right_section:toggle({name = "Grabbed Check", flag = "Global_GrabbedCheck", default = true})
-	right_section:toggle({name = "Tool Equipped Check", flag = "Global_ToolEquipped", default = false})
-	right_section:toggle({name = "Panic Mode", flag = "Global_PanicMode", default = false})
-	right_section:keybind({name = "Panic Key", flag = "Global_PanicKeybind", key = Enum.KeyCode.Unknown, mode = "Toggle", default = false})
-
-	right_section:label({name = "── Anti Aim Viewer ──"})
-	right_section:toggle({name = "Enabled", flag = "AntiAim_Enabled", default = true})
-	right_section:toggle({name = "Use Mouse Position", flag = "AntiAim_UseMousePos", default = true})
-
-	right_section:label({name = "── Anti Mod ──"})
-	right_section:toggle({name = "Anti Mod", flag = "Misc_AntiMod", default = true})
-	right_section:toggle({name = "Notification", flag = "Misc_AntiModNotification", default = true})
-	right_section:dropdown({name = "Action", flag = "Misc_AntiModAction", items = {"Notify", "Kick", "Server Hop"}, default = "Notify"})
-	right_section:keybind({name = "Check Mods", flag = "Misc_ModCheckAlert", key = Enum.KeyCode.Unknown, mode = "Toggle", default = false})
+    local right_section = right:section({name = "Camlock"})
+    
+    right_section:toggle({name = "Enabled", flag = "Camlock_Enabled", default = false})
+    right_section:slider({name = "FOV Radius", flag = "Camlock_FOVRadius", min = 0, max = 1000, default = 300, interval = 1})
 end
-
-
--- VISUALS TAB
-
-
-do
-	local left = visuals_tab:column({size = 1})
-	local right = visuals_tab:column({size = 1})
-
-	local left_section = left:section({name = "ESP & Visuals", size = 1})
-
-	left_section:label({name = "── Menu Label ──"})
-	left_section:toggle({name = "Enabled", flag = "MenuLabel_Enabled", default = false})
-	left_section:colorpicker({name = "Text Color", flag = "MenuLabel_TextColor", color = DefaultColor})
-
-	left_section:label({name = "── Raid Awareness ESP ──"})
-	left_section:toggle({name = "Enabled", flag = "RaidESP_Enabled", default = true})
-	left_section:keybind({name = "Add Target", flag = "RaidESP_AddKey", key = Enum.KeyCode.Unknown, mode = "Toggle", default = false})
-	left_section:keybind({name = "Hide Targets", flag = "RaidESP_HideKey", key = Enum.KeyCode.Unknown, mode = "Toggle", default = false})
-	left_section:keybind({name = "Clear All", flag = "RaidESP_ClearKey", key = Enum.KeyCode.Unknown, mode = "Toggle", default = false})
-	left_section:toggle({name = "Box ESP", flag = "RaidESP_Box", default = true})
-	left_section:toggle({name = "Name ESP", flag = "RaidESP_Name", default = true})
-	left_section:toggle({name = "Health Bar", flag = "RaidESP_Health", default = true})
-	left_section:toggle({name = "Distance", flag = "RaidESP_Distance", default = true})
-	left_section:toggle({name = "Chams/Highlight", flag = "RaidESP_Chams", default = true})
-	left_section:slider({name = "Max Distance", flag = "RaidESP_MaxDistance", min = 100, max = 5000, default = 1000, interval = 50})
-
-	left_section:label({name = "── ESP Colors ──"})
-	left_section:colorpicker({name = "Box Color", flag = "RaidESP_BoxColor", color = DefaultColor})
-	left_section:colorpicker({name = "Name Color", flag = "RaidESP_NameColor", color = Color3.fromRGB(100, 150, 180)})
-	left_section:colorpicker({name = "Chams Fill", flag = "RaidESP_ChamsFill", color = DefaultColor})
-	left_section:colorpicker({name = "Chams Outline", flag = "RaidESP_ChamsOutline", color = Color3.fromRGB(255, 255, 255)})
-	left_section:slider({name = "Fill Transparency", flag = "RaidESP_ChamsFillTransparency", min = 0, max = 100, default = 50, interval = 1, suffix = "%"})
-	left_section:slider({name = "Outline Transparency", flag = "RaidESP_ChamsOutlineTransparency", min = 0, max = 100, default = 0, interval = 1, suffix = "%"})
-
-	local right_section = right:section({name = "World", size = 1})
-
-	right_section:label({name = "── World Textures ──"})
-	right_section:toggle({name = "Enable Custom Textures", flag = "Textures_Enabled", default = false})
-	right_section:dropdown({name = "Material Type", flag = "Textures_Material", items = {"Plastic", "Wood", "Slate", "Concrete", "CorrodedMetal", "DiamondPlate", "Foil", "Grass", "Ice", "Marble", "Granite", "Brick", "Pebble", "Sand", "Fabric", "SmoothPlastic", "Metal", "WoodPlanks", "Cobblestone", "Neon", "Glass", "ForceField"}, default = "Plastic"})
-	right_section:toggle({name = "Use Custom Color", flag = "Textures_UseCustomColor", default = false})
-	right_section:colorpicker({name = "Custom Color", flag = "Textures_CustomColor", color = Color3.fromRGB(150, 150, 150)})
-end
-
-
--- MISC TAB
-
-
-do
-	local left = misc_tab:column({size = 1})
-	local right = misc_tab:column({size = 1})
-
-	local left_section = left:section({name = "Utilities", size = 1})
-
-	left_section:label({name = "── Character Mods ──"})
-	left_section:toggle({name = "No Jump Cooldown", flag = "Misc_NoJumpCooldown", default = false})
-	left_section:toggle({name = "No Slow", flag = "Misc_NoSlow", default = false})
-
-	left_section:label({name = "── Utilities ──"})
-	left_section:keybind({name = "Clear Console", flag = "Misc_ClearConsoleKey", key = Enum.KeyCode.Unknown, mode = "Toggle", default = false})
-
-	left_section:label({name = "── Auto Buy ──"})
-	left_section:toggle({name = "Enabled", flag = "AutoBuy_Enabled", default = false})
-	left_section:keybind({name = "Buy All", flag = "AutoBuy_BuyAllKey", key = Enum.KeyCode.Unknown, mode = "Toggle", default = false})
-	left_section:keybind({name = "Buy Armor", flag = "AutoBuy_ArmorKey", key = Enum.KeyCode.Unknown, mode = "Toggle", default = false})
-	left_section:slider({name = "Buy Armor Below %", flag = "AutoBuy_ArmorPercent", min = 10, max = 100, default = 50, interval = 1, suffix = "%"})
-	left_section:dropdown({name = "Select Weapons", flag = "AutoBuy_Weapons", items = {"Tactical Shotgun", "Shotgun", "Silencer", "USP"}, multi = true, default = {}})
-	left_section:dropdown({name = "Select Food", flag = "AutoBuy_Food", items = {"Burger", "Chicken", "Taco", "Pizza", "Soda", "Donut"}, multi = true, default = {}})
-	left_section:toggle({name = "Enable Food Buying", flag = "AutoBuy_FoodEnabled", default = false})
-
-	local ItemTypes = {"None", "Double Barrel", "Revolver", "Shotgun", "Tactical Shotgun", "Silencer", "USP/Pistol", "SMG", "AR", "Knife", "Katana", "Bat", "Any Melee", "Burger", "Chicken", "Taco", "Pizza", "Any Food", "Any Item"}
-
-	local right_section = right:section({name = "Inventory", size = 1})
-
-	right_section:label({name = "── Inventory Sorter ──"})
-	right_section:toggle({name = "Enabled", flag = "Inventory_Enabled", default = false})
-	right_section:keybind({name = "Sort Key", flag = "Inventory_SortKey", key = Enum.KeyCode.Unknown, mode = "Toggle", default = false})
-	right_section:dropdown({name = "Total Slots", flag = "Inventory_TotalSlots", items = {"4 Slots", "5 Slots", "6 Slots", "7 Slots", "8 Slots", "9 Slots", "10 Slots"}, default = "4 Slots"})
-	right_section:dropdown({name = "Slot 1", flag = "Inventory_Slot1", items = ItemTypes, default = "Double Barrel"})
-	right_section:dropdown({name = "Slot 2", flag = "Inventory_Slot2", items = ItemTypes, default = "Revolver"})
-	right_section:dropdown({name = "Slot 3", flag = "Inventory_Slot3", items = ItemTypes, default = "Tactical Shotgun"})
-	right_section:dropdown({name = "Slot 4", flag = "Inventory_Slot4", items = ItemTypes, default = "Katana"})
-	right_section:dropdown({name = "Slot 5", flag = "Inventory_Slot5", items = ItemTypes, default = "None"})
-	right_section:dropdown({name = "Slot 6", flag = "Inventory_Slot6", items = ItemTypes, default = "None"})
-	right_section:dropdown({name = "Slot 7", flag = "Inventory_Slot7", items = ItemTypes, default = "None"})
-	right_section:dropdown({name = "Slot 8", flag = "Inventory_Slot8", items = ItemTypes, default = "None"})
-	right_section:dropdown({name = "Slot 9", flag = "Inventory_Slot9", items = ItemTypes, default = "None"})
-	right_section:dropdown({name = "Slot 10", flag = "Inventory_Slot10", items = ItemTypes, default = "None"})
-end
-
 
 -- SETTINGS TAB
-
-
 do
-	local left = settings_tab:column({size = 1})
-	local left_section = left:section({name = "Menu", size = 1})
-
-	left_section:button({name = "Unload Script", callback = function()
-		Cleanup()
-		library:unload()
-	end})
+    local left = settings_tab:column({size = 1})
+    local left_section = left:section({name = "Menu"})
+    
+    left_section:button({name = "Unload Script", callback = function()
+        library:unload()
+    end})
 end
 
-library:init_config(window)
+window:init_config(window)
 
+-- Access flags:
+-- library.flags["Silent_Enabled"] --> true/false
+-- library.flags["Silent_HitChance"] --> number
+-- library.flags["Silent_TargetMode"] --> string
 
-
-local _keybind_watchers = {}
-local _keybind_states = {}
-local _value_watchers = {}
-local _value_states = {}
-
-task.spawn(function()
-	while true do
-		task.wait(0.05)
-		if Library.Unloaded then break end
-		for key, callbacks in pairs(_keybind_watchers) do
-			local curActive = false
-			pcall(function()
-				local data = Library.Flags[key]
-				if data and typeof(data) == "table" and data.active ~= nil then
-					curActive = data.active or false
-				end
-			end)
-			if _keybind_states[key] == nil then _keybind_states[key] = curActive end
-			if curActive ~= _keybind_states[key] then
-				_keybind_states[key] = curActive
-				for _, cb in ipairs(callbacks) do pcall(cb) end
-			end
-		end
-	end
-end)
-
-task.spawn(function()
-	while true do
-		task.wait(0.1)
-		if Library.Unloaded then break end
-		for key, callbacks in pairs(_value_watchers) do
-			local curVal = Library.Flags[key]
-			local compareVal
-			if typeof(curVal) == "table" then
-				local s = ""; for k, v in pairs(curVal) do s = s .. tostring(k) .. tostring(v) end; compareVal = s
-			else compareVal = curVal end
-			if _value_states[key] ~= nil and compareVal ~= _value_states[key] then
-				_value_states[key] = compareVal
-				for _, cb in ipairs(callbacks) do pcall(cb) end
-			end
-			if _value_states[key] == nil then _value_states[key] = compareVal end
-		end
-	end
-end)
-
-Toggles = setmetatable({}, {
-	__index = function(self, key)
-		local val = Library.Flags[key]
-		if val == nil then return nil end
-		return {
-			Value = (typeof(val) == "boolean") and val or false,
-			SetValue = function(_, newVal) Library.Flags[key] = newVal end,
-			OnChanged = function(_, cb)
-				if not _value_watchers[key] then _value_watchers[key] = {}; _value_states[key] = Library.Flags[key] end
-				table.insert(_value_watchers[key], cb)
-			end
-		}
-	end
-})
-
-Options = setmetatable({}, {
-	__index = function(self, key)
-		local val = Library.Flags[key]
-		if val == nil then return nil end
-		local isKeybind = typeof(val) == "table" and val.key ~= nil and val.mode ~= nil
-		local isColor = typeof(val) == "table" and val.Color ~= nil
-		local isTable = typeof(val) == "table" and not isKeybind and not isColor
-		if isKeybind then
-			return {
-				Value = val.key,
-				GetState = function() local d = Library.Flags[key]; return d and d.active or false end,
-				OnClick = function(_, cb)
-					if not _keybind_watchers[key] then _keybind_watchers[key] = {} end
-					table.insert(_keybind_watchers[key], cb)
-				end,
-				SetValue = function(_, newVal) Library.Flags[key] = newVal end
-			}
-		elseif isColor then
-			return {
-				Value = val.Color,
-				OnChanged = function(_, cb)
-					if not _value_watchers[key] then _value_watchers[key] = {}; _value_states[key] = tostring(val.Color) end
-					table.insert(_value_watchers[key], cb)
-				end
-			}
-		elseif isTable then
-			local dictVal = {}; for _, item in ipairs(val) do dictVal[item] = true end
-			return {
-				Value = dictVal,
-				SetValue = function(_, newVal)
-					if typeof(newVal) == "table" then
-						local arr = {}; for k, v in pairs(newVal) do if v then table.insert(arr, k) end end
-						Library.Flags[key] = arr
-					else Library.Flags[key] = newVal end
-				end,
-				OnChanged = function(_, cb)
-					if not _value_watchers[key] then
-						_value_watchers[key] = {}; local s = ""; for k, v in pairs(val) do s = s .. tostring(k) .. tostring(v) end; _value_states[key] = s
-					end
-					table.insert(_value_watchers[key], cb)
-				end
-			}
-		else
-			return {
-				Value = val,
-				SetValue = function(_, newVal) Library.Flags[key] = newVal end,
-				OnChanged = function(_, cb)
-					if not _value_watchers[key] then _value_watchers[key] = {}; _value_states[key] = val end
-					table.insert(_value_watchers[key], cb)
-				end
-			}
-		end
-	end
-})
-
-ThemeManager = { SetLibrary = function() end, SetFolder = function() end, ApplyToTab = function() end, ApplyTheme = function() end }
-SaveManager = { SetLibrary = function() end, IgnoreThemeSettings = function() end, SetIgnoreIndexes = function() end, SetFolder = function() end, BuildConfigSection = function() end, LoadAutoloadConfig = function() end }
-Tabs = { Combat = {}, Visuals = {}, Misc = {}, Settings = {} }
-
-Library:OnUnload(function() print("Avenir Unloaded!") end)
+]]
