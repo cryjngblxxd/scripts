@@ -260,50 +260,80 @@ do
     end
 
     function Library:GetConfig()
-        local Config = {}
-        for flag, value in pairs(Library.Flags) do
-            if flag == "cfg_selected" or flag == "cfg_name" then continue end
-            if typeof(value) == "Color3" then
-                Config[flag] = {_type = "Color3", hex = value:ToHex()}
-            elseif type(value) == "table" and value.key ~= nil and value.mode ~= nil then
-                local keyStr = "NONE"
-                if value.key and tostring(value.key) ~= "NONE" then
-                    keyStr = tostring(value.key)
-                end
-                Config[flag] = {_type = "Keybind", mode = value.mode, key = keyStr}
-            else
-                Config[flag] = value
+    local Config = {}
+    for flag, value in pairs(Library.Flags) do
+        if flag == "cfg_selected" or flag == "cfg_name" then continue end
+        if typeof(value) == "Color3" then
+            Config[flag] = {_type = "Color3", hex = value:ToHex()}
+        elseif type(value) == "table" and value.key ~= nil and value.mode ~= nil then
+            -- FIXED: Save keybind properly
+            local keyStr = "NONE"
+            if value.key then
+                keyStr = tostring(value.key):gsub("Enum%.KeyCode%.", ""):gsub("Enum%.UserInputType%.", "")
             end
+            Config[flag] = {_type = "Keybind", mode = value.mode, key = keyStr}
+        else
+            Config[flag] = value
         end
-        return game:GetService("HttpService"):JSONEncode(Config)
     end
+    return game:GetService("HttpService"):JSONEncode(Config)
+end
 
-    function Library:LoadConfig(configJson)
-        local success, config = pcall(function()
-            return game:GetService("HttpService"):JSONDecode(configJson)
-        end)
-        if not success then return end
-        for flag, value in pairs(config) do
-            if flag == "cfg_selected" or flag == "cfg_name" then continue end
-            if type(value) == "table" and value._type == "Keybind" then
-                continue
-            elseif type(value) == "table" and value._type == "Color3" then
-                local setter = Flags[flag]
-                if setter and type(setter) == "function" then
-                    pcall(function() setter(Color3.fromHex(value.hex)) end)
-                end
-            else
-                local setter = Flags[flag]
-                if setter then
-                    if type(setter) == "function" then
-                        pcall(function() setter(value) end)
-                    elseif type(setter) == "table" and setter.Set then
-                        pcall(function() setter:Set(value) end)
+function Library:LoadConfig(configJson)
+    local success, config = pcall(function()
+        return game:GetService("HttpService"):JSONDecode(configJson)
+    end)
+    if not success then return end
+    
+    for flag, value in pairs(config) do
+        if flag == "cfg_selected" or flag == "cfg_name" then continue end
+        
+        if type(value) == "table" and value._type == "Keybind" then
+            -- FIXED: Load keybind data
+            local setter = Flags[flag]
+            if setter and type(setter) == "table" then
+                -- Reconstruct the key EnumItem
+                local key = nil
+                if value.key and value.key ~= "NONE" then
+                    -- Try KeyCode first
+                    pcall(function()
+                        key = Enum.KeyCode[value.key]
+                    end)
+                    -- If that fails, try UserInputType
+                    if not key then
+                        pcall(function()
+                            key = Enum.UserInputType[value.key]
+                        end)
                     end
                 end
+                
+                -- Set the key
+                if setter.Set then
+                    pcall(function() setter:Set(key) end)
+                end
+                
+                -- Set the mode
+                if setter.SetMode and value.mode then
+                    pcall(function() setter:SetMode(value.mode) end)
+                end
+            end
+        elseif type(value) == "table" and value._type == "Color3" then
+            local setter = Flags[flag]
+            if setter and type(setter) == "function" then
+                pcall(function() setter(Color3.fromHex(value.hex)) end)
+            end
+        else
+            local setter = Flags[flag]
+            if setter then
+                if type(setter) == "function" then
+                    pcall(function() setter(value) end)
+                elseif type(setter) == "table" and setter.Set then
+                    pcall(function() setter:Set(value) end)
+                end
             end
         end
     end
+end
 
     function Library:SaveConfig(name)
         pcall(function()
@@ -469,7 +499,7 @@ do
     local function SetupKeybindHandler()
         local UIS = game:GetService("UserInputService")
         
-        
+       
         
         Library:Connection(UIS.InputBegan, function(input, gameProcessed)
             if gameProcessed then return end
@@ -684,7 +714,7 @@ do
                 PagesFrame.Size = UDim2.new(1, -tabOffset, 1, 0)
             end)
 
-            local versionText = '<font color="#4e4e4e">build: </font>Beta Version'
+            local versionText = '<font color="#4e4e4e">build: </font>live'
             if Base.GameInfo and Base.GameInfo ~= "" then
                 versionText = versionText .. '  <font color="#4e4e4e">| </font>' .. Base.GameInfo
             end
@@ -2049,9 +2079,9 @@ do
                 KB.Callback = callback
             end
 
-            
+            -- Register this keybind with the global system
             table.insert(Library._keybinds, KB)
-            
+           
 
             Flags[KB.Flag] = KB
             return KB
