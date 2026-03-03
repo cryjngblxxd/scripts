@@ -469,7 +469,7 @@ do
     local function SetupKeybindHandler()
         local UIS = game:GetService("UserInputService")
         
-        print("[KEYBIND SYSTEM] Setting up global handler...")
+        
         
         Library:Connection(UIS.InputBegan, function(input, gameProcessed)
             if gameProcessed then return end
@@ -537,7 +537,7 @@ do
             end
         end)
         
-        print("[KEYBIND SYSTEM] Global handler ready!")
+        
     end
 
     do
@@ -2049,9 +2049,9 @@ do
                 KB.Callback = callback
             end
 
-            -- Register this keybind with the global system
+            
             table.insert(Library._keybinds, KB)
-            print("[KEYBIND] Registered keybind:", KB.Name, "Key:", KB.Key, "Mode:", KB.Mode)
+            
 
             Flags[KB.Flag] = KB
             return KB
