@@ -688,61 +688,121 @@ do
 
         -- Toggle
         function Sections:Toggle(Options)
-            local Props = Options or {}
-            local Toggle = {
-                Window = self.Window, Page = self.Page, Section = self,
-                State = Props.state or Props.State or Props.default or Props.Default or false,
-                Callback = Props.callback or Props.Callback or function() end,
-                Flag = Props.flag or Props.Flag or Library.NextFlag(),
-                Toggled = false; Colorpickers = 0; Holder = nil;
-            }
+        local Props = Options or {}
+        local Toggle = {
+            Window = self.Window, Page = self.Page, Section = self,
+            State = Props.state or Props.State or Props.default or Props.Default or false,
+            Callback = Props.callback or Props.Callback or function() end,
+            Flag = Props.flag or Props.Flag or Library.NextFlag(),
+            Toggled = false,
+            Colorpickers = 0,
+            Holder = nil,
+        }
 
-            local parent = Options.Side == "Right" and Toggle.Section.Elements.Right or Toggle.Section.Elements.Left
-            local HolderT = Instance.new('TextButton', parent)
-            local FrameT = Instance.new('Frame', HolderT)
-            local AccentFrameT = Instance.new('Frame', FrameT)
-            local GradT = Instance.new('UIGradient', AccentFrameT)
-            local TextLabelT = Instance.new('TextLabel', HolderT)
+        local parent = Options.Side == "Right" and Toggle.Section.Elements.Right or Toggle.Section.Elements.Left
+        local HolderT = Instance.new('TextButton', parent)
+        local FrameT = Instance.new('Frame', HolderT)
+        local AccentFrameT = Instance.new('Frame', FrameT)
+        local GradT = Instance.new('UIGradient', AccentFrameT)
+        local TextLabelT = Instance.new('TextLabel', HolderT)
 
-            Toggle.Holder = HolderT
-            table.insert(Library.ThemeObjects, AccentFrameT)
+        Toggle.Holder = HolderT
+        table.insert(Library.ThemeObjects, AccentFrameT)
 
-            HolderT.Name = "Toggle"; HolderT.Size = UDim2.new(1,0,0,16); HolderT.BackgroundTransparency = 1; HolderT.Text = ""; HolderT.AutoButtonColor = false
-            FrameT.Position = UDim2.new(0,0,0,5); FrameT.Size = UDim2.new(0,6,0,6); FrameT.BackgroundColor3 = Color3.new(0.0784,0.0784,0.0784); FrameT.BorderColor3 = Color3.new(0,0,0)
-            AccentFrameT.Size = UDim2.new(1,0,1,0); AccentFrameT.BackgroundColor3 = Library.Accent; AccentFrameT.BorderSizePixel = 0; AccentFrameT.Visible = false
-            GradT.Color = ColorSequence.new{ColorSequenceKeypoint.new(0,Color3.new(0.78,0.749,0.8)),ColorSequenceKeypoint.new(1,Color3.new(1,1,1))}; GradT.Rotation = -90
-            TextLabelT.Position = UDim2.new(0,15,0,0); TextLabelT.Size = UDim2.new(1,-60,1,0); TextLabelT.BackgroundTransparency = 1
-            TextLabelT.TextColor3 = Color3.new(0.306,0.306,0.306); TextLabelT.FontFace = Library.UIFont; TextLabelT.TextSize = Library.FontSize
-            TextLabelT.ZIndex = 105; TextLabelT.TextXAlignment = Enum.TextXAlignment.Left; TextLabelT.Text = Options.Name or "toggle"
+        HolderT.Name = "Toggle"
+        HolderT.Size = UDim2.new(1, 0, 0, 16)
+        HolderT.BackgroundTransparency = 1
+        HolderT.Text = ""
+        HolderT.AutoButtonColor = false
+        
+        FrameT.Position = UDim2.new(0, 0, 0, 5)
+        FrameT.Size = UDim2.new(0, 6, 0, 6)
+        FrameT.BackgroundColor3 = Color3.new(0.0784, 0.0784, 0.0784)
+        FrameT.BorderColor3 = Color3.new(0, 0, 0)
+        
+        AccentFrameT.Size = UDim2.new(1, 0, 1, 0)
+        AccentFrameT.BackgroundColor3 = Library.Accent
+        AccentFrameT.BorderSizePixel = 0
+        AccentFrameT.Visible = false
+        
+        GradT.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.new(0.78, 0.749, 0.8)),
+            ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1))
+        }
+        GradT.Rotation = -90
+        
+        TextLabelT.Position = UDim2.new(0, 15, 0, 0)
+        TextLabelT.Size = UDim2.new(1, -60, 1, 0)
+        TextLabelT.BackgroundTransparency = 1
+        TextLabelT.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+        TextLabelT.FontFace = Library.UIFont
+        TextLabelT.TextSize = Library.FontSize
+        TextLabelT.ZIndex = 105
+        TextLabelT.TextXAlignment = Enum.TextXAlignment.Left
+        TextLabelT.Text = Options.Name or "toggle"
 
-            local function SetState()
-                Toggle.Toggled = not Toggle.Toggled
-                AccentFrameT.Visible = Toggle.Toggled
-                TextLabelT.TextColor3 = Toggle.Toggled and Color3.fromRGB(255,255,255) or Color3.new(0.306,0.306,0.306)
-                Library.Flags[Toggle.Flag] = Toggle.Toggled
-                Toggle.Callback(Toggle.Toggled)
-                Library:UpdateDependencies(Toggle.Flag, Toggle.Toggled)
-                Library:FireFlagCallbacks(Toggle.Flag, Toggle.Toggled)
-            end
-
-            local function ForceSet(bool)
-                bool = type(bool) == "boolean" and bool or false
-                if Toggle.Toggled ~= bool then SetState() end
-            end
-
-            function Toggle:Set(bool) ForceSet(bool) end
-
-            if Toggle.State then
-                Toggle.Toggled = false
-                SetState()
-            else
-                Library.Flags[Toggle.Flag] = false
-            end
-
-            Flags[Toggle.Flag] = ForceSet
-            Library:Connection(HolderT.MouseButton1Click, SetState)
-            return Toggle
+        local function UpdateVisual()
+            AccentFrameT.Visible = Toggle.Toggled
+            TextLabelT.TextColor3 = Toggle.Toggled and Color3.fromRGB(255, 255, 255) or Color3.new(0.306, 0.306, 0.306)
         end
+
+        local function SetState(newState)
+            if typeof(newState) == "boolean" then
+                Toggle.Toggled = newState
+            else
+                Toggle.Toggled = not Toggle.Toggled
+            end
+            
+            UpdateVisual()
+            Library.Flags[Toggle.Flag] = Toggle.Toggled
+            
+            task.spawn(function()
+                pcall(Toggle.Callback, Toggle.Toggled)
+            end)
+            
+            Library:UpdateDependencies(Toggle.Flag, Toggle.Toggled)
+            Library:FireFlagCallbacks(Toggle.Flag, Toggle.Toggled)
+        end
+
+        function Toggle:Set(bool)
+            if typeof(bool) == "boolean" and Toggle.Toggled ~= bool then
+                SetState(bool)
+            elseif typeof(bool) == "boolean" then
+                -- Force update even if same value (for loading configs)
+                Toggle.Toggled = bool
+                UpdateVisual()
+                Library.Flags[Toggle.Flag] = Toggle.Toggled
+            end
+        end
+
+        function Toggle:GetState()
+            return Toggle.Toggled
+        end
+
+        -- Initialize with default state
+        Toggle.Toggled = Toggle.State
+        Library.Flags[Toggle.Flag] = Toggle.Toggled
+        UpdateVisual()
+        
+        -- Fire initial callback if default is true
+        if Toggle.State then
+            task.spawn(function()
+                pcall(Toggle.Callback, Toggle.Toggled)
+            end)
+        end
+
+        -- Connect click event
+        HolderT.MouseButton1Click:Connect(function()
+            SetState()
+        end)
+
+        -- Store in Flags for config loading
+        Flags[Toggle.Flag] = function(value)
+            Toggle:Set(value)
+        end
+
+        return Toggle
+    end
 
         -- Slider (FIXED - proper input handling)
         function Sections:Slider(Options)
