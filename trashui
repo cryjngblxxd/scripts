@@ -89,6 +89,8 @@ do
     local Dropdowns = {}
     local Pickers = {}
 
+    Library._Flags = Flags 
+
     Library.__index = Library
     Library.Pages.__index = Library.Pages
     Library.Sections.__index = Library.Sections
@@ -570,6 +572,32 @@ end
         
     end
 
+    -- Setup menu toggle keybind handler
+Library:Connection(game:GetService("UserInputService").InputBegan, function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    -- Check if UI_MenuKeybind flag exists and matches
+    local menuKeybind = Library.Flags["UI_MenuKeybind"]
+    if menuKeybind and typeof(menuKeybind) == "table" and menuKeybind.key then
+        local inputKey = nil
+        if input.UserInputType == Enum.UserInputType.Keyboard then
+            inputKey = input.KeyCode
+        elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+            inputKey = Enum.UserInputType.MouseButton1
+        elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+            inputKey = Enum.UserInputType.MouseButton2
+        elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
+            inputKey = Enum.UserInputType.MouseButton3
+        end
+        
+        if inputKey and inputKey == menuKeybind.key then
+            Library.Open = not Library.Open
+            Main.Visible = Library.Open
+            return
+        end
+    end
+end)
+
     do
         local Pages = Library.Pages
         local Sections = Library.Sections
@@ -751,18 +779,43 @@ end
                 end
             end)
 
+            -- Setup keybind handler when window is created
+            SetupKeybindHandler()
+
+            -- Menu toggle keybind handler (supports custom keybind)
             Library:Connection(game:GetService("UserInputService").InputBegan, function(input, gameProcessed)
                 if gameProcessed then return end
-                if input.KeyCode == Enum.KeyCode.Insert or input.KeyCode == Enum.KeyCode.RightControl then
-                    Library.Open = not Library.Open
-                    Main.Visible = Library.Open
+                
+                local inputKey = nil
+                if input.UserInputType == Enum.UserInputType.Keyboard then
+                    inputKey = input.KeyCode
+                elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    inputKey = Enum.UserInputType.MouseButton1
+                elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+                    inputKey = Enum.UserInputType.MouseButton2
+                elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
+                    inputKey = Enum.UserInputType.MouseButton3
+                end
+                
+                if not inputKey then return end
+                
+                -- Check for custom menu keybind
+                local menuKeybind = Library.Flags["UI_MenuKeybind"]
+                if menuKeybind and typeof(menuKeybind) == "table" and menuKeybind.key then
+                    if inputKey == menuKeybind.key then
+                        Library.Open = not Library.Open
+                        Main.Visible = Library.Open
+                    end
+                else
+                    -- Default keybinds (Insert or RightControl)
+                    if inputKey == Enum.KeyCode.Insert or inputKey == Enum.KeyCode.RightControl then
+                        Library.Open = not Library.Open
+                        Main.Visible = Library.Open
+                    end
                 end
             end)
 
             Base.Elements = {Main = Main, Title = Title, Middle = Middle, PageHolder = PagesFrame, SectionHolder = SectionsFrame}
-
-            -- Setup keybind handler when window is created
-            SetupKeybindHandler()
 
             return setmetatable(Base, Library)
         end
