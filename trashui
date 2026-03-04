@@ -1568,8 +1568,6 @@ do
     end
 end
 
--- ESP PREVIEW MODULE
-
 local ESPPreview = {}
 
 function ESPPreview.Create(library, screenGui)
@@ -1579,9 +1577,14 @@ function ESPPreview.Create(library, screenGui)
         _connections = {},
     }
 
+    -- Match the main UI height
+    local mainSize = Library.Holder.AbsoluteSize
+    local panelWidth = 180
+    local panelHeight = mainSize.Y
+
     local Panel = Instance.new('Frame', screenGui)
     Panel.Name = "ESPPreview"
-    Panel.Size = UDim2.new(0, 160, 0, 300)
+    Panel.Size = UDim2.new(0, panelWidth, 0, panelHeight)
     Panel.BackgroundColor3 = Color3.new(0.0314, 0.0314, 0.0314)
     Panel.BorderColor3 = Color3.new(0.1098, 0.1098, 0.1098)
     Panel.Visible = true
@@ -1589,12 +1592,19 @@ function ESPPreview.Create(library, screenGui)
 
     preview._panel = Panel
 
+    -- Outer border to match main UI style
+    local OuterBorder = Instance.new('Frame', Panel)
+    OuterBorder.Size = UDim2.new(1, -4, 1, -4)
+    OuterBorder.Position = UDim2.new(0, 2, 0, 2)
+    OuterBorder.BackgroundColor3 = Color3.new(0.0431, 0.0431, 0.0431)
+    OuterBorder.BorderColor3 = Color3.new(0, 0, 0)
+    Instance.new('UICorner', OuterBorder).CornerRadius = UDim.new(0, 2)
+
     -- Title bar
-    local TitleBar = Instance.new('Frame', Panel)
+    local TitleBar = Instance.new('Frame', OuterBorder)
     TitleBar.Size = UDim2.new(1, 0, 0, 20)
     TitleBar.BackgroundColor3 = Color3.new(0.0431, 0.0431, 0.0431)
     TitleBar.BorderColor3 = Color3.new(0.1098, 0.1098, 0.1098)
-    Instance.new('UICorner', TitleBar).CornerRadius = UDim.new(0, 2)
     Instance.new('UIGradient', TitleBar).Color = ColorSequence.new{
         ColorSequenceKeypoint.new(0, Color3.new(0.78, 0.749, 0.8)),
         ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1))
@@ -1611,7 +1621,7 @@ function ESPPreview.Create(library, screenGui)
     TitleText.TextXAlignment = Enum.TextXAlignment.Left
 
     -- Preview area
-    local PreviewArea = Instance.new('Frame', Panel)
+    local PreviewArea = Instance.new('Frame', OuterBorder)
     PreviewArea.Name = "PreviewArea"
     PreviewArea.Position = UDim2.new(0, 5, 0, 25)
     PreviewArea.Size = UDim2.new(1, -10, 1, -30)
@@ -1621,74 +1631,60 @@ function ESPPreview.Create(library, screenGui)
 
     preview._previewArea = PreviewArea
 
-    -- Character silhouette (simple box representation)
+    -- Character silhouette
     local CharBox = Instance.new('Frame', PreviewArea)
     CharBox.Name = "CharBox"
     CharBox.AnchorPoint = Vector2.new(0.5, 0.5)
     CharBox.Position = UDim2.new(0.5, 0, 0.5, 0)
-    CharBox.Size = UDim2.new(0, 40, 0, 80)
+    CharBox.Size = UDim2.new(0, 50, 0, 110)
     CharBox.BackgroundTransparency = 1
     CharBox.BorderSizePixel = 0
 
-    -- Head
     local Head = Instance.new('Frame', CharBox)
-    Head.Name = "Head"
-    Head.Size = UDim2.new(0, 16, 0, 16)
-    Head.Position = UDim2.new(0.5, -8, 0, 0)
+    Head.Size = UDim2.new(0, 20, 0, 20)
+    Head.Position = UDim2.new(0.5, -10, 0, 0)
     Head.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
     Head.BorderSizePixel = 0
-    Instance.new('UICorner', Head).CornerRadius = UDim.new(0, 3)
+    Instance.new('UICorner', Head).CornerRadius = UDim.new(0, 4)
 
-    -- Body
     local Body = Instance.new('Frame', CharBox)
-    Body.Name = "Body"
-    Body.Size = UDim2.new(0, 20, 0, 30)
-    Body.Position = UDim2.new(0.5, -10, 0, 18)
+    Body.Size = UDim2.new(0, 26, 0, 38)
+    Body.Position = UDim2.new(0.5, -13, 0, 22)
     Body.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
     Body.BorderSizePixel = 0
 
-    -- Left Arm
     local LArm = Instance.new('Frame', CharBox)
-    LArm.Name = "LArm"
-    LArm.Size = UDim2.new(0, 8, 0, 28)
-    LArm.Position = UDim2.new(0.5, -20, 0, 18)
+    LArm.Size = UDim2.new(0, 10, 0, 36)
+    LArm.Position = UDim2.new(0.5, -25, 0, 22)
     LArm.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
     LArm.BorderSizePixel = 0
 
-    -- Right Arm
     local RArm = Instance.new('Frame', CharBox)
-    RArm.Name = "RArm"
-    RArm.Size = UDim2.new(0, 8, 0, 28)
-    RArm.Position = UDim2.new(0.5, 12, 0, 18)
+    RArm.Size = UDim2.new(0, 10, 0, 36)
+    RArm.Position = UDim2.new(0.5, 15, 0, 22)
     RArm.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
     RArm.BorderSizePixel = 0
 
-    -- Left Leg
     local LLeg = Instance.new('Frame', CharBox)
-    LLeg.Name = "LLeg"
-    LLeg.Size = UDim2.new(0, 9, 0, 28)
-    LLeg.Position = UDim2.new(0.5, -10, 0, 50)
+    LLeg.Size = UDim2.new(0, 12, 0, 36)
+    LLeg.Position = UDim2.new(0.5, -13, 0, 62)
     LLeg.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
     LLeg.BorderSizePixel = 0
 
-    -- Right Leg
     local RLeg = Instance.new('Frame', CharBox)
-    RLeg.Name = "RLeg"
-    RLeg.Size = UDim2.new(0, 9, 0, 28)
-    RLeg.Position = UDim2.new(0.5, 1, 0, 50)
+    RLeg.Size = UDim2.new(0, 12, 0, 36)
+    RLeg.Position = UDim2.new(0.5, 1, 0, 62)
     RLeg.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
     RLeg.BorderSizePixel = 0
 
     preview._charParts = {Head, Body, LArm, RArm, LLeg, RLeg}
     preview._charBox = CharBox
 
-    -- ESP overlay elements
     -- Box ESP
     local BoxESP = Instance.new('Frame', PreviewArea)
-    BoxESP.Name = "BoxESP"
     BoxESP.AnchorPoint = Vector2.new(0.5, 0.5)
     BoxESP.Position = UDim2.new(0.5, 0, 0.5, 0)
-    BoxESP.Size = UDim2.new(0, 50, 0, 90)
+    BoxESP.Size = UDim2.new(0, 62, 0, 120)
     BoxESP.BackgroundTransparency = 1
     BoxESP.BorderSizePixel = 0
     BoxESP.Visible = false
@@ -1702,9 +1698,8 @@ function ESPPreview.Create(library, screenGui)
 
     -- Name ESP
     local NameESP = Instance.new('TextLabel', PreviewArea)
-    NameESP.Name = "NameESP"
     NameESP.AnchorPoint = Vector2.new(0.5, 1)
-    NameESP.Position = UDim2.new(0.5, 0, 0.5, -50)
+    NameESP.Position = UDim2.new(0.5, 0, 0.5, -65)
     NameESP.Size = UDim2.new(1, 0, 0, 14)
     NameESP.BackgroundTransparency = 1
     NameESP.Text = Players.LocalPlayer.DisplayName
@@ -1717,16 +1712,14 @@ function ESPPreview.Create(library, screenGui)
 
     -- Health bar
     local HealthBarBG = Instance.new('Frame', PreviewArea)
-    HealthBarBG.Name = "HealthBarBG"
     HealthBarBG.AnchorPoint = Vector2.new(1, 0.5)
-    HealthBarBG.Position = UDim2.new(0.5, -30, 0.5, 0)
-    HealthBarBG.Size = UDim2.new(0, 3, 0, 90)
+    HealthBarBG.Position = UDim2.new(0.5, -37, 0.5, 0)
+    HealthBarBG.Size = UDim2.new(0, 3, 0, 120)
     HealthBarBG.BackgroundColor3 = Color3.new(0, 0, 0)
     HealthBarBG.BorderSizePixel = 0
     HealthBarBG.Visible = false
 
     local HealthBarFill = Instance.new('Frame', HealthBarBG)
-    HealthBarFill.Name = "Fill"
     HealthBarFill.AnchorPoint = Vector2.new(0, 1)
     HealthBarFill.Position = UDim2.new(0, 0, 1, 0)
     HealthBarFill.Size = UDim2.new(1, 0, 1, 0)
@@ -1738,9 +1731,8 @@ function ESPPreview.Create(library, screenGui)
 
     -- Distance text
     local DistESP = Instance.new('TextLabel', PreviewArea)
-    DistESP.Name = "DistESP"
     DistESP.AnchorPoint = Vector2.new(0.5, 0)
-    DistESP.Position = UDim2.new(0.5, 0, 0.5, 50)
+    DistESP.Position = UDim2.new(0.5, 0, 0.5, 65)
     DistESP.Size = UDim2.new(1, 0, 0, 14)
     DistESP.BackgroundTransparency = 1
     DistESP.Text = "[120m]"
@@ -1751,24 +1743,12 @@ function ESPPreview.Create(library, screenGui)
 
     preview._distESP = DistESP
 
-    -- Skeleton lines (simplified)
-    local function createLine(name, from, to)
-        local line = Instance.new('Frame', PreviewArea)
-        line.Name = name
-        line.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        line.BorderSizePixel = 0
-        line.Size = UDim2.new(0, 1, 0, 1)
-        line.Visible = false
-        line.AnchorPoint = Vector2.new(0.5, 0)
-        return line
-    end
-
-    -- Simple skeleton lines
+    -- Skeleton lines
     local skeletonLines = {}
     local lineData = {
         {name = "spine", x1 = 0.5, y1 = 0.18, x2 = 0.5, y2 = 0.55},
-        {name = "larm", x1 = 0.5, y1 = 0.22, x2 = 0.25, y2 = 0.55},
-        {name = "rarm", x1 = 0.5, y1 = 0.22, x2 = 0.75, y2 = 0.55},
+        {name = "larm", x1 = 0.5, y1 = 0.22, x2 = 0.22, y2 = 0.55},
+        {name = "rarm", x1 = 0.5, y1 = 0.22, x2 = 0.78, y2 = 0.55},
         {name = "lleg", x1 = 0.5, y1 = 0.55, x2 = 0.35, y2 = 0.95},
         {name = "rleg", x1 = 0.5, y1 = 0.55, x2 = 0.65, y2 = 0.95},
         {name = "neck", x1 = 0.5, y1 = 0.1, x2 = 0.5, y2 = 0.22},
@@ -1798,23 +1778,23 @@ function ESPPreview.Create(library, screenGui)
 
     preview._skeletonLines = skeletonLines
 
-    -- Chams (glow on character parts)
-    local chamsActive = false
-    preview._chamsActive = false
-
-    -- Position panel relative to main UI
+    -- Position panel to the RIGHT of main UI
     local function updatePosition()
-        if Library.Holder and Library.Holder.Visible then
+        if Library.Holder then
             local mainPos = Library.Holder.AbsolutePosition
-            local mainSize = Library.Holder.AbsoluteSize
-            Panel.Position = UDim2.new(0, mainPos.X - Panel.Size.X.Offset - 5, 0, mainPos.Y)
+            local mainSize2 = Library.Holder.AbsoluteSize
+
+            -- Match height to main UI
+            Panel.Size = UDim2.new(0, panelWidth, 0, mainSize2.Y)
+
+            -- Position to the RIGHT
+            Panel.Position = UDim2.new(0, mainPos.X + mainSize2.X + 5, 0, mainPos.Y)
             Panel.Visible = Library.Open
         else
             Panel.Visible = false
         end
     end
 
-    -- Update methods
     function preview:SetBoxESP(enabled, color)
         self._boxESP.Visible = enabled
         if color then self._boxStroke.Color = color end
@@ -1831,9 +1811,7 @@ function ESPPreview.Create(library, screenGui)
         if percent then
             self._healthBarFill.Size = UDim2.new(1, 0, math.clamp(percent, 0, 1), 0)
             if not color then
-                local r = 1 - percent
-                local g = percent
-                self._healthBarFill.BackgroundColor3 = Color3.new(r, g, 0)
+                self._healthBarFill.BackgroundColor3 = Color3.new(1 - percent, percent, 0)
             end
         end
         if color then self._healthBarFill.BackgroundColor3 = color end
@@ -1865,21 +1843,9 @@ function ESPPreview.Create(library, screenGui)
         end
     end
 
-    function preview:SetFillColor(color)
-        for _, part in ipairs(self._charParts) do
-            part.BackgroundColor3 = color
-        end
-    end
+    function preview:Show() Panel.Visible = true end
+    function preview:Hide() Panel.Visible = false end
 
-    function preview:Show()
-        Panel.Visible = true
-    end
-
-    function preview:Hide()
-        Panel.Visible = false
-    end
-
-    -- Auto position update
     Library:Connection(game:GetService("RunService").Heartbeat, function()
         updatePosition()
     end)
@@ -1909,7 +1875,7 @@ function library:window(opts)
         return win:Page({Name = opts2.name or opts2.Name or "tab"})
     end
 
-    -- Create ESP Preview attached to the left
+    
     local sg = Library.Holder.Parent
     wrapper.esp_preview = ESPPreview.Create(library, sg)
 
