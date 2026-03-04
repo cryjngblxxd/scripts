@@ -2046,38 +2046,47 @@ function ESPPreview.Create(library, screenGui)
 
             preview._charW = charW
             preview._charH = charH
-        else
+         else
             -- ============================================
-            -- ANIME GIRL MODE - FILL THE PREVIEW AREA
-            -- The image container takes up the FULL preview area
-            -- We calculate where the 9:16 image actually renders
-            -- inside it so ESP elements align to the visible image
+            -- ANIME GIRL MODE - MAXIMIZED IMAGE
             -- ============================================
             
             local fullW = areaSize.X
             local fullH = areaSize.Y
             
-            -- Container fills the ENTIRE preview area - no margins stealing space
+            -- Calculate the largest 9:16 image that fits in the preview area
+            local imageAspect = IMAGE_WIDTH / IMAGE_HEIGHT -- 9/16 = 0.5625
+            local containerAspect = fullW / fullH
+            
+            local renderedW, renderedH
+            
+            if containerAspect > imageAspect then
+                -- Container is wider than 9:16, height is the limit
+                renderedH = fullH
+                renderedW = renderedH * imageAspect
+            else
+                -- Container is taller than 9:16, width is the limit
+                renderedW = fullW
+                renderedH = renderedW / imageAspect
+            end
+            
+            preview._renderedImageW = renderedW
+            preview._renderedImageH = renderedH
+            
+            -- Container fills full area
             ImageContainer.Size = UDim2.new(1, 0, 1, 0)
             ImageContainer.Position = UDim2.new(0.5, 0, 0.5, 0)
             ImageContainer.AnchorPoint = Vector2.new(0.5, 0.5)
             
-            -- Image fills the entire container, ScaleType.Fit preserves ratio
-            PreviewImage.Size = UDim2.new(1, 0, 1, 0)
+            -- IMAGE IS SIZED TO EXACT CALCULATED PIXELS
+            -- This is the key - not UDim2.new(1, 0, 1, 0)
+            -- ScaleType.Stretch works because dimensions are already correct ratio
+            PreviewImage.Size = UDim2.new(0, renderedW, 0, renderedH)
             PreviewImage.Position = UDim2.new(0.5, 0, 0.5, 0)
             PreviewImage.AnchorPoint = Vector2.new(0.5, 0.5)
-            PreviewImage.ScaleType = Enum.ScaleType.Fit
+            PreviewImage.ScaleType = Enum.ScaleType.Stretch
             
-            -- Calculate where the 9:16 image ACTUALLY renders inside the container
-            -- This is what ScaleType.Fit does internally
-            local renderedW, renderedH, offsetX, offsetY = calculateRenderedImageBounds(fullW, fullH)
-            
-            preview._renderedImageW = renderedW
-            preview._renderedImageH = renderedH
-            preview._renderedImageOffsetX = offsetX
-            preview._renderedImageOffsetY = offsetY
-            
-            -- ESP elements position based on the RENDERED image size, not container
+            -- ESP wraps around this exact size
             preview._charW = renderedW
             preview._charH = renderedH
         end
