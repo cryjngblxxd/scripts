@@ -1578,9 +1578,24 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 
 local SNAP_ZONES = {"Top", "Bottom", "Left", "Right"}
+local PREVIEW_MODES = {"Character", "Avenir Anime Girl"}
+local ANIME_GIRL_IMAGE = "rbxassetid://138507241500989"
 
 function ESPPreview.Create(library, screenGui)
-    local preview = { Enabled = true, _connections = {}, _elementPositions = {} }
+    local preview = { 
+        Enabled = true, 
+        _connections = {}, 
+        _elementPositions = {},
+        _currentMode = "Character", -- Default mode
+        _previewHealth = 100,
+        _previewMaxHealth = 100,
+        _previewArmor = 100,
+        _previewMaxArmor = 100,
+        _previewDistance = 120,
+        _previewTool = "AK-47",
+        _previewName = Players.LocalPlayer.DisplayName,
+        _liveMode = false, -- When false, uses preview values instead of live tracking
+    }
     local panelWidth = 350
 
     local Panel = Instance.new('Frame', screenGui)
@@ -1623,7 +1638,7 @@ function ESPPreview.Create(library, screenGui)
     TitleBar.BackgroundTransparency = 1
 
     local TitleText = Instance.new('TextLabel', TitleBar)
-    TitleText.Size = UDim2.new(1, -8, 1, 0)
+    TitleText.Size = UDim2.new(0, 80, 1, 0)
     TitleText.Position = UDim2.new(0, 4, 0, 0)
     TitleText.BackgroundTransparency = 1
     TitleText.Text = "ESP Preview"
@@ -1632,6 +1647,48 @@ function ESPPreview.Create(library, screenGui)
     TitleText.TextSize = Library.FontSize
     TitleText.TextXAlignment = Enum.TextXAlignment.Left
     table.insert(Library.ThemeObjects, TitleText)
+
+    -- Mode Selector Dropdown
+    local ModeButton = Instance.new('TextButton', TitleBar)
+    ModeButton.Size = UDim2.new(0, 120, 0, 18)
+    ModeButton.Position = UDim2.new(1, -125, 0, 2)
+    ModeButton.BackgroundColor3 = Color3.new(0.0784, 0.0784, 0.0784)
+    ModeButton.BorderColor3 = Color3.new(0, 0, 0)
+    ModeButton.Text = "Character"
+    ModeButton.TextColor3 = Color3.new(0.7, 0.7, 0.7)
+    ModeButton.FontFace = Library.UIFont
+    ModeButton.TextSize = 11
+    ModeButton.AutoButtonColor = false
+    preview._modeButton = ModeButton
+
+    local ModeDropdown = Instance.new('Frame', ModeButton)
+    ModeDropdown.Position = UDim2.new(0, 0, 1, 2)
+    ModeDropdown.Size = UDim2.new(1, 0, 0, #PREVIEW_MODES * 18)
+    ModeDropdown.BackgroundColor3 = Color3.new(0.0784, 0.0784, 0.0784)
+    ModeDropdown.BorderColor3 = Color3.new(0, 0, 0)
+    ModeDropdown.Visible = false
+    ModeDropdown.ZIndex = 200
+
+    local ModeList = Instance.new('UIListLayout', ModeDropdown)
+    ModeList.SortOrder = Enum.SortOrder.LayoutOrder
+
+    local modeDropdownOpen = false
+
+    ModeButton.MouseButton1Click:Connect(function()
+        modeDropdownOpen = not modeDropdownOpen
+        ModeDropdown.Visible = modeDropdownOpen
+    end)
+
+    Library:Connection(UserInputService.InputBegan, function(input)
+        if modeDropdownOpen and input.UserInputType == Enum.UserInputType.MouseButton1 then
+            task.defer(function()
+                if not Library:IsMouseOverFrame(ModeDropdown) and not Library:IsMouseOverFrame(ModeButton) then
+                    modeDropdownOpen = false
+                    ModeDropdown.Visible = false
+                end
+            end)
+        end
+    end)
 
     local PreviewArea = Instance.new('Frame', Inner)
     PreviewArea.Position = UDim2.new(0, 8, 0, 8)
@@ -1646,13 +1703,14 @@ function ESPPreview.Create(library, screenGui)
     preview._charW = 0
     preview._charH = 0
 
-    -- Character container
+    -- CHARACTER MODEL CONTAINER
     local CharBox = Instance.new('Frame', PreviewArea)
     CharBox.Name = "CharBox"
     CharBox.AnchorPoint = Vector2.new(0.5, 0.5)
     CharBox.Position = UDim2.new(0.5, 0, 0.5, 0)
     CharBox.BackgroundTransparency = 1
     CharBox.BorderSizePixel = 0
+    CharBox.Visible = true
     preview._charBox = CharBox
 
     -- Character parts
@@ -1689,78 +1747,161 @@ function ESPPreview.Create(library, screenGui)
 
     preview._charParts = {Head, Torso, LArm, RArm, LLeg, RLeg}
 
-    -- Recalculate character to fill 85% of panel
+    -- ANIME GIRL IMAGE CONTAINER
+    local ImageContainer = Instance.new('Frame', PreviewArea)
+    ImageContainer.Name = "ImageContainer"
+    ImageContainer.AnchorPoint = Vector2.new(0.5, 0.5)
+    ImageContainer.Position = UDim2.new(0.5, 0, 0.5, 0)
+    ImageContainer.BackgroundTransparency = 1
+    ImageContainer.BorderSizePixel = 0
+    ImageContainer.Visible = false
+    preview._imageContainer = ImageContainer
+
+    local PreviewImage = Instance.new('ImageLabel', ImageContainer)
+    PreviewImage.Name = "PreviewImage"
+    PreviewImage.AnchorPoint = Vector2.new(0.5, 0.5)
+    PreviewImage.Position = UDim2.new(0.5, 0, 0.5, 0)
+    PreviewImage.BackgroundTransparency = 1
+    PreviewImage.Image = ANIME_GIRL_IMAGE
+    PreviewImage.ScaleType = Enum.ScaleType.Fit
+    preview._previewImage = PreviewImage
+
+    -- Function to switch modes
+    local function switchMode(newMode)
+        preview._currentMode = newMode
+        ModeButton.Text = newMode
+        modeDropdownOpen = false
+        ModeDropdown.Visible = false
+
+        if newMode == "Character" then
+            CharBox.Visible = true
+            ImageContainer.Visible = false
+            preview._liveMode = true
+        else
+            CharBox.Visible = false
+            ImageContainer.Visible = true
+            preview._liveMode = false
+        end
+
+        -- Recalculate sizes
+        recalculateCharacter()
+        updateAllPositions()
+        updatePreviewValues()
+    end
+
+    -- Create mode options
+    for i, mode in ipairs(PREVIEW_MODES) do
+        local ModeOption = Instance.new('TextButton', ModeDropdown)
+        ModeOption.Size = UDim2.new(1, 0, 0, 18)
+        ModeOption.BackgroundTransparency = 1
+        ModeOption.Text = mode
+        ModeOption.TextColor3 = Color3.new(0.6, 0.6, 0.6)
+        ModeOption.FontFace = Library.UIFont
+        ModeOption.TextSize = 11
+        ModeOption.ZIndex = 201
+        ModeOption.LayoutOrder = i
+
+        ModeOption.MouseButton1Click:Connect(function()
+            switchMode(mode)
+        end)
+
+        ModeOption.MouseEnter:Connect(function()
+            ModeOption.TextColor3 = Color3.fromRGB(255, 255, 255)
+        end)
+
+        ModeOption.MouseLeave:Connect(function()
+            ModeOption.TextColor3 = Color3.new(0.6, 0.6, 0.6)
+        end)
+    end
+
+    -- Recalculate character/image to fill 85% of panel
     local function recalculateCharacter()
         local areaSize = PreviewArea.AbsoluteSize
         if areaSize.X < 50 or areaSize.Y < 50 then return end
 
-        -- 85% of the panel, but leave space for ESP elements
         local targetFill = 0.85
-        local espSpace = 50 -- Space for ESP text above/below
+        local espSpace = 40
         
         local availableHeight = (areaSize.Y - espSpace * 2) * targetFill
-        local availableWidth = areaSize.X * 0.6 -- Leave space for side bars
+        local availableWidth = areaSize.X * 0.6
 
-        -- R6 proportions: Total 5 studs tall, 4 studs wide
-        local totalHeightStuds = 5
-        local totalWidthStuds = 4
-        local gap = 2
+        if preview._currentMode == "Character" then
+            -- R6 proportions
+            local totalHeightStuds = 5
+            local totalWidthStuds = 4
+            local gap = 2
 
-        local scaleY = availableHeight / (totalHeightStuds * 20 + gap * 2)
-        local scaleX = availableWidth / (totalWidthStuds * 20 + gap * 2)
-        local scale = math.min(scaleY, scaleX)
+            local scaleY = availableHeight / (totalHeightStuds * 20 + gap * 2)
+            local scaleX = availableWidth / (totalWidthStuds * 20 + gap * 2)
+            local scale = math.min(scaleY, scaleX)
+            scale = math.clamp(scale, 1, 10)
 
-        -- Minimum and maximum scale
-        scale = math.clamp(scale, 1, 10)
+            local headW = 20 * scale
+            local headH = 20 * scale
+            local torsoW = 40 * scale
+            local torsoH = 40 * scale
+            local armW = 20 * scale
+            local armH = 40 * scale
+            local legW = 20 * scale
+            local legH = 40 * scale
 
-        local headW = 20 * scale
-        local headH = 20 * scale
-        local torsoW = 40 * scale
-        local torsoH = 40 * scale
-        local armW = 20 * scale
-        local armH = 40 * scale
-        local legW = 20 * scale
-        local legH = 40 * scale
+            local charW = torsoW + (armW + gap) * 2
+            local charH = headH + gap + torsoH + gap + legH
 
-        local charW = torsoW + (armW + gap) * 2
-        local charH = headH + gap + torsoH + gap + legH
+            CharBox.Size = UDim2.new(0, charW, 0, charH)
 
-        CharBox.Size = UDim2.new(0, charW, 0, charH)
+            Head.Size = UDim2.new(0, headW, 0, headH)
+            Head.Position = UDim2.new(0.5, -headW/2, 0, 0)
 
-        Head.Size = UDim2.new(0, headW, 0, headH)
-        Head.Position = UDim2.new(0.5, -headW/2, 0, 0)
+            Torso.Size = UDim2.new(0, torsoW, 0, torsoH)
+            Torso.Position = UDim2.new(0.5, -torsoW/2, 0, headH + gap)
 
-        Torso.Size = UDim2.new(0, torsoW, 0, torsoH)
-        Torso.Position = UDim2.new(0.5, -torsoW/2, 0, headH + gap)
+            LArm.Size = UDim2.new(0, armW, 0, armH)
+            LArm.Position = UDim2.new(0.5, -torsoW/2 - gap - armW, 0, headH + gap)
 
-        LArm.Size = UDim2.new(0, armW, 0, armH)
-        LArm.Position = UDim2.new(0.5, -torsoW/2 - gap - armW, 0, headH + gap)
+            RArm.Size = UDim2.new(0, armW, 0, armH)
+            RArm.Position = UDim2.new(0.5, torsoW/2 + gap, 0, headH + gap)
 
-        RArm.Size = UDim2.new(0, armW, 0, armH)
-        RArm.Position = UDim2.new(0.5, torsoW/2 + gap, 0, headH + gap)
+            LLeg.Size = UDim2.new(0, legW, 0, legH)
+            LLeg.Position = UDim2.new(0.5, -torsoW/2, 0, headH + gap + torsoH + gap)
 
-        LLeg.Size = UDim2.new(0, legW, 0, legH)
-        LLeg.Position = UDim2.new(0.5, -torsoW/2, 0, headH + gap + torsoH + gap)
+            RLeg.Size = UDim2.new(0, legW, 0, legH)
+            RLeg.Position = UDim2.new(0.5, torsoW/2 - legW, 0, headH + gap + torsoH + gap)
 
-        RLeg.Size = UDim2.new(0, legW, 0, legH)
-        RLeg.Position = UDim2.new(0.5, torsoW/2 - legW, 0, headH + gap + torsoH + gap)
+            preview._charW = charW
+            preview._charH = charH
 
-        preview._charW = charW
-        preview._charH = charH
+        else
+            -- Anime Girl Image mode
+            local imgHeight = availableHeight
+            local imgWidth = imgHeight * 0.6 -- Aspect ratio for character image
+            
+            if imgWidth > availableWidth then
+                imgWidth = availableWidth
+                imgHeight = imgWidth / 0.6
+            end
 
+            ImageContainer.Size = UDim2.new(0, imgWidth, 0, imgHeight)
+            PreviewImage.Size = UDim2.new(1, 0, 1, 0)
+
+            preview._charW = imgWidth
+            preview._charH = imgHeight
+        end
+
+        -- Update ESP elements
         if preview._boxESP then
-            preview._boxESP.Size = UDim2.new(0, charW + boxPad * 2, 0, charH + boxPad * 2)
+            preview._boxESP.Size = UDim2.new(0, preview._charW + boxPad * 2, 0, preview._charH + boxPad * 2)
         end
 
         if preview._healthBarBG then
-            preview._healthBarBG.Size = UDim2.new(0, 4, 0, charH + boxPad * 2)
+            preview._healthBarBG.Size = UDim2.new(0, 4, 0, preview._charH + boxPad * 2)
         end
 
         if preview._armorBarBG then
-            preview._armorBarBG.Size = UDim2.new(0, 4, 0, charH + boxPad * 2)
+            preview._armorBarBG.Size = UDim2.new(0, 4, 0, preview._charH + boxPad * 2)
         end
 
-        return charW, charH
+        return preview._charW, preview._charH
     end
 
     -- Box ESP
@@ -1779,7 +1920,7 @@ function ESPPreview.Create(library, screenGui)
     preview._boxESP = BoxESP
     preview._boxStroke = BoxStroke
 
-    -- Get snap zone based on element position
+    -- Snap zone detection
     local function getSnapZone(element)
         local areaPos = PreviewArea.AbsolutePosition
         local areaSize = PreviewArea.AbsoluteSize
@@ -1791,29 +1932,16 @@ function ESPPreview.Create(library, screenGui)
         local areaCenterX = areaPos.X + areaSize.X / 2
         local areaCenterY = areaPos.Y + areaSize.Y / 2
 
-        -- Check which quadrant the element is in
         local relX = elemCenterX - areaCenterX
         local relY = elemCenterY - areaCenterY
 
-        -- Determine zone based on position relative to center
         if math.abs(relY) > math.abs(relX) then
-            -- More vertical than horizontal
-            if relY < 0 then
-                return "Top"
-            else
-                return "Bottom"
-            end
+            return relY < 0 and "Top" or "Bottom"
         else
-            -- More horizontal than vertical
-            if relX < 0 then
-                return "Left"
-            else
-                return "Right"
-            end
+            return relX < 0 and "Left" or "Right"
         end
     end
 
-    -- Get stacking order for elements in same zone
     local function getElementsInZone(zone)
         local elements = {}
         local order = {"Name", "Distance", "Armor", "Tool"}
@@ -1825,7 +1953,47 @@ function ESPPreview.Create(library, screenGui)
         return elements
     end
 
-    -- Update all element positions with proper stacking
+    -- Update preview values (non-live mode)
+    local function updatePreviewValues()
+        if preview._liveMode then return end
+
+        -- Health
+        if preview._healthBarBG and preview._healthBarBG.Visible then
+            local pct = math.clamp(preview._previewHealth / preview._previewMaxHealth, 0, 1)
+            preview._healthBarFill.Size = UDim2.new(1, 0, pct, 0)
+            preview._healthBarFill.BackgroundColor3 = Color3.new(1 - pct, pct, 0)
+            preview._healthText.Text = tostring(math.floor(preview._previewHealth))
+        end
+
+        -- Armor
+        if preview._armorBarBG and (preview._armorBarBG.Visible or preview._armorESP.Visible) then
+            local pct = math.clamp(preview._previewArmor / preview._previewMaxArmor, 0, 1)
+            local color = getArmorColor(preview._previewArmor)
+            preview._armorBarFill.Size = UDim2.new(1, 0, pct, 0)
+            preview._armorBarFill.BackgroundColor3 = color
+            preview._armorText.Text = tostring(math.floor(preview._previewArmor))
+            preview._armorText.TextColor3 = color
+            preview._armorESP.Text = "Armor: " .. tostring(math.floor(preview._previewArmor))
+            preview._armorESP.TextColor3 = color
+        end
+
+        -- Distance
+        if preview._distESP and preview._distESP.Visible then
+            preview._distESP.Text = "[" .. tostring(preview._previewDistance) .. "m]"
+        end
+
+        -- Tool
+        if preview._toolESP and preview._toolESP.Visible then
+            preview._toolESP.Text = "[" .. preview._previewTool .. "]"
+        end
+
+        -- Name
+        if preview._nameESP and preview._nameESP.Visible then
+            preview._nameESP.Text = preview._previewName
+        end
+    end
+
+    -- Update all positions
     local function updateAllPositions()
         local charH = preview._charH
         local charW = preview._charW
@@ -1835,7 +2003,6 @@ function ESPPreview.Create(library, screenGui)
 
         local spacing = 14
 
-        -- Process each zone and stack elements
         for _, zone in ipairs(SNAP_ZONES) do
             local elementsInZone = getElementsInZone(zone)
             
@@ -1870,7 +2037,7 @@ function ESPPreview.Create(library, screenGui)
             end
         end
 
-        -- Health bar positioning
+        -- Health bar
         if preview._healthBarBG and preview._elementPositions["Health"] then
             local zone = preview._elementPositions["Health"]
             local x = 0.5
@@ -1888,7 +2055,7 @@ function ESPPreview.Create(library, screenGui)
             preview._healthBarBG.AnchorPoint = Vector2.new(anchorX, 0.5)
         end
 
-        -- Armor bar positioning
+        -- Armor bar
         if preview._armorBarBG and preview._elementPositions["ArmorBar"] then
             local zone = preview._elementPositions["ArmorBar"]
             local x = 0.5
@@ -1923,7 +2090,6 @@ function ESPPreview.Create(library, screenGui)
         element.InputEnded:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 if dragging then
-                    -- Snap to zone on release
                     local zone = getSnapZone(element)
                     preview._elementPositions[elementName] = zone
                     
@@ -1933,7 +2099,6 @@ function ESPPreview.Create(library, screenGui)
                         end
                     end)
                     
-                    -- Immediately snap to position
                     updateAllPositions()
                 end
                 dragging = false
@@ -1956,7 +2121,7 @@ function ESPPreview.Create(library, screenGui)
         end)
     end
 
-    -- Snap draggable for bar elements (Left/Right only)
+    -- Snap draggable for bar elements
     local function makeSnapDraggableBar(element, elementName)
         local dragging = false
         local dragOffsetX = 0
@@ -2058,7 +2223,7 @@ function ESPPreview.Create(library, screenGui)
     preview._elementPositions["Health"] = "Left"
     makeSnapDraggableBar(HealthBarBG, "Health")
 
-    -- Distance ESP (FIXED)
+    -- Distance ESP
     local DistESP = Instance.new('TextButton', PreviewArea)
     DistESP.Name = "DistESP"
     DistESP.AnchorPoint = Vector2.new(0.5, 0)
@@ -2073,7 +2238,7 @@ function ESPPreview.Create(library, screenGui)
     DistESP.AutoButtonColor = false
     DistESP.AutomaticSize = Enum.AutomaticSize.X
     preview._distESP = DistESP
-    preview._distanceESP = DistESP -- Alias for compatibility
+    preview._distanceESP = DistESP
     preview._elementPositions["Distance"] = "Bottom"
     makeSnapDraggable(DistESP, "Distance")
 
@@ -2196,17 +2361,21 @@ function ESPPreview.Create(library, screenGui)
         end
     end
 
+    -- Make getArmorColor accessible
+    _G.getArmorColor = getArmorColor
+
     preview._currentArmor = 100
     preview._maxArmor = 100
 
-    -- Health tracking
+    -- Live tracking functions (only for Character mode)
     local function getHumanoid()
         local char = Players.LocalPlayer.Character
         if char then return char:FindFirstChildOfClass("Humanoid") end
         return nil
     end
 
-    local function updateHealth()
+    local function updateHealthLive()
+        if not preview._liveMode then return end
         local hum = getHumanoid()
         if hum and HealthBarBG.Visible then
             local pct = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
@@ -2217,8 +2386,7 @@ function ESPPreview.Create(library, screenGui)
         end
     end
 
-    -- Armor tracking
-    local function getArmorValue()
+    local function getArmorValueLive()
         local char = Players.LocalPlayer.Character
         if not char then return preview._currentArmor end
 
@@ -2244,10 +2412,11 @@ function ESPPreview.Create(library, screenGui)
         return preview._currentArmor
     end
 
-    local function updateArmor()
+    local function updateArmorLive()
+        if not preview._liveMode then return end
         if not ArmorBarBG.Visible and not ArmorESP.Visible then return end
 
-        local armorValue = getArmorValue()
+        local armorValue = getArmorValueLive()
         preview._currentArmor = armorValue
 
         local pct = math.clamp(armorValue / preview._maxArmor, 0, 1)
@@ -2267,8 +2436,8 @@ function ESPPreview.Create(library, screenGui)
         if healthCon then healthCon:Disconnect() end
         local hum = getHumanoid()
         if hum then
-            healthCon = hum:GetPropertyChangedSignal("Health"):Connect(updateHealth)
-            updateHealth()
+            healthCon = hum:GetPropertyChangedSignal("Health"):Connect(updateHealthLive)
+            updateHealthLive()
         end
     end
 
@@ -2279,8 +2448,8 @@ function ESPPreview.Create(library, screenGui)
     end)
     task.defer(connectHealth)
 
-    -- Tool tracking
-    local function updateTool()
+    local function updateToolLive()
+        if not preview._liveMode then return end
         if not ToolESP.Visible then return end
         local char = Players.LocalPlayer.Character
         if char then
@@ -2295,12 +2464,12 @@ function ESPPreview.Create(library, screenGui)
         local char = Players.LocalPlayer.Character
         if char then
             toolCon = char.ChildAdded:Connect(function(child)
-                if child:IsA("Tool") then updateTool() end
+                if child:IsA("Tool") then updateToolLive() end
             end)
             char.ChildRemoved:Connect(function(child)
-                if child:IsA("Tool") then updateTool() end
+                if child:IsA("Tool") then updateToolLive() end
             end)
-            updateTool()
+            updateToolLive()
         end
     end
 
@@ -2333,9 +2502,12 @@ function ESPPreview.Create(library, screenGui)
 
     Library:Connection(RunService.Heartbeat, function()
         updatePosition()
-        if HealthBarBG.Visible then updateHealth() end
-        if ToolESP.Visible then updateTool() end
-        if ArmorBarBG.Visible or ArmorESP.Visible then updateArmor() end
+        
+        if preview._liveMode then
+            if HealthBarBG.Visible then updateHealthLive() end
+            if ToolESP.Visible then updateToolLive() end
+            if ArmorBarBG.Visible or ArmorESP.Visible then updateArmorLive() end
+        end
     end)
 
     local function syncFromFlags()
@@ -2362,7 +2534,14 @@ function ESPPreview.Create(library, screenGui)
     function preview:SetNameESP(enabled, color, text)
         self._nameESP.Visible = enabled
         if color then self._nameESP.TextColor3 = color end
-        self._nameESP.Text = text or Players.LocalPlayer.DisplayName
+        if text then 
+            self._previewName = text
+            self._nameESP.Text = text 
+        elseif self._liveMode then
+            self._nameESP.Text = Players.LocalPlayer.DisplayName
+        else
+            self._nameESP.Text = self._previewName
+        end
         if enabled then updateAllPositions() end
     end
 
@@ -2370,42 +2549,73 @@ function ESPPreview.Create(library, screenGui)
         self._healthBarBG.Visible = enabled
         self._healthText.Visible = enabled
         if enabled then
-            updateHealth()
+            if self._liveMode then
+                updateHealthLive()
+            else
+                updatePreviewValues()
+            end
             updateAllPositions()
         end
     end
 
     function preview:SetDistanceESP(enabled, text, color)
         self._distESP.Visible = enabled
-        if text then self._distESP.Text = text end
+        if text then 
+            -- Extract number from text like "[120m]"
+            local num = tonumber(text:match("%d+"))
+            if num then self._previewDistance = num end
+            self._distESP.Text = text 
+        elseif not self._liveMode then
+            self._distESP.Text = "[" .. tostring(self._previewDistance) .. "m]"
+        end
         if color then self._distESP.TextColor3 = color end
         if enabled then updateAllPositions() end
     end
 
-    function preview:SetToolESP(enabled, color)
+    function preview:SetToolESP(enabled, color, tool)
         self._toolESP.Visible = enabled
         if color then self._toolESP.TextColor3 = color end
-        if enabled then
-            updateTool()
-            updateAllPositions()
+        if tool then 
+            self._previewTool = tool
+            self._toolESP.Text = "[" .. tool .. "]"
+        elseif self._liveMode then
+            updateToolLive()
+        else
+            self._toolESP.Text = "[" .. self._previewTool .. "]"
         end
+        if enabled then updateAllPositions() end
     end
 
     function preview:SetArmorESP(enabled, armorValue, maxArmor)
         self._armorESP.Visible = enabled
         self._armorBarBG.Visible = enabled
         self._armorText.Visible = enabled
-        if maxArmor then self._maxArmor = maxArmor end
-        if armorValue ~= nil then self._currentArmor = armorValue end
+        if maxArmor then 
+            self._maxArmor = maxArmor 
+            self._previewMaxArmor = maxArmor
+        end
+        if armorValue ~= nil then 
+            self._currentArmor = armorValue 
+            self._previewArmor = armorValue
+        end
         if enabled then
-            updateArmor()
+            if self._liveMode then
+                updateArmorLive()
+            else
+                updatePreviewValues()
+            end
             updateAllPositions()
         end
     end
 
     function preview:SetArmorValue(value)
         self._currentArmor = value
-        updateArmor()
+        self._previewArmor = value
+        if self._liveMode then
+            updateArmorLive()
+        else
+            updatePreviewValues()
+        end
     end
 
     function preview:SetSkeleton(enabled, color)
@@ -2436,13 +2646,61 @@ function ESPPreview.Create(library, screenGui)
         return self._elementPositions[elementName]
     end
 
+    function preview:SetMode(mode)
+        if mode == "Character" or mode == "Avenir Anime Girl" then
+            switchMode(mode)
+        end
+    end
+
+    function preview:GetMode()
+        return self._currentMode
+    end
+
+    function preview:SetPreviewHealth(health, maxHealth)
+        self._previewHealth = health
+        if maxHealth then self._previewMaxHealth = maxHealth end
+        if not self._liveMode then updatePreviewValues() end
+    end
+
+    function preview:SetPreviewArmor(armor, maxArmor)
+        self._previewArmor = armor
+        if maxArmor then self._previewMaxArmor = maxArmor end
+        if not self._liveMode then updatePreviewValues() end
+    end
+
+    function preview:SetPreviewDistance(distance)
+        self._previewDistance = distance
+        if not self._liveMode then updatePreviewValues() end
+    end
+
+    function preview:SetPreviewTool(tool)
+        self._previewTool = tool
+        if not self._liveMode then updatePreviewValues() end
+    end
+
+    function preview:SetPreviewName(name)
+        self._previewName = name
+        if not self._liveMode then 
+            self._nameESP.Text = name 
+        end
+    end
+
+    function preview:SetLiveMode(enabled)
+        self._liveMode = enabled
+        if not enabled then
+            updatePreviewValues()
+        end
+    end
+
     function preview:Show() Panel.Visible = true end
     function preview:Hide() Panel.Visible = false end
 
+    -- Initialize
     task.defer(function()
         task.wait(0.15)
         recalculateCharacter()
         updateAllPositions()
+        updatePreviewValues()
     end)
 
     return preview
@@ -2450,9 +2708,8 @@ end
 
 
 
+
 -- ESP PREVIEW DONE 
-
-
 
 
 -- WRAPPER
