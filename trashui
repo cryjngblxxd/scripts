@@ -212,75 +212,78 @@ do
     end
 
     function Library:GetConfig()
-        local Config = {}
-        for flag, value in pairs(self.Flags) do
-            if flag == "cfg_selected" or flag == "cfg_name" then continue end
-            if typeof(value) == "Color3" then
-                Config[flag] = {_type = "Color3", hex = value:ToHex()}
-            elseif type(value) == "table" and value.mode ~= nil and value.active ~= nil then
-                local keyData = {_type = "Keybind", mode = value.mode, key = "NONE", keyType = "NONE"}
-                if value.key and typeof(value.key) == "EnumItem" and value.key ~= Enum.KeyCode.Unknown then
-                    local ks = tostring(value.key)
-                    if ks:find("Enum%.KeyCode%.") then
-                        keyData.keyType = "KeyCode"
-                        keyData.key = ks:gsub("Enum%.KeyCode%.", "")
-                    elseif ks:find("Enum%.UserInputType%.") then
-                        keyData.keyType = "UserInputType"
-                        keyData.key = ks:gsub("Enum%.UserInputType%.", "")
-                    end
+    local Config = {}
+    for flag, value in pairs(self.Flags) do
+        if flag == "cfg_selected" or flag == "cfg_name" then continue end
+        if typeof(value) == "Color3" then
+            Config[flag] = {_type = "Color3", hex = value:ToHex()}
+        elseif type(value) == "table" and value.mode ~= nil and value.active ~= nil then
+            local keyData = {_type = "Keybind", mode = value.mode, key = "NONE", keyType = "NONE"}
+            if value.key and typeof(value.key) == "EnumItem" and value.key ~= Enum.KeyCode.Unknown then
+                local ks = tostring(value.key)
+                if ks:find("Enum%.KeyCode%.") then
+                    keyData.keyType = "KeyCode"
+                    keyData.key = ks:gsub("Enum%.KeyCode%.", "")
+                elseif ks:find("Enum%.UserInputType%.") then
+                    keyData.keyType = "UserInputType"
+                    keyData.key = ks:gsub("Enum%.UserInputType%.", "")
                 end
-                Config[flag] = keyData
-            else
-                Config[flag] = value
             end
+            Config[flag] = keyData
+        else
+            Config[flag] = value
         end
-        return HttpService:JSONEncode(Config)
     end
+    return HttpService:JSONEncode(Config)
+end
 
-    function Library:LoadConfig(configJson)
-        local ok, config = pcall(HttpService.JSONDecode, HttpService, configJson)
-        if not ok then return end
-        for flag, value in pairs(config) do
-            if flag == "cfg_selected" or flag == "cfg_name" then continue end
-            if type(value) == "table" and value._type == "Keybind" then
-                local kb = nil
-                for _, k in ipairs(self._keybinds) do
-                    if k.Flag == flag then kb = k; break end
-                end
-                if not kb then
-                    local s = Flags[flag]
-                    if s and type(s) == "table" and s.Set then kb = s end
-                end
-                if kb then
-                    if kb.SetMode and value.mode then
-                        pcall(function() kb:SetMode(value.mode) end)
-                    end
-                    if value.key and value.key ~= "NONE" and value.keyType and value.keyType ~= "NONE" then
-                        local key = nil
-                        if value.keyType == "KeyCode" then
-                            local s, r = pcall(function() return Enum.KeyCode[value.key] end)
-                            if s and r and r ~= Enum.KeyCode.Unknown then key = r end
-                        elseif value.keyType == "UserInputType" then
-                            local s, r = pcall(function() return Enum.UserInputType[value.key] end)
-                            if s and r then key = r end
-                        end
-                        if key and kb.Set then
-                            pcall(function() kb:Set(key) end)
-                        end
-                    end
-                end
-            elseif type(value) == "table" and value._type == "Color3" then
+function Library:LoadConfig(configJson)
+    local ok, config = pcall(HttpService.JSONDecode, HttpService, configJson)
+    if not ok or type(config) ~= "table" then return end
+    for flag, value in pairs(config) do
+        if flag == "cfg_selected" or flag == "cfg_name" then continue end
+        if type(value) == "table" and value._type == "Keybind" then
+            local kb = nil
+            for _, k in ipairs(self._keybinds) do
+                if k.Flag == flag then kb = k; break end
+            end
+            if not kb then
                 local s = Flags[flag]
-                if s and type(s) == "function" then pcall(s, Color3.fromHex(value.hex)) end
-            else
-                local s = Flags[flag]
-                if s then
-                    if type(s) == "function" then pcall(s, value)
-                    elseif type(s) == "table" and s.Set then pcall(function() s:Set(value) end) end
+                if s and type(s) == "table" and s.Set then kb = s end
+            end
+            if kb then
+                if kb.SetMode and value.mode then pcall(function() kb:SetMode(value.mode) end) end
+                if value.key and value.key ~= "NONE" and value.keyType and value.keyType ~= "NONE" then
+                    local key = nil
+                    if value.keyType == "KeyCode" then
+                        local s, r = pcall(function() return Enum.KeyCode[value.key] end)
+                        if s and r and r ~= Enum.KeyCode.Unknown then key = r end
+                    elseif value.keyType == "UserInputType" then
+                        local s, r = pcall(function() return Enum.UserInputType[value.key] end)
+                        if s and r then key = r end
+                    end
+                    if key and kb.Set then pcall(function() kb:Set(key) end) end
                 end
+            end
+        elseif type(value) == "table" and value._type == "Color3" then
+            local s = Flags[flag]
+            if s and type(s) == "function" then pcall(s, Color3.fromHex(value.hex)) end
+        elseif type(value) == "table" then
+            -- Multi dropdown (array)
+            local s = Flags[flag]
+            if s then
+                if type(s) == "table" and s.Set then pcall(function() s:Set(value) end)
+                elseif type(s) == "function" then pcall(s, value) end
+            end
+        else
+            local s = Flags[flag]
+            if s then
+                if type(s) == "function" then pcall(s, value)
+                elseif type(s) == "table" and s.Set then pcall(function() s:Set(value) end) end
             end
         end
     end
+end
 
     function Library:SaveConfig(name)
         pcall(function()
@@ -1571,12 +1574,8 @@ end
 local ESPPreview = {}
 
 function ESPPreview.Create(library, screenGui)
-    local preview = {
-        Enabled = true,
-        _connections = {},
-    }
-
-    local panelWidth = 450
+    local preview = { Enabled = true, _connections = {} }
+    local panelWidth = 350
 
     local Panel = Instance.new('Frame', screenGui)
     Panel.Name = "ESPPreview"
@@ -1585,7 +1584,6 @@ function ESPPreview.Create(library, screenGui)
     Panel.BorderColor3 = Color3.new(0, 0, 0)
     Panel.Visible = true
     Instance.new('UICorner', Panel).CornerRadius = UDim.new(0, 2)
-
     preview._panel = Panel
 
     local Inline = Instance.new('Frame', Panel)
@@ -1614,7 +1612,6 @@ function ESPPreview.Create(library, screenGui)
     BotLine.BackgroundColor3 = Color3.new(0.1098, 0.1098, 0.1098)
     BotLine.BorderSizePixel = 0
 
-    -- Title
     local TitleBar = Instance.new('Frame', Inline)
     TitleBar.Size = UDim2.new(1, 0, 0, 22)
     TitleBar.BackgroundTransparency = 1
@@ -1630,171 +1627,185 @@ function ESPPreview.Create(library, screenGui)
     TitleText.TextXAlignment = Enum.TextXAlignment.Left
     table.insert(Library.ThemeObjects, TitleText)
 
-    -- Preview area
     local PreviewArea = Instance.new('Frame', Inner)
-    PreviewArea.Name = "PreviewArea"
     PreviewArea.Position = UDim2.new(0, 8, 0, 8)
     PreviewArea.Size = UDim2.new(1, -16, 1, -16)
     PreviewArea.BackgroundColor3 = Color3.new(0.02, 0.02, 0.02)
     PreviewArea.BorderColor3 = Color3.new(0.1098, 0.1098, 0.1098)
     PreviewArea.ClipsDescendants = true
-
     preview._previewArea = PreviewArea
 
-    -- R6 CHARACTER MODEL (properly proportioned)
-    -- R6 proportions: Head 2x2, Torso 2x3, Arms 1x3, Legs 1x3
-    -- Scale: 1 stud = ~30 pixels
-    local SCALE = 30
-    local totalHeight = 5 * SCALE -- 5 studs tall = 150px
-    local torsoWidth = 2 * SCALE  -- 60px
-    local limbWidth = 1 * SCALE   -- 30px
-    local headSize = 1.6 * SCALE  -- 48px (slightly smaller than 2 for visual)
-    local torsoHeight = 2 * SCALE -- 60px
-    local limbHeight = 2 * SCALE  -- 60px (arms and legs)
-    local headHeight = 1.2 * SCALE -- 36px
+    -- R6 Character
+    local SCALE = 45
+    local headW = 1.8 * SCALE
+    local headH = 1.0 * SCALE
+    local torsoW = 2.0 * SCALE
+    local torsoH = 2.0 * SCALE
+    local armW = 1.0 * SCALE
+    local armH = 2.0 * SCALE
+    local legW = 1.0 * SCALE
+    local legH = 2.0 * SCALE
+    local gap = 2
+
+    local charW = torsoW + armW * 2 + gap * 2
+    local charH = headH + torsoH + legH + gap * 2
 
     local CharBox = Instance.new('Frame', PreviewArea)
-    CharBox.Name = "CharBox"
     CharBox.AnchorPoint = Vector2.new(0.5, 0.5)
     CharBox.Position = UDim2.new(0.5, 0, 0.5, 0)
-    CharBox.Size = UDim2.new(0, torsoWidth + limbWidth * 2 + 4, 0, headHeight + torsoHeight + limbHeight + 4)
+    CharBox.Size = UDim2.new(0, charW, 0, charH)
     CharBox.BackgroundTransparency = 1
     CharBox.BorderSizePixel = 0
+    preview._charBox = CharBox
 
-    local charW = torsoWidth + limbWidth * 2 + 4
-    local charH = headHeight + torsoHeight + limbHeight + 4
-
-    -- Head
     local Head = Instance.new('Frame', CharBox)
-    Head.Name = "Head"
-    Head.Size = UDim2.new(0, headSize, 0, headHeight)
-    Head.Position = UDim2.new(0.5, -headSize / 2, 0, 0)
+    Head.Size = UDim2.new(0, headW, 0, headH)
+    Head.Position = UDim2.new(0.5, -headW / 2, 0, 0)
     Head.BackgroundColor3 = Color3.new(0.35, 0.35, 0.35)
     Head.BorderSizePixel = 0
-    Instance.new('UICorner', Head).CornerRadius = UDim.new(0, 4)
+    Instance.new('UICorner', Head).CornerRadius = UDim.new(0, 3)
 
-    -- Torso
     local Torso = Instance.new('Frame', CharBox)
-    Torso.Name = "Torso"
-    Torso.Size = UDim2.new(0, torsoWidth, 0, torsoHeight)
-    Torso.Position = UDim2.new(0.5, -torsoWidth / 2, 0, headHeight + 2)
+    Torso.Size = UDim2.new(0, torsoW, 0, torsoH)
+    Torso.Position = UDim2.new(0.5, -torsoW / 2, 0, headH + gap)
     Torso.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
     Torso.BorderSizePixel = 0
 
-    -- Left Arm
     local LArm = Instance.new('Frame', CharBox)
-    LArm.Name = "LArm"
-    LArm.Size = UDim2.new(0, limbWidth, 0, limbHeight)
-    LArm.Position = UDim2.new(0.5, -torsoWidth / 2 - limbWidth - 2, 0, headHeight + 2)
+    LArm.Size = UDim2.new(0, armW, 0, armH)
+    LArm.Position = UDim2.new(0.5, -torsoW / 2 - armW - gap, 0, headH + gap)
     LArm.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
     LArm.BorderSizePixel = 0
 
-    -- Right Arm
     local RArm = Instance.new('Frame', CharBox)
-    RArm.Name = "RArm"
-    RArm.Size = UDim2.new(0, limbWidth, 0, limbHeight)
-    RArm.Position = UDim2.new(0.5, torsoWidth / 2 + 2, 0, headHeight + 2)
+    RArm.Size = UDim2.new(0, armW, 0, armH)
+    RArm.Position = UDim2.new(0.5, torsoW / 2 + gap, 0, headH + gap)
     RArm.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
     RArm.BorderSizePixel = 0
 
-    -- Left Leg
     local LLeg = Instance.new('Frame', CharBox)
-    LLeg.Name = "LLeg"
-    LLeg.Size = UDim2.new(0, limbWidth, 0, limbHeight)
-    LLeg.Position = UDim2.new(0.5, -torsoWidth / 2, 0, headHeight + torsoHeight + 4)
+    LLeg.Size = UDim2.new(0, legW, 0, legH)
+    LLeg.Position = UDim2.new(0.5, -torsoW / 2, 0, headH + torsoH + gap * 2)
     LLeg.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
     LLeg.BorderSizePixel = 0
 
-    -- Right Leg
     local RLeg = Instance.new('Frame', CharBox)
-    RLeg.Name = "RLeg"
-    RLeg.Size = UDim2.new(0, limbWidth, 0, limbHeight)
-    RLeg.Position = UDim2.new(0.5, torsoWidth / 2 - limbWidth, 0, headHeight + torsoHeight + 4)
+    RLeg.Size = UDim2.new(0, legW, 0, legH)
+    RLeg.Position = UDim2.new(0.5, torsoW / 2 - legW, 0, headH + torsoH + gap * 2)
     RLeg.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
     RLeg.BorderSizePixel = 0
 
     preview._charParts = {Head, Torso, LArm, RArm, LLeg, RLeg}
-    preview._charBox = CharBox
 
-    -- Box ESP (surrounds the character)
-    local boxPadding = 6
+    -- DRAGGABLE ELEMENT HELPER
+    local function makeDraggable(element)
+        local dragging = false
+        local dragOffset = Vector2.new(0, 0)
+
+        element.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                local ePos = element.AbsolutePosition
+                dragOffset = Vector2.new(input.Position.X - ePos.X, input.Position.Y - ePos.Y)
+            end
+        end)
+
+        element.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = false
+            end
+        end)
+
+        Library:Connection(game:GetService("UserInputService").InputChanged, function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                local areaPos = PreviewArea.AbsolutePosition
+                local areaSize = PreviewArea.AbsoluteSize
+                local newX = input.Position.X - dragOffset.X - areaPos.X
+                local newY = input.Position.Y - dragOffset.Y - areaPos.Y
+
+                local clampX = math.clamp(newX, 0, areaSize.X - element.AbsoluteSize.X)
+                local clampY = math.clamp(newY, 0, areaSize.Y - element.AbsoluteSize.Y)
+
+                element.Position = UDim2.new(0, clampX, 0, clampY)
+                element.AnchorPoint = Vector2.new(0, 0)
+            end
+        end)
+    end
+
+    -- Same helper but for bar elements (vertical drag along side)
+    local function makeDraggableBar(element)
+        local dragging = false
+        local dragOffsetY = 0
+
+        element.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                dragOffsetY = input.Position.Y - element.AbsolutePosition.Y
+            end
+        end)
+
+        element.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = false
+            end
+        end)
+
+        Library:Connection(game:GetService("UserInputService").InputChanged, function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                local areaPos = PreviewArea.AbsolutePosition
+                local areaSize = PreviewArea.AbsoluteSize
+                local newX = element.AbsolutePosition.X - areaPos.X
+                local newY = input.Position.Y - dragOffsetY - areaPos.Y
+
+                local clampY = math.clamp(newY, 0, areaSize.Y - element.AbsoluteSize.Y)
+                local clampX = math.clamp(newX, 0, areaSize.X - element.AbsoluteSize.X)
+
+                element.Position = UDim2.new(0, clampX, 0, clampY)
+                element.AnchorPoint = Vector2.new(0, 0)
+            end
+        end)
+    end
+
+    -- Box ESP
+    local boxPad = 8
     local BoxESP = Instance.new('Frame', PreviewArea)
     BoxESP.AnchorPoint = Vector2.new(0.5, 0.5)
     BoxESP.Position = UDim2.new(0.5, 0, 0.5, 0)
-    BoxESP.Size = UDim2.new(0, charW + boxPadding * 2, 0, charH + boxPadding * 2)
+    BoxESP.Size = UDim2.new(0, charW + boxPad * 2, 0, charH + boxPad * 2)
     BoxESP.BackgroundTransparency = 1
-    BoxESP.BorderSizePixel = 0
     BoxESP.Visible = false
-
     local BoxStroke = Instance.new('UIStroke', BoxESP)
     BoxStroke.Color = Color3.fromRGB(255, 255, 255)
     BoxStroke.Thickness = 1
-
     preview._boxESP = BoxESP
     preview._boxStroke = BoxStroke
 
-    -- Corner Box ESP (alternative style)
-    local CornerBox = Instance.new('Frame', PreviewArea)
-    CornerBox.AnchorPoint = Vector2.new(0.5, 0.5)
-    CornerBox.Position = UDim2.new(0.5, 0, 0.5, 0)
-    CornerBox.Size = UDim2.new(0, charW + boxPadding * 2, 0, charH + boxPadding * 2)
-    CornerBox.BackgroundTransparency = 1
-    CornerBox.BorderSizePixel = 0
-    CornerBox.Visible = false
-
-    local cornerLen = 12
-    local cornerThick = 1
-    local corners = {}
-
-    local function makeCorner(px, py, w, h)
-        local c = Instance.new('Frame', CornerBox)
-        c.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        c.BorderSizePixel = 0
-        c.Position = UDim2.new(px, 0, py, 0)
-        c.Size = UDim2.new(0, w, 0, h)
-        corners[#corners + 1] = c
-        return c
-    end
-
-    -- Top left
-    makeCorner(0, 0, cornerLen, cornerThick)
-    makeCorner(0, 0, cornerThick, cornerLen)
-    -- Top right
-    makeCorner(1, 0, -cornerLen, cornerThick)
-    makeCorner(1, 0, -cornerThick, cornerLen)
-    -- Bottom left
-    makeCorner(0, 1, cornerLen, -cornerThick)
-    makeCorner(0, 1, cornerThick, -cornerLen)
-    -- Bottom right
-    makeCorner(1, 1, -cornerLen, -cornerThick)
-    makeCorner(1, 1, -cornerThick, -cornerLen)
-
-    preview._cornerBox = CornerBox
-    preview._corners = corners
-
-    -- Name ESP
-    local NameESP = Instance.new('TextLabel', PreviewArea)
+    -- Name ESP (draggable)
+    local NameESP = Instance.new('TextButton', PreviewArea)
     NameESP.AnchorPoint = Vector2.new(0.5, 1)
-    NameESP.Position = UDim2.new(0.5, 0, 0.5, -(charH / 2) - boxPadding - 4)
-    NameESP.Size = UDim2.new(1, 0, 0, 16)
+    NameESP.Position = UDim2.new(0.5, 0, 0.5, -(charH / 2) - boxPad - 4)
+    NameESP.Size = UDim2.new(0, 150, 0, 16)
     NameESP.BackgroundTransparency = 1
     NameESP.Text = Players.LocalPlayer.DisplayName
     NameESP.TextColor3 = Color3.fromRGB(255, 255, 255)
     NameESP.FontFace = Library.UIFont
     NameESP.TextSize = 12
     NameESP.Visible = false
-
+    NameESP.AutoButtonColor = false
+    NameESP.AutomaticSize = Enum.AutomaticSize.X
     preview._nameESP = NameESP
+    makeDraggable(NameESP)
 
-    -- Health bar (left side of box)
-    local HealthBarBG = Instance.new('Frame', PreviewArea)
+    -- Health bar (draggable)
+    local HealthBarBG = Instance.new('TextButton', PreviewArea)
     HealthBarBG.AnchorPoint = Vector2.new(1, 0.5)
-    HealthBarBG.Position = UDim2.new(0.5, -(charW / 2) - boxPadding - 6, 0.5, 0)
-    HealthBarBG.Size = UDim2.new(0, 4, 0, charH + boxPadding * 2)
+    HealthBarBG.Position = UDim2.new(0.5, -(charW / 2) - boxPad - 6, 0.5, 0)
+    HealthBarBG.Size = UDim2.new(0, 4, 0, charH + boxPad * 2)
     HealthBarBG.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
     HealthBarBG.BorderColor3 = Color3.new(0, 0, 0)
-    HealthBarBG.BorderSizePixel = 1
     HealthBarBG.Visible = false
+    HealthBarBG.Text = ""
+    HealthBarBG.AutoButtonColor = false
 
     local HealthBarFill = Instance.new('Frame', HealthBarBG)
     HealthBarFill.AnchorPoint = Vector2.new(0, 1)
@@ -1803,18 +1814,80 @@ function ESPPreview.Create(library, screenGui)
     HealthBarFill.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
     HealthBarFill.BorderSizePixel = 0
 
+    local HealthText = Instance.new('TextLabel', HealthBarBG)
+    HealthText.AnchorPoint = Vector2.new(0.5, 0)
+    HealthText.Position = UDim2.new(0.5, 0, 1, 2)
+    HealthText.Size = UDim2.new(0, 30, 0, 10)
+    HealthText.BackgroundTransparency = 1
+    HealthText.Text = "100"
+    HealthText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    HealthText.FontFace = Library.UIFont
+    HealthText.TextSize = 9
+    HealthText.Visible = false
+
     preview._healthBarBG = HealthBarBG
     preview._healthBarFill = HealthBarFill
+    preview._healthText = HealthText
+    makeDraggableBar(HealthBarBG)
 
-    -- Armor bar (right side of box)
-    local ArmorBarBG = Instance.new('Frame', PreviewArea)
+    -- Distance ESP (draggable)
+    local DistESP = Instance.new('TextButton', PreviewArea)
+    DistESP.AnchorPoint = Vector2.new(0.5, 0)
+    DistESP.Position = UDim2.new(0.5, 0, 0.5, (charH / 2) + boxPad + 4)
+    DistESP.Size = UDim2.new(0, 80, 0, 14)
+    DistESP.BackgroundTransparency = 1
+    DistESP.Text = "[120m]"
+    DistESP.TextColor3 = Color3.fromRGB(200, 200, 200)
+    DistESP.FontFace = Library.UIFont
+    DistESP.TextSize = 11
+    DistESP.Visible = false
+    DistESP.AutoButtonColor = false
+    DistESP.AutomaticSize = Enum.AutomaticSize.X
+    preview._distESP = DistESP
+    makeDraggable(DistESP)
+
+    -- Tool ESP (draggable)
+    local ToolESP = Instance.new('TextButton', PreviewArea)
+    ToolESP.AnchorPoint = Vector2.new(0.5, 0)
+    ToolESP.Position = UDim2.new(0.5, 0, 0.5, (charH / 2) + boxPad + 20)
+    ToolESP.Size = UDim2.new(0, 80, 0, 14)
+    ToolESP.BackgroundTransparency = 1
+    ToolESP.Text = "[AK-47]"
+    ToolESP.TextColor3 = Color3.fromRGB(180, 180, 180)
+    ToolESP.FontFace = Library.UIFont
+    ToolESP.TextSize = 10
+    ToolESP.Visible = false
+    ToolESP.AutoButtonColor = false
+    ToolESP.AutomaticSize = Enum.AutomaticSize.X
+    preview._toolESP = ToolESP
+    makeDraggable(ToolESP)
+
+    -- Armor ESP text (draggable)
+    local ArmorESP = Instance.new('TextButton', PreviewArea)
+    ArmorESP.AnchorPoint = Vector2.new(0.5, 1)
+    ArmorESP.Position = UDim2.new(0.5, 0, 0.5, -(charH / 2) - boxPad - 20)
+    ArmorESP.Size = UDim2.new(0, 120, 0, 14)
+    ArmorESP.BackgroundTransparency = 1
+    ArmorESP.Text = "Heavy Armor"
+    ArmorESP.TextColor3 = Color3.fromRGB(0, 150, 255)
+    ArmorESP.FontFace = Library.UIFont
+    ArmorESP.TextSize = 11
+    ArmorESP.Visible = false
+    ArmorESP.AutoButtonColor = false
+    ArmorESP.AutomaticSize = Enum.AutomaticSize.X
+    preview._armorESP = ArmorESP
+    makeDraggable(ArmorESP)
+
+    -- Armor bar (draggable)
+    local ArmorBarBG = Instance.new('TextButton', PreviewArea)
     ArmorBarBG.AnchorPoint = Vector2.new(0, 0.5)
-    ArmorBarBG.Position = UDim2.new(0.5, (charW / 2) + boxPadding + 6, 0.5, 0)
-    ArmorBarBG.Size = UDim2.new(0, 4, 0, charH + boxPadding * 2)
+    ArmorBarBG.Position = UDim2.new(0.5, (charW / 2) + boxPad + 6, 0.5, 0)
+    ArmorBarBG.Size = UDim2.new(0, 4, 0, charH + boxPad * 2)
     ArmorBarBG.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
     ArmorBarBG.BorderColor3 = Color3.new(0, 0, 0)
-    ArmorBarBG.BorderSizePixel = 1
     ArmorBarBG.Visible = false
+    ArmorBarBG.Text = ""
+    ArmorBarBG.AutoButtonColor = false
 
     local ArmorBarFill = Instance.new('Frame', ArmorBarBG)
     ArmorBarFill.AnchorPoint = Vector2.new(0, 1)
@@ -1825,87 +1898,138 @@ function ESPPreview.Create(library, screenGui)
 
     preview._armorBarBG = ArmorBarBG
     preview._armorBarFill = ArmorBarFill
+    makeDraggableBar(ArmorBarBG)
 
-    -- Distance text
-    local DistESP = Instance.new('TextLabel', PreviewArea)
-    DistESP.AnchorPoint = Vector2.new(0.5, 0)
-    DistESP.Position = UDim2.new(0.5, 0, 0.5, (charH / 2) + boxPadding + 4)
-    DistESP.Size = UDim2.new(1, 0, 0, 14)
-    DistESP.BackgroundTransparency = 1
-    DistESP.Text = "[120m]"
-    DistESP.TextColor3 = Color3.fromRGB(200, 200, 200)
-    DistESP.FontFace = Library.UIFont
-    DistESP.TextSize = 11
-    DistESP.Visible = false
-
-    preview._distESP = DistESP
-
-    -- Weapon text
-    local WeaponESP = Instance.new('TextLabel', PreviewArea)
-    WeaponESP.AnchorPoint = Vector2.new(0.5, 0)
-    WeaponESP.Position = UDim2.new(0.5, 0, 0.5, (charH / 2) + boxPadding + 18)
-    WeaponESP.Size = UDim2.new(1, 0, 0, 14)
-    WeaponESP.BackgroundTransparency = 1
-    WeaponESP.Text = "[AK-47]"
-    WeaponESP.TextColor3 = Color3.fromRGB(180, 180, 180)
-    WeaponESP.FontFace = Library.UIFont
-    WeaponESP.TextSize = 10
-    WeaponESP.Visible = false
-
-    preview._weaponESP = WeaponESP
-
-    -- Skeleton lines
+    -- Skeleton
     local skeletonLines = {}
     local lineData = {
-        {name = "neck", x1 = 0.5, y1 = 0.15, x2 = 0.5, y2 = 0.25},
-        {name = "spine", x1 = 0.5, y1 = 0.25, x2 = 0.5, y2 = 0.58},
-        {name = "lshoulder", x1 = 0.5, y1 = 0.25, x2 = 0.2, y2 = 0.28},
-        {name = "rshoulder", x1 = 0.5, y1 = 0.25, x2 = 0.8, y2 = 0.28},
-        {name = "larm", x1 = 0.2, y1 = 0.28, x2 = 0.18, y2 = 0.55},
-        {name = "rarm", x1 = 0.8, y1 = 0.28, x2 = 0.82, y2 = 0.55},
+        {name = "neck", x1 = 0.5, y1 = 0.12, x2 = 0.5, y2 = 0.22},
+        {name = "spine", x1 = 0.5, y1 = 0.22, x2 = 0.5, y2 = 0.58},
+        {name = "lshoulder", x1 = 0.5, y1 = 0.22, x2 = 0.18, y2 = 0.25},
+        {name = "rshoulder", x1 = 0.5, y1 = 0.22, x2 = 0.82, y2 = 0.25},
+        {name = "larm", x1 = 0.18, y1 = 0.25, x2 = 0.16, y2 = 0.55},
+        {name = "rarm", x1 = 0.82, y1 = 0.25, x2 = 0.84, y2 = 0.55},
         {name = "lhip", x1 = 0.5, y1 = 0.58, x2 = 0.35, y2 = 0.6},
         {name = "rhip", x1 = 0.5, y1 = 0.58, x2 = 0.65, y2 = 0.6},
-        {name = "lleg", x1 = 0.35, y1 = 0.6, x2 = 0.33, y2 = 0.92},
-        {name = "rleg", x1 = 0.65, y1 = 0.6, x2 = 0.67, y2 = 0.92},
+        {name = "lleg", x1 = 0.35, y1 = 0.6, x2 = 0.33, y2 = 0.95},
+        {name = "rleg", x1 = 0.65, y1 = 0.6, x2 = 0.67, y2 = 0.95},
     }
 
     for _, ld in ipairs(lineData) do
         local line = Instance.new('Frame', PreviewArea)
-        line.Name = "Skeleton_" .. ld.name
         line.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
         line.BorderSizePixel = 0
         line.Visible = false
-
-        local cx = (ld.x1 + ld.x2) / 2
-        local cy = (ld.y1 + ld.y2) / 2
-        local dx = ld.x2 - ld.x1
-        local dy = ld.y2 - ld.y1
+        local cx, cy = (ld.x1 + ld.x2) / 2, (ld.y1 + ld.y2) / 2
+        local dx, dy = ld.x2 - ld.x1, ld.y2 - ld.y1
         local len = math.sqrt(dx * dx + dy * dy)
-        local angle = math.deg(math.atan2(dx, dy))
-
         line.AnchorPoint = Vector2.new(0.5, 0.5)
         line.Position = UDim2.new(cx, 0, cy, 0)
         line.Size = UDim2.new(len, 0, 0, 1)
-        line.Rotation = -angle
-
+        line.Rotation = -math.deg(math.atan2(dx, dy))
         skeletonLines[ld.name] = line
     end
-
     preview._skeletonLines = skeletonLines
 
-    -- Position panel to RIGHT of main UI, match height
+    -- Armor colors
+    local armorColors = {
+        High = Color3.fromRGB(0, 120, 255),
+        Medium = Color3.fromRGB(0, 200, 150),
+        Light = Color3.fromRGB(255, 200, 0),
+        Low = Color3.fromRGB(255, 130, 0),
+        None = Color3.fromRGB(255, 60, 60),
+    }
+
+    -- REAL HEALTH TRACKING
+    local function getHumanoid()
+        local char = Players.LocalPlayer.Character
+        if char then return char:FindFirstChildOfClass("Humanoid") end
+        return nil
+    end
+
+    local function updateHealth()
+        local hum = getHumanoid()
+        if hum and HealthBarBG.Visible then
+            local pct = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+            HealthBarFill.Size = UDim2.new(1, 0, pct, 0)
+            HealthBarFill.BackgroundColor3 = Color3.new(1 - pct, pct, 0)
+            HealthText.Text = tostring(math.floor(hum.Health))
+            HealthText.Visible = true
+        end
+    end
+
+    -- Track health changes
+    local healthCon = nil
+    local function connectHealth()
+        if healthCon then healthCon:Disconnect() end
+        local hum = getHumanoid()
+        if hum then
+            healthCon = hum:GetPropertyChangedSignal("Health"):Connect(updateHealth)
+            updateHealth()
+        end
+    end
+
+    Library:Connection(Players.LocalPlayer.CharacterAdded, function(char)
+        char:WaitForChild("Humanoid")
+        task.wait(0.1)
+        connectHealth()
+    end)
+    task.defer(connectHealth)
+
+    -- Track tool changes for tool ESP
+    local function updateTool()
+        if not ToolESP.Visible then return end
+        local char = Players.LocalPlayer.Character
+        if char then
+            local tool = char:FindFirstChildOfClass("Tool")
+            if tool then
+                ToolESP.Text = "[" .. tool.Name .. "]"
+            else
+                ToolESP.Text = "[None]"
+            end
+        end
+    end
+
+    local toolCon = nil
+    local function connectTool()
+        if toolCon then toolCon:Disconnect() end
+        local char = Players.LocalPlayer.Character
+        if char then
+            toolCon = char.ChildAdded:Connect(function(child)
+                if child:IsA("Tool") then updateTool() end
+            end)
+            char.ChildRemoved:Connect(function(child)
+                if child:IsA("Tool") then updateTool() end
+            end)
+            updateTool()
+        end
+    end
+
+    Library:Connection(Players.LocalPlayer.CharacterAdded, function(char)
+        task.wait(0.1)
+        connectTool()
+    end)
+    task.defer(connectTool)
+
+    -- Position to RIGHT
     local function updatePosition()
         if Library.Holder then
-            local mainPos = Library.Holder.AbsolutePosition
-            local mainSize = Library.Holder.AbsoluteSize
-
-            Panel.Size = UDim2.new(0, panelWidth, 0, mainSize.Y)
-            Panel.Position = UDim2.new(0, mainPos.X + mainSize.X + 5, 0, mainPos.Y)
+            local mp = Library.Holder.AbsolutePosition
+            local ms = Library.Holder.AbsoluteSize
+            Panel.Size = UDim2.new(0, panelWidth, 0, ms.Y)
+            Panel.Position = UDim2.new(0, mp.X + ms.X + 5, 0, mp.Y)
             Panel.Visible = Library.Open
         else
             Panel.Visible = false
         end
     end
+
+    -- Update health every frame when visible
+    Library:Connection(game:GetService("RunService").Heartbeat, function()
+        updatePosition()
+        if HealthBarBG.Visible then updateHealth() end
+        if ToolESP.Visible then updateTool() end
+    end)
 
     -- API
 
@@ -1914,36 +2038,16 @@ function ESPPreview.Create(library, screenGui)
         if color then self._boxStroke.Color = color end
     end
 
-    function preview:SetCornerBox(enabled, color)
-        self._cornerBox.Visible = enabled
-        if color then
-            for _, c in ipairs(self._corners) do c.BackgroundColor3 = color end
-        end
-    end
-
     function preview:SetNameESP(enabled, color, text)
         self._nameESP.Visible = enabled
         if color then self._nameESP.TextColor3 = color end
-        if text then self._nameESP.Text = text else self._nameESP.Text = Players.LocalPlayer.DisplayName end
+        self._nameESP.Text = text or Players.LocalPlayer.DisplayName
     end
 
-    function preview:SetHealthBar(enabled, percent, color)
+    function preview:SetHealthBar(enabled)
         self._healthBarBG.Visible = enabled
-        if percent then
-            self._healthBarFill.Size = UDim2.new(1, 0, math.clamp(percent, 0, 1), 0)
-            if not color then
-                self._healthBarFill.BackgroundColor3 = Color3.new(1 - percent, percent, 0)
-            end
-        end
-        if color then self._healthBarFill.BackgroundColor3 = color end
-    end
-
-    function preview:SetArmorBar(enabled, percent, color)
-        self._armorBarBG.Visible = enabled
-        if percent then
-            self._armorBarFill.Size = UDim2.new(1, 0, math.clamp(percent, 0, 1), 0)
-        end
-        if color then self._armorBarFill.BackgroundColor3 = color end
+        self._healthText.Visible = enabled
+        if enabled then updateHealth() end
     end
 
     function preview:SetDistanceESP(enabled, text, color)
@@ -1952,10 +2056,31 @@ function ESPPreview.Create(library, screenGui)
         if color then self._distESP.TextColor3 = color end
     end
 
-    function preview:SetWeaponESP(enabled, text, color)
-        self._weaponESP.Visible = enabled
-        if text then self._weaponESP.Text = text end
-        if color then self._weaponESP.TextColor3 = color end
+    function preview:SetToolESP(enabled, color)
+        self._toolESP.Visible = enabled
+        if color then self._toolESP.TextColor3 = color end
+        if enabled then updateTool() end
+    end
+
+    function preview:SetArmorESP(enabled, armorType, armorValue)
+        self._armorESP.Visible = enabled
+        self._armorBarBG.Visible = enabled
+        if armorType then
+            local col = armorColors[armorType] or armorColors.None
+            self._armorESP.Text = armorType .. " Armor" .. (armorValue and (" [" .. armorValue .. "]") or "")
+            self._armorESP.TextColor3 = col
+            self._armorBarFill.BackgroundColor3 = col
+            local pct = 0
+            if armorType == "High" then pct = 1
+            elseif armorType == "Medium" then pct = 0.7
+            elseif armorType == "Light" then pct = 0.4
+            elseif armorType == "Low" then pct = 0.2
+            else pct = 0 end
+            if armorValue and type(armorValue) == "number" then
+                pct = math.clamp(armorValue / 100, 0, 1)
+            end
+            self._armorBarFill.Size = UDim2.new(1, 0, pct, 0)
+        end
     end
 
     function preview:SetSkeleton(enabled, color)
@@ -1977,24 +2102,8 @@ function ESPPreview.Create(library, screenGui)
         end
     end
 
-    function preview:SetFillESP(enabled, color, transparency)
-        for _, part in ipairs(self._charParts) do
-            if enabled then
-                part.BackgroundColor3 = color or Library.Accent
-                part.BackgroundTransparency = transparency or 0.5
-            else
-                part.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
-                part.BackgroundTransparency = 0
-            end
-        end
-    end
-
     function preview:Show() Panel.Visible = true end
     function preview:Hide() Panel.Visible = false end
-
-    Library:Connection(game:GetService("RunService").Heartbeat, function()
-        updatePosition()
-    end)
 
     return preview
 end
