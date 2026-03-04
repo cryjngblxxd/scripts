@@ -1581,8 +1581,8 @@ local ANIME_GIRL_IMAGE = "rbxassetid://138507241500989"
 local ANIME_GIRL_NAME = "discord.gg/avenir"
 
 
-local IMAGE_WIDTH = 900
-local IMAGE_HEIGHT = 1600
+local IMAGE_WIDTH = 9
+local IMAGE_HEIGHT = 16
 
 function ESPPreview.Create(library, screenGui)
     local preview = { 
@@ -1758,7 +1758,7 @@ function ESPPreview.Create(library, screenGui)
     PreviewImage.Size = UDim2.new(1, 0, 1, 0)
     PreviewImage.BackgroundTransparency = 1
     PreviewImage.Image = ANIME_GIRL_IMAGE
-    PreviewImage.ScaleType = Enum.ScaleType.Stretch -- We manually calculate size so Stretch is fine
+    PreviewImage.ScaleType = Enum.ScaleType.Fit 
     preview._previewImage = PreviewImage
 
     -- Box ESP
@@ -2052,35 +2052,71 @@ function ESPPreview.Create(library, screenGui)
 
             preview._charW = charW
             preview._charH = charH
-        else
+                else
+            -- ANIME GIRL MODE
+            local espMarginX = 30
+            local espMarginY = 30
             
-            local espMarginX = 30  -- space on left/right for health bar, armor bar
-            local espMarginY = 30  -- space on top/bottom for name, distance labels
-            
-            -- Available space for the image itself
             local availableW = areaSize.X - (espMarginX * 2)
             local availableH = areaSize.Y - (espMarginY * 2)
             
-            -- Calculate exact rendered size maintaining aspect ratio
-            local renderedW, renderedH, offsetX, offsetY = calculateRenderedImageBounds(availableW, availableH)
+            -- Calculate rendered bounds using container aspect
+            -- We DON'T hardcode image dimensions anymore
+            -- Instead we let ScaleType.Fit handle rendering
+            -- and size the ImageLabel to the available space
+            -- then calculate what Fit will actually render
             
-            -- Store for ESP positioning
-            preview._renderedImageW = renderedW
-            preview._renderedImageH = renderedH
-            preview._renderedImageOffsetX = offsetX
-            preview._renderedImageOffsetY = offsetY
+            -- Try multiple common aspect ratios and pick the best one
+            -- by checking what fits. Since we don't know exact pixels,
+            -- we measure the container and work backwards.
             
-            -- Size the container to available space
+            -- Size container to available space
             ImageContainer.Size = UDim2.new(0, availableW, 0, availableH)
             ImageContainer.Position = UDim2.new(0.5, 0, 0.5, 0)
             ImageContainer.AnchorPoint = Vector2.new(0.5, 0.5)
             
-   
-            PreviewImage.Size = UDim2.new(0, renderedW, 0, renderedH)
+            -- Image fills the container, ScaleType.Fit handles aspect ratio
+            PreviewImage.Size = UDim2.new(1, 0, 1, 0)
             PreviewImage.Position = UDim2.new(0.5, 0, 0.5, 0)
             PreviewImage.AnchorPoint = Vector2.new(0.5, 0.5)
+            PreviewImage.ScaleType = Enum.ScaleType.Fit
             
-            -- charW and charH drive all ESP element positioning
+            -- Now we need to figure out the ACTUAL rendered image size
+            -- inside the Fit container for ESP positioning
+            -- We use ImageRectSize if available, otherwise estimate
+            
+            local imageRectSize = PreviewImage.ImageRectSize
+            local sourceW, sourceH
+            
+            if imageRectSize and imageRectSize.X > 0 and imageRectSize.Y > 0 then
+                sourceW = imageRectSize.X
+                sourceH = imageRectSize.Y
+            else
+                -- Fallback: use known dimensions or measure from AbsoluteSize
+                -- Your image - adjust this ratio if box is still off
+                sourceW = IMAGE_WIDTH
+                sourceH = IMAGE_HEIGHT
+            end
+            
+            local imageAspect = sourceW / sourceH
+            local containerAspect = availableW / availableH
+            
+            local renderedW, renderedH
+            
+            if containerAspect > imageAspect then
+                -- Container wider than image, height is the limit
+                renderedH = availableH
+                renderedW = renderedH * imageAspect
+            else
+                -- Container taller than image, width is the limit
+                renderedW = availableW
+                renderedH = renderedW / imageAspect
+            end
+            
+            preview._renderedImageW = renderedW
+            preview._renderedImageH = renderedH
+            
+            -- charW/charH drive ESP positioning - use RENDERED size not container
             preview._charW = renderedW
             preview._charH = renderedH
         end
