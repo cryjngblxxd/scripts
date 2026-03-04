@@ -1580,7 +1580,6 @@ local PREVIEW_MODES = {"Character", "Avenir Anime Girl"}
 local ANIME_GIRL_IMAGE = "rbxassetid://138507241500989"
 local ANIME_GIRL_NAME = "discord.gg/avenir"
 
--- 9:16 aspect ratio
 local IMAGE_WIDTH = 9
 local IMAGE_HEIGHT = 16
 
@@ -1600,8 +1599,6 @@ function ESPPreview.Create(library, screenGui)
         _liveMode = true,
         _renderedImageW = 0,
         _renderedImageH = 0,
-        _renderedImageOffsetX = 0,
-        _renderedImageOffsetY = 0,
     }
     local panelWidth = 350
 
@@ -1694,7 +1691,6 @@ function ESPPreview.Create(library, screenGui)
     preview._charW = 0
     preview._charH = 0
 
-    -- CHARACTER MODEL CONTAINER
     local CharBox = Instance.new('Frame', PreviewArea)
     CharBox.Name = "CharBox"
     CharBox.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -1737,7 +1733,6 @@ function ESPPreview.Create(library, screenGui)
 
     preview._charParts = {Head, Torso, LArm, RArm, LLeg, RLeg}
 
-    -- ANIME GIRL IMAGE CONTAINER
     local ImageContainer = Instance.new('Frame', PreviewArea)
     ImageContainer.Name = "ImageContainer"
     ImageContainer.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -1749,7 +1744,6 @@ function ESPPreview.Create(library, screenGui)
     ImageContainer.ClipsDescendants = false
     preview._imageContainer = ImageContainer
 
-    -- The actual preview image - we manually size this to the exact rendered dimensions
     local PreviewImage = Instance.new('ImageLabel', ImageContainer)
     PreviewImage.Name = "PreviewImage"
     PreviewImage.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -1757,10 +1751,9 @@ function ESPPreview.Create(library, screenGui)
     PreviewImage.Size = UDim2.new(1, 0, 1, 0)
     PreviewImage.BackgroundTransparency = 1
     PreviewImage.Image = ANIME_GIRL_IMAGE
-    PreviewImage.ScaleType = Enum.ScaleType.Fit
+    PreviewImage.ScaleType = Enum.ScaleType.Stretch
     preview._previewImage = PreviewImage
 
-    -- Box ESP
     local BoxESP = Instance.new('Frame', PreviewArea)
     BoxESP.Name = "BoxESP"
     BoxESP.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -1791,7 +1784,6 @@ function ESPPreview.Create(library, screenGui)
         end
     end
 
-    -- Name ESP
     local NameESP = Instance.new('TextButton', PreviewArea)
     NameESP.Name = "NameESP"
     NameESP.AnchorPoint = Vector2.new(0.5, 1)
@@ -1808,7 +1800,6 @@ function ESPPreview.Create(library, screenGui)
     preview._nameESP = NameESP
     preview._elementPositions["Name"] = "Top"
 
-    -- Health bar
     local HealthBarBG = Instance.new('TextButton', PreviewArea)
     HealthBarBG.Name = "HealthBarBG"
     HealthBarBG.AnchorPoint = Vector2.new(1, 0.5)
@@ -1843,7 +1834,6 @@ function ESPPreview.Create(library, screenGui)
     preview._healthText = HealthText
     preview._elementPositions["Health"] = "Left"
 
-    -- Distance ESP
     local DistESP = Instance.new('TextButton', PreviewArea)
     DistESP.Name = "DistESP"
     DistESP.AnchorPoint = Vector2.new(0.5, 0)
@@ -1861,7 +1851,6 @@ function ESPPreview.Create(library, screenGui)
     preview._distanceESP = DistESP
     preview._elementPositions["Distance"] = "Bottom"
 
-    -- Tool ESP
     local ToolESP = Instance.new('TextButton', PreviewArea)
     ToolESP.Name = "ToolESP"
     ToolESP.AnchorPoint = Vector2.new(0.5, 0)
@@ -1878,7 +1867,6 @@ function ESPPreview.Create(library, screenGui)
     preview._toolESP = ToolESP
     preview._elementPositions["Tool"] = "Bottom"
 
-    -- Armor ESP
     local ArmorESP = Instance.new('TextButton', PreviewArea)
     ArmorESP.Name = "ArmorESP"
     ArmorESP.AnchorPoint = Vector2.new(0.5, 0)
@@ -1895,7 +1883,6 @@ function ESPPreview.Create(library, screenGui)
     preview._armorESP = ArmorESP
     preview._elementPositions["Armor"] = "Bottom"
 
-    -- Armor bar
     local ArmorBarBG = Instance.new('TextButton', PreviewArea)
     ArmorBarBG.Name = "ArmorBarBG"
     ArmorBarBG.AnchorPoint = Vector2.new(0, 0.5)
@@ -1930,7 +1917,6 @@ function ESPPreview.Create(library, screenGui)
     preview._armorText = ArmorText
     preview._elementPositions["ArmorBar"] = "Right"
 
-    -- Skeleton
     local skeletonLines = {}
     local lineData = {
         {name = "neck", x1 = 0.5, y1 = 0.10, x2 = 0.5, y2 = 0.20},
@@ -1964,65 +1950,38 @@ function ESPPreview.Create(library, screenGui)
     preview._currentArmor = 100
     preview._maxArmor = 100
 
-    -- ============================================
-    -- CORE: Calculate exactly where the 9:16 image 
-    -- renders inside any given container size
-    -- ============================================
-    local function calculateRenderedImageBounds(containerW, containerH)
-        local imageAspect = IMAGE_WIDTH / IMAGE_HEIGHT -- 9/16 = 0.5625
-        local containerAspect = containerW / containerH
-
-        local renderedW, renderedH, offsetX, offsetY
-
-        if containerAspect > imageAspect then
-            renderedH = containerH
-            renderedW = renderedH * imageAspect
-            offsetX = (containerW - renderedW) / 2
-            offsetY = 0
-        else
-            renderedW = containerW
-            renderedH = renderedW / imageAspect
-            offsetX = 0
-            offsetY = (containerH - renderedH) / 2
-        end
-
-        return renderedW, renderedH, offsetX, offsetY
-    end
-
-    -- ============================================
-    -- RECALCULATE - sizes character or image
-    -- ============================================
     local function recalculateCharacter()
         local areaSize = PreviewArea.AbsoluteSize
         if areaSize.X < 50 or areaSize.Y < 50 then return end
 
-        local espSpace = 35
+        local espPadding = 25
+        local availableW = areaSize.X - (espPadding * 2)
+        local availableH = areaSize.Y - (espPadding * 2)
 
         if preview._currentMode == "Character" then
-            local targetFill = 0.85
-            local availableHeight = (areaSize.Y - espSpace * 2) * targetFill
-            local availableWidth = areaSize.X * 0.6
+            local charAspect = 4 / 5
+            local containerAspect = availableW / availableH
 
-            local totalHeightStuds = 5
-            local totalWidthStuds = 4
-            local gap = 2
+            local charW, charH
 
-            local scaleY = availableHeight / (totalHeightStuds * 20 + gap * 2)
-            local scaleX = availableWidth / (totalWidthStuds * 20 + gap * 2)
-            local scale = math.min(scaleY, scaleX)
-            scale = math.clamp(scale, 1, 10)
+            if containerAspect > charAspect then
+                charH = availableH
+                charW = charH * charAspect
+            else
+                charW = availableW
+                charH = charW / charAspect
+            end
 
-            local headW = 20 * scale
-            local headH = 20 * scale
-            local torsoW = 40 * scale
-            local torsoH = 40 * scale
-            local armW = 20 * scale
-            local armH = 40 * scale
-            local legW = 20 * scale
-            local legH = 40 * scale
+            local gap = charH * 0.02
 
-            local charW = torsoW + (armW + gap) * 2
-            local charH = headH + gap + torsoH + gap + legH
+            local headH = charH * 0.18
+            local headW = headH
+            local torsoH = charH * 0.36
+            local torsoW = charW * 0.45
+            local armW = charW * 0.18
+            local armH = torsoH
+            local legW = torsoW * 0.48
+            local legH = charH * 0.36
 
             CharBox.Size = UDim2.new(0, charW, 0, charH)
 
@@ -2046,62 +2005,41 @@ function ESPPreview.Create(library, screenGui)
 
             preview._charW = charW
             preview._charH = charH
-         else
-            -- ============================================
-            -- ANIME GIRL MODE - MAXIMIZED IMAGE
-            -- ============================================
-            
-            local fullW = areaSize.X
-            local fullH = areaSize.Y
-            
-            -- Calculate the largest 9:16 image that fits in the preview area
-            local imageAspect = IMAGE_WIDTH / IMAGE_HEIGHT -- 9/16 = 0.5625
-            local containerAspect = fullW / fullH
-            
+        else
+            local imageAspect = IMAGE_WIDTH / IMAGE_HEIGHT
+            local containerAspect = availableW / availableH
+
             local renderedW, renderedH
-            
+
             if containerAspect > imageAspect then
-                -- Container is wider than 9:16, height is the limit
-                renderedH = fullH
+                renderedH = availableH
                 renderedW = renderedH * imageAspect
             else
-                -- Container is taller than 9:16, width is the limit
-                renderedW = fullW
+                renderedW = availableW
                 renderedH = renderedW / imageAspect
             end
-            
-            preview._renderedImageW = renderedW
-            preview._renderedImageH = renderedH
-            
-            -- Container fills full area
+
             ImageContainer.Size = UDim2.new(1, 0, 1, 0)
             ImageContainer.Position = UDim2.new(0.5, 0, 0.5, 0)
             ImageContainer.AnchorPoint = Vector2.new(0.5, 0.5)
-            
-            -- IMAGE IS SIZED TO EXACT CALCULATED PIXELS
-            -- This is the key - not UDim2.new(1, 0, 1, 0)
-            -- ScaleType.Stretch works because dimensions are already correct ratio
+
             PreviewImage.Size = UDim2.new(0, renderedW, 0, renderedH)
             PreviewImage.Position = UDim2.new(0.5, 0, 0.5, 0)
             PreviewImage.AnchorPoint = Vector2.new(0.5, 0.5)
             PreviewImage.ScaleType = Enum.ScaleType.Stretch
-            
-            -- ESP wraps around this exact size
+
             preview._charW = renderedW
             preview._charH = renderedH
         end
 
-        -- Update box ESP to wrap tightly around character/rendered image
         if preview._boxESP then
             preview._boxESP.Size = UDim2.new(0, preview._charW + boxPad * 2, 0, preview._charH + boxPad * 2)
         end
 
-        -- Health bar matches height
         if preview._healthBarBG then
             preview._healthBarBG.Size = UDim2.new(0, 4, 0, preview._charH + boxPad * 2)
         end
 
-        -- Armor bar matches height
         if preview._armorBarBG then
             preview._armorBarBG.Size = UDim2.new(0, 4, 0, preview._charH + boxPad * 2)
         end
@@ -2109,7 +2047,6 @@ function ESPPreview.Create(library, screenGui)
         return preview._charW, preview._charH
     end
 
-    -- Snap zone detection
     local function getSnapZone(element)
         local areaPos = PreviewArea.AbsolutePosition
         local areaSize = PreviewArea.AbsoluteSize
@@ -2142,11 +2079,6 @@ function ESPPreview.Create(library, screenGui)
         return elements
     end
 
-    -- ============================================
-    -- UPDATE ALL ESP POSITIONS
-    -- Everything positions relative to charW/charH
-    -- which is the RENDERED image size in anime mode
-    -- ============================================
     local function updateAllPositions()
         local charH = preview._charH
         local charW = preview._charW
@@ -2225,7 +2157,6 @@ function ESPPreview.Create(library, screenGui)
         end
     end
 
-    -- Update preview values (non-live mode)
     local function updatePreviewValues()
         if preview._liveMode then return end
 
@@ -2278,7 +2209,6 @@ function ESPPreview.Create(library, screenGui)
         end
     end
 
-    -- Switch mode
     local function switchMode(newMode)
         preview._currentMode = newMode
         ModeButton.Text = "  " .. newMode .. " ▼"
@@ -2301,7 +2231,6 @@ function ESPPreview.Create(library, screenGui)
         updateNameForMode()
     end
 
-    -- Snap draggable for text elements
     local function makeSnapDraggable(element, elementName)
         local dragging = false
         local dragOffset = Vector2.new(0, 0)
@@ -2443,7 +2372,6 @@ function ESPPreview.Create(library, screenGui)
         end)
     end
 
-    -- Live tracking
     local function getHumanoid()
         local char = Players.LocalPlayer.Character
         if char then return char:FindFirstChildOfClass("Humanoid") end
@@ -2601,9 +2529,6 @@ function ESPPreview.Create(library, screenGui)
     end
     task.defer(syncFromFlags)
 
-    -- ============================================
-    -- API
-    -- ============================================
     function preview:SetBoxESP(enabled, color)
         self._boxESP.Visible = enabled
         if color then self._boxStroke.Color = color end
