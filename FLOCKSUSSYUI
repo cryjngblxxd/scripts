@@ -1,5 +1,22 @@
+
 local Library = {}
 do
+
+local UIS = game:GetService("UserInputService")
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+local Toggles = {}
+local Options = {}
+
+if not getgenv then
+getgenv = function() return _G end
+end
+getgenv().Toggles = Toggles
+getgenv().Options = Options
+
 Library = {
 Open = true,
 Folders = { main = "Avenir.CC", configs = "Avenir.CC/Configs" },
@@ -14,6 +31,8 @@ PageHolder = nil,
 UIGradient = nil,
 Dependencies = {},
 ProjectName = "default",
+ToggleKeybind = nil,
+Unloaded = false,
 Keys = {
 [Enum.KeyCode.LeftShift] = "LS", [Enum.KeyCode.RightShift] = "RS",
 [Enum.KeyCode.LeftControl] = "LC", [Enum.KeyCode.RightControl] = "RC",
@@ -44,7 +63,6 @@ Keys = {
 Connections = {},
 UIFont = Font.fromEnum(Enum.Font.GothamBold),
 FontSize = 13,
-Unloaded = false,
 OnUnloadCallbacks = {},
 _flagCallbacks = {},
 AutoLoadConfigName = nil,
@@ -52,15 +70,9 @@ _keybinds = {},
 _menuToggleSetup = false,
 _Flags = {},
 _configIgnore = {},
+_Toggles = Toggles,
+_Options = Options,
 }
-
-local Flags = Library._Flags
-local Pickers = {}
-local UIS = game:GetService("UserInputService")
-local HttpService = game:GetService("HttpService")
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local LocalPlayer = Players.LocalPlayer
 
 Library.__index = Library
 Library.Pages.__index = Library.Pages
@@ -191,9 +203,7 @@ if isfile(self:GetSettingsPath()) then
 local ok, data = pcall(HttpService.JSONDecode, HttpService, readfile(self:GetSettingsPath()))
 if ok and type(data) == "table" then existing = data end
 end
-existing[self.ProjectName] = {
-auto_load_config = self.AutoLoadConfigName
-}
+existing[self.ProjectName] = { auto_load_config = self.AutoLoadConfigName }
 writefile(self:GetSettingsPath(), HttpService:JSONEncode(existing))
 end)
 end
@@ -220,75 +230,39 @@ self.AutoLoadConfigName = nil
 self:SaveLibrarySettings()
 end
 
-function Library:_serializeValue(flag, value)
-if self._configIgnore[flag] then return nil end
-if typeof(value) == "Color3" then
-return {T = "Color3", R = math.floor(value.R * 255), G = math.floor(value.G * 255), B = math.floor(value.B * 255)}
-elseif typeof(value) == "boolean" then
-return {T = "Bool", V = value}
-elseif typeof(value) == "number" then
-return {T = "Num", V = value}
-elseif typeof(value) == "string" then
-return {T = "Str", V = value}
-elseif type(value) == "table" then
-if value.mode ~= nil and value.active ~= nil then
-local keyStr = "NONE"
-local keyType = "NONE"
-if value.key and typeof(value.key) == "EnumItem" and value.key ~= Enum.KeyCode.Unknown then
-local ks = tostring(value.key)
-if ks:find("Enum%.KeyCode%.") then
-keyType = "KC"
-keyStr = ks:gsub("Enum%.KeyCode%.", "")
-elseif ks:find("Enum%.UserInputType%.") then
-keyType = "UIT"
-keyStr = ks:gsub("Enum%.UserInputType%.", "")
-end
-end
-return {T = "Key", M = value.mode, K = keyStr, KT = keyType}
-else
-local isArray = true
-local maxIdx = 0
-for k, v in pairs(value) do
-if type(k) ~= "number" then isArray = false; break end
-if k > maxIdx then maxIdx = k end
-end
-if isArray and maxIdx == #value then
-return {T = "Arr", V = value}
-else
-return {T = "Tbl", V = value}
-end
-end
-end
-return nil
-end
-
-function Library:_deserializeValue(data)
-if type(data) ~= "table" or not data.T then return nil, false end
-if data.T == "Color3" then
-return Color3.fromRGB(data.R or 255, data.G or 255, data.B or 255), true
-elseif data.T == "Bool" then
-return data.V, true
-elseif data.T == "Num" then
-return data.V, true
-elseif data.T == "Str" then
-return data.V, true
-elseif data.T == "Key" then
-return {mode = data.M, key = data.K, keyType = data.KT}, true
-elseif data.T == "Arr" then
-return data.V, true
-elseif data.T == "Tbl" then
-return data.V, true
-end
-return nil, false
-end
-
 function Library:GetConfig()
 local cfg = {}
-for flag, value in pairs(self.Flags) do
-if self._configIgnore[flag] then continue end
-local serialized = self:_serializeValue(flag, value)
-if serialized then
-cfg[flag] = serialized
+for idx, toggle in pairs(Toggles) do
+if self._configIgnore[idx] then continue end
+cfg["t_" .. idx] = toggle.Value
+end
+for idx, option in pairs(Options) do
+if self._configIgnore[idx] then continue end
+local v = option.Value
+if option.Type == "ColorPicker" then
+if typeof(v) == "Color3" then
+cfg["o_" .. idx] = {T = "C3", R = math.floor(v.R * 255), G = math.floor(v.G * 255), B = math.floor(v.B * 255)}
+end
+elseif option.Type == "KeyPicker" then
+local keyName = "Unknown"
+if option.Value and option.Value ~= "" then keyName = tostring(option.Value) end
+cfg["o_" .. idx] = {T = "KP", K = keyName, M = option.Mode or "Toggle"}
+elseif option.Type == "Slider" then
+cfg["o_" .. idx] = {T = "SL", V = v}
+elseif option.Type == "Dropdown" then
+if option.Multi then
+local tbl = {}
+if type(v) == "table" then
+for k2, v2 in pairs(v) do
+if v2 then tbl[k2] = true end
+end
+end
+cfg["o_" .. idx] = {T = "DD", M = true, V = tbl}
+else
+cfg["o_" .. idx] = {T = "DD", M = false, V = v}
+end
+elseif option.Type == "Input" then
+cfg["o_" .. idx] = {T = "IN", V = tostring(v or "")}
 end
 end
 return HttpService:JSONEncode(cfg)
@@ -297,45 +271,33 @@ end
 function Library:LoadConfig(cfgJson)
 local ok, cfg = pcall(HttpService.JSONDecode, HttpService, cfgJson)
 if not ok or type(cfg) ~= "table" then return false end
-
-for flag, serialized in pairs(cfg) do
-if self._configIgnore[flag] then continue end
-local value, valid = self:_deserializeValue(serialized)
-if not valid then continue end
-
-local setter = Flags[flag]
-
-if serialized.T == "Key" then
-local kb = nil
-for _, k in ipairs(self._keybinds) do
-if k.Flag == flag then kb = k; break end
+for key, data in pairs(cfg) do
+local prefix = key:sub(1, 2)
+local idx = key:sub(3)
+if self._configIgnore[idx] then continue end
+if prefix == "t_" then
+local toggle = Toggles[idx]
+if toggle and toggle.SetValue then
+pcall(function() toggle:SetValue(data) end)
 end
-if not kb and setter and type(setter) == "table" and setter.Set then kb = setter end
-if kb then
-if kb.SetMode and value.mode then
-pcall(function() kb:SetMode(value.mode) end)
-end
-if value.key and value.key ~= "NONE" and value.keyType and value.keyType ~= "NONE" then
-local key = nil
-if value.keyType == "KC" then
-local s, r = pcall(function() return Enum.KeyCode[value.key] end)
-if s and r and r ~= Enum.KeyCode.Unknown then key = r end
-elseif value.keyType == "UIT" then
-local s, r = pcall(function() return Enum.UserInputType[value.key] end)
-if s and r then key = r end
-end
-if key and kb.Set then pcall(function() kb:Set(key) end) end
-end
-end
-elseif serialized.T == "Color3" then
-if setter then
-if type(setter) == "function" then pcall(setter, value)
-elseif type(setter) == "table" and setter.Set then pcall(function() setter:Set(value) end) end
-end
+elseif prefix == "o_" then
+local option = Options[idx]
+if option and type(data) == "table" then
+if data.T == "C3" and option.SetValueRGB then
+pcall(function() option:SetValueRGB(Color3.fromRGB(data.R or 255, data.G or 255, data.B or 255)) end)
+elseif data.T == "KP" and option.SetValue then
+pcall(function() option:SetValue({data.K or "Unknown", data.M or "Toggle"}) end)
+elseif data.T == "SL" and option.SetValue then
+pcall(function() option:SetValue(data.V) end)
+elseif data.T == "DD" and option.SetValue then
+if data.M then
+pcall(function() option:SetValue(data.V or {}) end)
 else
-if setter then
-if type(setter) == "function" then pcall(setter, value)
-elseif type(setter) == "table" and setter.Set then pcall(function() setter:Set(value) end) end
+pcall(function() option:SetValue(data.V) end)
+end
+elseif data.T == "IN" and option.SetValue then
+pcall(function() option:SetValue(data.V or "") end)
+end
 end
 end
 end
@@ -346,8 +308,7 @@ function Library:SaveConfig(name)
 local success = false
 pcall(function()
 self:InitFolders()
-local path = self:GetConfigPath() .. "/" .. name .. ".cfg"
-writefile(path, self:GetConfig())
+writefile(self:GetConfigPath() .. "/" .. name .. ".cfg", self:GetConfig())
 success = true
 end)
 return success
@@ -368,10 +329,7 @@ function Library:DeleteConfig(name)
 local success = false
 pcall(function()
 local p = self:GetConfigPath() .. "/" .. name .. ".cfg"
-if isfile(p) then
-delfile(p)
-success = true
-end
+if isfile(p) then delfile(p); success = true end
 end)
 return success
 end
@@ -392,11 +350,19 @@ end
 
 function Library:ConfigExists(name)
 local exists = false
-pcall(function()
-exists = isfile(self:GetConfigPath() .. "/" .. name .. ".cfg")
-end)
+pcall(function() exists = isfile(self:GetConfigPath() .. "/" .. name .. ".cfg") end)
 return exists
 end
+
+function Library:LoadAutoloadConfig()
+self:LoadLibrarySettings()
+if self.AutoLoadConfigName then
+return self:LoadConfigFile(self.AutoLoadConfigName)
+end
+return false
+end
+
+local Pickers = {}
 
 function Library:NewPicker(default, alpha, parent, count, flag, callback)
 local Icon = Instance.new('TextButton', parent)
@@ -490,7 +456,7 @@ end)
 
 local cpt = {}
 function cpt:Set(color) set(color) end
-Flags[flag] = function(c) set(c) end
+Library._Flags[flag] = function(c) set(c) end
 return cpt
 end
 
@@ -509,11 +475,14 @@ kb._keyDown = true
 if kb.Mode == "Hold" then
 kb.Active = true
 kb:_updateFlag()
-if kb.Callback then task.spawn(pcall, kb.Callback, true) end
-else
+if kb._onClick then task.spawn(pcall, kb._onClick, true) end
+elseif kb.Mode == "Toggle" then
 kb.Active = not kb.Active
 kb:_updateFlag()
-if kb.Callback then task.spawn(pcall, kb.Callback, kb.Active) end
+if kb._onClick then task.spawn(pcall, kb._onClick, kb.Active) end
+elseif kb.Mode == "Always" then
+kb.Active = true
+kb:_updateFlag()
 end
 end
 end
@@ -532,7 +501,7 @@ kb._keyDown = false
 if kb.Mode == "Hold" and kb.Active then
 kb.Active = false
 kb:_updateFlag()
-if kb.Callback then task.spawn(pcall, kb.Callback, false) end
+if kb._onClick then task.spawn(pcall, kb._onClick, false) end
 end
 end
 end
@@ -547,35 +516,54 @@ if gp or not Library.Holder then return end
 local key
 if input.UserInputType == Enum.UserInputType.Keyboard then key = input.KeyCode end
 if not key then return end
-local mk = Library.Flags["UI_MenuKeybind"]
-if mk and type(mk) == "table" and mk.key then
-if key == mk.key then
+if Library.ToggleKeybind then
+local tkb = Library.ToggleKeybind
+if tkb.Key and key == tkb.Key then
 Library.Open = not Library.Open
 Library.Holder.Visible = Library.Open
+return
 end
-else
-if key == Enum.KeyCode.Insert or key == Enum.KeyCode.RightControl then
+end
+if key == Enum.KeyCode.Insert or key == Enum.KeyCode.End or key == Enum.KeyCode.RightControl then
 Library.Open = not Library.Open
 Library.Holder.Visible = Library.Open
-end
 end
 end)
+end
+
+local function resolveKeyFromString(str)
+if not str or str == "" or str == "Unknown" or str == "NONE" then return nil end
+if str == "MB1" then return Enum.UserInputType.MouseButton1 end
+if str == "MB2" then return Enum.UserInputType.MouseButton2 end
+if str == "MB3" then return Enum.UserInputType.MouseButton3 end
+for enumKey, shortName in pairs(Library.Keys) do
+if shortName == str then return enumKey end
+end
+local s, r = pcall(function() return Enum.KeyCode[str] end)
+if s and r then return r end
+return nil
+end
+
+local function getKeyName(key)
+if not key or key == Enum.KeyCode.Unknown then return "Unknown" end
+if Library.Keys[key] then return Library.Keys[key] end
+return tostring(key):gsub("Enum.KeyCode.", ""):gsub("Enum.UserInputType.", "")
 end
 
 do
 local Pages = Library.Pages
 local Sections = Library.Sections
 
-function Library:Window(Options)
+function Library:Window(OptionsW)
 local Base = {
 Pages = {}, Sections = {}, Elements = {},
 Dragging = {false, UDim2.new(0, 0, 0, 0)},
-Title = Options.Name or "Avenir",
-Suffix = Options.Suffix or "",
-Size = Options.Size or UDim2.fromOffset(650, 550),
+Title = OptionsW.Name or OptionsW.Title or "Avenir",
+Suffix = OptionsW.Suffix or "",
+Size = OptionsW.Size or UDim2.fromOffset(650, 550),
 }
 
-Library.ProjectName = Options.Project or Base.Title or "default"
+Library.ProjectName = OptionsW.Project or Base.Title or "default"
 Library:InitFolders()
 Library:LoadLibrarySettings()
 
@@ -603,13 +591,20 @@ table.insert(Library.ThemeObjects, Title)
 table.insert(Library.ThemeObjects, version)
 
 Main.Name = "Main"
-Main.Position = UDim2.new(0.5, 0, 0.5, 0)
 Main.Size = Base.Size
 Main.BackgroundColor3 = Color3.new(0.1098, 0.1098, 0.1098)
 Main.BorderColor3 = Color3.new(0, 0, 0)
 Main.AnchorPoint = Vector2.new(0.5, 0.5)
 Main.Visible = false
 Library.Holder = Main
+
+if OptionsW.Center then
+Main.Position = UDim2.new(0.5, 0, 0.5, 0)
+elseif OptionsW.Position then
+Main.Position = OptionsW.Position
+else
+Main.Position = UDim2.new(0.5, 0, 0.5, 0)
+end
 
 Inline.Position = UDim2.new(0, 2, 0, 2)
 Inline.Size = UDim2.new(1, -4, 1, -4)
@@ -717,17 +712,30 @@ end)
 SetupKeybindHandler()
 SetupMenuToggle()
 
-Base.Elements = {Main = Main, Title = Title, Middle = Middle, PageHolder = PagesFrame, SectionHolder = SectionsFrame}
-return setmetatable(Base, Library)
+if OptionsW.AutoShow then
+task.defer(function()
+Library.Open = true
+Main.Visible = true
+end)
 end
 
-function Library:Page(Options)
+Base.Elements = {Main = Main, Title = Title, Middle = Middle, PageHolder = PagesFrame, SectionHolder = SectionsFrame}
+
+function Base:AddTab(name)
+return Library.Page(Library, {Name = name, _win = Base})
+end
+
+return Base
+end
+
+function Library:Page(OptionsP)
+local win = OptionsP._win or self
 local Page = {
-Window = self, Open = false, Sections = {}, Elements = {},
-Title = Options.Name or "page"
+Window = win, Open = false, Sections = {}, Elements = {},
+Title = OptionsP.Name or "page"
 }
 
-local Holder = Instance.new('TextButton', Page.Window.Elements.PageHolder)
+local Holder = Instance.new('TextButton', win.Elements.PageHolder)
 local Button = Instance.new('Frame', Holder)
 local TopLine = Instance.new('Frame', Button)
 local LineP = Instance.new('Frame', Button)
@@ -736,9 +744,9 @@ local RightDec = Instance.new('Frame', Button)
 local Black = Instance.new('Frame', Button)
 local Black2 = Instance.new('Frame', Button)
 local TitleLabel = Instance.new('TextLabel', Holder)
-local PageSections = Instance.new('Frame', Page.Window.Elements.SectionHolder)
+local PageSections = Instance.new('Frame', win.Elements.SectionHolder)
 local UIListLayoutP = Instance.new('UIListLayout', PageSections)
-local SectionHolder = Instance.new('Frame', Page.Window.Elements.Middle)
+local SectionHolder = Instance.new('Frame', win.Elements.Middle)
 
 table.insert(Library.ThemeObjects, TopLine)
 table.insert(Library.ThemeObjects, LeftDec)
@@ -820,6 +828,30 @@ SectionHolder.BackgroundTransparency = 1
 SectionHolder.ZIndex = 53
 SectionHolder.Visible = false
 
+local LeftCol = Instance.new('ScrollingFrame', SectionHolder)
+LeftCol.Position = UDim2.new(0, 0, 0, 0)
+LeftCol.Size = UDim2.new(0.5, -4, 1, 0)
+LeftCol.BackgroundTransparency = 1
+LeftCol.BorderSizePixel = 0
+LeftCol.ScrollBarThickness = 2
+LeftCol.ScrollBarImageColor3 = Color3.new(0.3, 0.3, 0.3)
+LeftCol.CanvasSize = UDim2.new(0, 0, 0, 0)
+LeftCol.AutomaticCanvasSize = Enum.AutomaticSize.Y
+Instance.new('UIListLayout', LeftCol).SortOrder = Enum.SortOrder.LayoutOrder
+LeftCol:FindFirstChildOfClass("UIListLayout").Padding = UDim.new(0, 4)
+
+local RightCol = Instance.new('ScrollingFrame', SectionHolder)
+RightCol.Position = UDim2.new(0.5, 4, 0, 0)
+RightCol.Size = UDim2.new(0.5, -4, 1, 0)
+RightCol.BackgroundTransparency = 1
+RightCol.BorderSizePixel = 0
+RightCol.ScrollBarThickness = 2
+RightCol.ScrollBarImageColor3 = Color3.new(0.3, 0.3, 0.3)
+RightCol.CanvasSize = UDim2.new(0, 0, 0, 0)
+RightCol.AutomaticCanvasSize = Enum.AutomaticSize.Y
+Instance.new('UIListLayout', RightCol).SortOrder = Enum.SortOrder.LayoutOrder
+RightCol:FindFirstChildOfClass("UIListLayout").Padding = UDim.new(0, 4)
+
 function Page:Turn(bool)
 Page.Open = bool
 PageSections.Visible = bool
@@ -831,58 +863,23 @@ end
 Holder.MouseButton1Click:Connect(function()
 if not Page.Open then
 Page:Turn(true)
-for _, other in ipairs(Page.Window.Pages) do
+for _, other in ipairs(win.Pages) do
 if other.Open and other ~= Page then other:Turn(false) end
 end
 end
 end)
 
-if #Page.Window.Pages == 0 then Page:Turn(true) end
+if #win.Pages == 0 then Page:Turn(true) end
 
 task.defer(function()
 Holder.Size = UDim2.new(0, TitleLabel.TextBounds.X + 16, 1, 0)
 end)
 
-Page.Elements = {ButtonHolder = PageSections, RealHold = SectionHolder}
-Page.Window.Pages[#Page.Window.Pages + 1] = Page
-Page._columns = {}
-Page._columnFrames = {}
+Page.Elements = {ButtonHolder = PageSections, RealHold = SectionHolder, LeftCol = LeftCol, RightCol = RightCol}
+win.Pages[#win.Pages + 1] = Page
 
-function Page:column()
-local col = {Page = Page, Sections = {}}
-table.insert(Page._columns, col)
-
-local ColFrame = Instance.new('Frame', SectionHolder)
-ColFrame.BackgroundTransparency = 1
-
-local ScrollFrame = Instance.new('ScrollingFrame', ColFrame)
-ScrollFrame.Size = UDim2.new(1, 0, 1, 0)
-ScrollFrame.BackgroundTransparency = 1
-ScrollFrame.BorderSizePixel = 0
-ScrollFrame.ScrollBarThickness = 2
-ScrollFrame.ScrollBarImageColor3 = Color3.new(0.3, 0.3, 0.3)
-ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-ScrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
-
-local ContentList = Instance.new('UIListLayout', ScrollFrame)
-ContentList.SortOrder = Enum.SortOrder.LayoutOrder
-ContentList.Padding = UDim.new(0, 4)
-
-table.insert(Page._columnFrames, ColFrame)
-col._frame = ColFrame
-col._scrollFrame = ScrollFrame
-
-for i, cf in ipairs(Page._columnFrames) do
-local n = #Page._columnFrames
-local w = 1 / n
-local gap = 8
-cf.Position = UDim2.new(w * (i - 1), i > 1 and gap / 2 or 0, 0, 0)
-cf.Size = UDim2.new(w, -gap, 1, 0)
-end
-
-function col:section(Options)
-local sectionName = Options.name or Options.Name or "section"
-local SectionFrame = Instance.new('Frame', ScrollFrame)
+local function createGroupbox(name, parentCol)
+local SectionFrame = Instance.new('Frame', parentCol)
 SectionFrame.Size = UDim2.new(1, 0, 0, 0)
 SectionFrame.AutomaticSize = Enum.AutomaticSize.Y
 SectionFrame.BackgroundColor3 = Color3.new(0.0314, 0.0314, 0.0314)
@@ -898,7 +895,7 @@ local SectionTitleS = Instance.new('TextLabel', BarS)
 SectionTitleS.Position = UDim2.new(0, 4, 0, 0)
 SectionTitleS.Size = UDim2.new(1, -4, 1, 0)
 SectionTitleS.BackgroundTransparency = 1
-SectionTitleS.Text = sectionName
+SectionTitleS.Text = name or "Groupbox"
 SectionTitleS.TextColor3 = Color3.new(0.306, 0.306, 0.306)
 SectionTitleS.FontFace = Library.UIFont
 SectionTitleS.TextSize = Library.FontSize
@@ -909,61 +906,28 @@ Content.Position = UDim2.new(0, 10, 0, 25)
 Content.Size = UDim2.new(1, -20, 0, 0)
 Content.AutomaticSize = Enum.AutomaticSize.Y
 Content.BackgroundTransparency = 1
-
 Instance.new('UIListLayout', Content).SortOrder = Enum.SortOrder.LayoutOrder
 Content:FindFirstChildOfClass("UIListLayout").Padding = UDim.new(0, 4)
-
 Instance.new('UIPadding', SectionFrame).PaddingBottom = UDim.new(0, 8)
 
-local fakeSection = {
-Window = Page.Window, Page = Page,
-Elements = {Left = Content, Right = Content},
-}
-setmetatable(fakeSection, Library.Sections)
+local gb = {}
+gb._content = Content
+gb._frame = SectionFrame
 
-local sect = {}
-sect._content = Content
+function gb:AddToggle(idx, opts)
+opts = opts or {}
+local flag = idx or Library.NextFlag()
+local togObj = {Value = opts.Default or false, Type = "Toggle", _changedCbs = {}, _colorPickers = {}, _keyPickers = {}}
 
-function sect:toggle(o) o=o or{} return fakeSection:Toggle({Name=o.name or o.Name,Side="Left",Flag=o.flag or o.Flag,State=o.default or o.Default or false,Callback=o.callback or o.Callback or function()end}) end
-function sect:slider(o) o=o or{} return fakeSection:Slider({Name=o.name or o.Name,Side="Left",Flag=o.flag or o.Flag,Min=o.min or 0,Max=o.max or 100,State=o.default or o.Default or 0,Decimals=o.interval or 1,Suffix=o.suffix or"",Callback=o.callback or o.Callback or function()end}) end
-function sect:dropdown(o) o=o or{} return fakeSection:List({Name=o.name or o.Name,Side="Left",Flag=o.flag or o.Flag,Options=o.items or o.Items or{},State=o.default or o.Default,Multi=o.multi or o.Multi or false,Callback=o.callback or o.Callback or function()end}) end
-function sect:textbox(o) o=o or{} return fakeSection:Textbox({Name=o.name or o.Name,Side="Left",Flag=o.flag or o.Flag,Placeholder=o.placeholder or"",State=o.default or o.Default or"",Callback=o.callback or o.Callback or function()end,OnChange=o.onchange or o.OnChange}) end
-function sect:button(o) o=o or{} return fakeSection:Button({Name=o.name or o.Name,Side="Left",Callback=o.callback or o.Callback or function()end}) end
-function sect:colorpicker(o) o=o or{} return fakeSection:Colorpicker({Name=o.name or o.Name,Side="Left",Flag=o.flag or o.Flag,State=o.color or o.Color or Color3.fromRGB(255,0,0),Callback=o.callback or o.Callback or function()end}) end
-function sect:keybind(o) o=o or{} return fakeSection:Keybind({Name=o.name or o.Name,Side="Left",Flag=o.flag or o.Flag,State=o.key or o.Key,Mode=o.mode or o.Mode or"Toggle",Callback=o.callback or o.Callback}) end
-function sect:label(o) o=o or{} return fakeSection:Label({Name=o.name or o.Name or o.text or"Label",Side="Left"}) end
-function sect:divider() return fakeSection:Divider({Side="Left"}) end
-
-col.Sections[#col.Sections + 1] = sect
-return sect
-end
-
-return col
-end
-
-return setmetatable(Page, Library.Pages)
-end
-
-function Sections:Toggle(Options)
-local Props = Options or {}
-local Toggle = {
-Section = self,
-Callback = Props.Callback or function() end,
-Flag = Props.Flag or Library.NextFlag(),
-Toggled = Props.State or false,
-Holder = nil,
-}
-
-local parent = Props.Side == "Right" and self.Elements.Right or self.Elements.Left
+local parent = Content
 local H = Instance.new('TextButton', parent)
 local F = Instance.new('Frame', H)
 local Inner = Instance.new('Frame', F)
-local Accent = Instance.new('Frame', Inner)
-local G = Instance.new('UIGradient', Accent)
+local AccentF = Instance.new('Frame', Inner)
+local G = Instance.new('UIGradient', AccentF)
 local T = Instance.new('TextLabel', H)
 
-Toggle.Holder = H
-table.insert(Library.ThemeObjects, Accent)
+table.insert(Library.ThemeObjects, AccentF)
 
 H.Size = UDim2.new(1, 0, 0, 18)
 H.BackgroundTransparency = 1
@@ -980,10 +944,10 @@ Inner.Size = UDim2.new(1, -4, 1, -4)
 Inner.BackgroundTransparency = 1
 Inner.BorderSizePixel = 0
 
-Accent.Size = UDim2.new(1, 0, 1, 0)
-Accent.BackgroundColor3 = Library.Accent
-Accent.BorderSizePixel = 0
-Accent.Visible = false
+AccentF.Size = UDim2.new(1, 0, 1, 0)
+AccentF.BackgroundColor3 = Library.Accent
+AccentF.BorderSizePixel = 0
+AccentF.Visible = false
 
 G.Color = ColorSequence.new{ColorSequenceKeypoint.new(0, Color3.new(0.78, 0.749, 0.8)), ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1))}
 G.Rotation = -90
@@ -996,75 +960,347 @@ T.FontFace = Library.UIFont
 T.TextSize = Library.FontSize
 T.ZIndex = 105
 T.TextXAlignment = Enum.TextXAlignment.Left
-T.Text = Props.Name or "toggle"
+T.Text = opts.Text or "Toggle"
 
-local function UpdateVisual()
-Accent.Visible = Toggle.Toggled
-T.TextColor3 = Toggle.Toggled and Color3.fromRGB(255, 255, 255) or Color3.new(0.306, 0.306, 0.306)
+if opts.Tooltip then
+H.MouseEnter:Connect(function() end)
 end
 
-function Toggle:Set(bool)
-if typeof(bool) == "boolean" then
-Toggle.Toggled = bool
-UpdateVisual()
-Library.Flags[Toggle.Flag] = bool
-Library:UpdateDependencies(Toggle.Flag, bool)
-Library:FireFlagCallbacks(Toggle.Flag, bool)
-task.spawn(pcall, Toggle.Callback, bool)
-end
+local function updateVisual()
+AccentF.Visible = togObj.Value
+T.TextColor3 = togObj.Value and Color3.fromRGB(255, 255, 255) or Color3.new(0.306, 0.306, 0.306)
 end
 
-function Toggle:GetState() return Toggle.Toggled end
+function togObj:SetValue(bool)
+if typeof(bool) ~= "boolean" then return end
+togObj.Value = bool
+updateVisual()
+Library.Flags[flag] = bool
+Library:UpdateDependencies(flag, bool)
+Library:FireFlagCallbacks(flag, bool)
+for _, cb in ipairs(togObj._changedCbs) do task.spawn(pcall, cb) end
+end
 
-Library.Flags[Toggle.Flag] = Toggle.Toggled
-UpdateVisual()
-if Toggle.Toggled then task.spawn(pcall, Toggle.Callback, true) end
+function togObj:OnChanged(cb) togObj._changedCbs[#togObj._changedCbs + 1] = cb end
 
-H.MouseButton1Click:Connect(function()
-Toggle:Set(not Toggle.Toggled)
+function togObj:AddColorPicker(cpIdx, cpOpts)
+cpOpts = cpOpts or {}
+local cpFlag = cpIdx or Library.NextFlag()
+local cpObj = {Value = cpOpts.Default or Color3.fromRGB(255, 255, 255), Type = "ColorPicker", _changedCbs = {}}
+
+local pickerCount = #togObj._colorPickers
+local cpt = Library:NewPicker(cpObj.Value, 1, H, pickerCount, cpFlag, function(color)
+cpObj.Value = color
+for _, cb in ipairs(cpObj._changedCbs) do task.spawn(pcall, cb) end
 end)
 
-Flags[Toggle.Flag] = function(v) Toggle:Set(v) end
-return Toggle
+function cpObj:SetValueRGB(color) cpt:Set(color); cpObj.Value = color end
+function cpObj:OnChanged(cb) cpObj._changedCbs[#cpObj._changedCbs + 1] = cb end
+
+togObj._colorPickers[#togObj._colorPickers + 1] = cpObj
+Options[cpIdx] = cpObj
+return togObj
 end
 
-function Sections:Slider(Options)
-local Props = Options or {}
-local Slider = {
-Section = self, Name = Props.Name,
-Min = Props.Min or 0, Max = Props.Max or 100,
-Sub = Props.Suffix or "", Decimals = Props.Decimals or 1,
-Callback = Props.Callback or function() end,
-Flag = Props.Flag or Library.NextFlag(), Holder = nil
-}
+function togObj:AddKeyPicker(kpIdx, kpOpts)
+kpOpts = kpOpts or {}
+local kpObj = {Value = kpOpts.Default or "Unknown", Type = "KeyPicker", Mode = kpOpts.Mode or "Toggle", Key = nil, Active = false, Binding = false, _keyDown = false, _onClick = nil, _changedCbs = {}, Flag = kpIdx}
 
-local parent = Props.Side == "Right" and self.Elements.Right or self.Elements.Left
-local H = Instance.new('Frame', parent)
-Slider.Holder = H
-local F = Instance.new('TextButton', H)
-local Fill = Instance.new('Frame', F)
-local TitleSL = Instance.new('TextLabel', H)
-local ValSL = Instance.new('TextLabel', Slider.Name and H or F)
+local initKey = resolveKeyFromString(kpOpts.Default)
+if initKey then kpObj.Key = initKey; kpObj.Value = getKeyName(initKey) end
 
-Instance.new('UIGradient', Fill).Color = ColorSequence.new{ColorSequenceKeypoint.new(0, Color3.new(0.78, 0.749, 0.8)), ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1))}
-Instance.new('UIGradient', F).Color = ColorSequence.new{ColorSequenceKeypoint.new(0, Color3.new(0.78, 0.749, 0.8)), ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1))}
-table.insert(Library.ThemeObjects, Fill)
+local V = Instance.new('TextButton', H)
+V.Position = UDim2.new(1, -50, 0, 0)
+V.Size = UDim2.new(0, 45, 1, 0)
+V.BackgroundTransparency = 1
+V.Text = kpObj.Value or "Unknown"
+V.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+V.FontFace = Library.UIFont
+V.TextSize = Library.FontSize
+V.AutoButtonColor = false
+V.TextXAlignment = Enum.TextXAlignment.Right
 
-H.Size = Slider.Name and UDim2.new(1, 0, 0, 32) or UDim2.new(1, 0, 0, 18)
+function kpObj:_updateFlag()
+Library.Flags[kpIdx] = {key = kpObj.Key, mode = kpObj.Mode, active = kpObj.Active}
+Library:FireFlagCallbacks(kpIdx, Library.Flags[kpIdx])
+end
+
+function kpObj:GetState() return kpObj.Active end
+function kpObj:OnClick(cb) kpObj._onClick = cb end
+function kpObj:OnChanged(cb) kpObj._changedCbs[#kpObj._changedCbs + 1] = cb end
+
+function kpObj:SetValue(tbl)
+if type(tbl) == "table" then
+local keyStr = tbl[1] or "Unknown"
+local mode = tbl[2] or "Toggle"
+local resolved = resolveKeyFromString(keyStr)
+if resolved then
+kpObj.Key = resolved
+kpObj.Value = getKeyName(resolved)
+else
+kpObj.Key = nil
+kpObj.Value = "Unknown"
+end
+kpObj.Mode = mode
+V.Text = kpObj.Value
+kpObj:_updateFlag()
+for _, cb in ipairs(kpObj._changedCbs) do task.spawn(pcall, cb) end
+end
+end
+
+V.MouseButton1Click:Connect(function()
+if kpObj.Binding then return end
+kpObj.Binding = true; V.Text = "..."
+end)
+
+Library:Connection(UIS.InputBegan, function(input, gp)
+if kpObj.Binding then
+local key
+if input.UserInputType == Enum.UserInputType.Keyboard then key = input.KeyCode
+elseif input.UserInputType == Enum.UserInputType.MouseButton1 then key = Enum.UserInputType.MouseButton1
+elseif input.UserInputType == Enum.UserInputType.MouseButton2 then key = Enum.UserInputType.MouseButton2
+elseif input.UserInputType == Enum.UserInputType.MouseButton3 then key = Enum.UserInputType.MouseButton3 end
+if key then
+if key == Enum.KeyCode.Backspace or key == Enum.KeyCode.Escape then
+kpObj.Key = nil; kpObj.Value = "Unknown"; V.Text = "Unknown"
+else
+kpObj.Key = key; kpObj.Value = getKeyName(key); V.Text = kpObj.Value
+end
+kpObj.Active = false; kpObj._keyDown = false; kpObj:_updateFlag(); kpObj.Binding = false
+for _, cb in ipairs(kpObj._changedCbs) do task.spawn(pcall, cb) end
+end
+end
+end)
+
+kpObj:_updateFlag()
+Library._keybinds[#Library._keybinds + 1] = kpObj
+togObj._keyPickers[#togObj._keyPickers + 1] = kpObj
+Options[kpIdx] = kpObj
+return togObj
+end
+
+Library.Flags[flag] = togObj.Value
+updateVisual()
+if togObj.Value then
+task.defer(function() for _, cb in ipairs(togObj._changedCbs) do task.spawn(pcall, cb) end end)
+end
+
+H.MouseButton1Click:Connect(function() togObj:SetValue(not togObj.Value) end)
+
+Toggles[idx] = togObj
+Library._Flags[flag] = function(v) togObj:SetValue(v) end
+return togObj
+end
+
+function gb:AddButton(text, callback)
+local btnObj = {_subButtons = {}}
+local H = Instance.new('Frame', Content)
+H.Size = UDim2.new(1, 0, 0, 24)
 H.BackgroundTransparency = 1
 
-F.Position = Slider.Name and UDim2.new(0, 0, 0, 18) or UDim2.new(0, 0, 0, 4)
+local BtnFrame = Instance.new('Frame', H)
+BtnFrame.Size = UDim2.new(1, -15, 1, 0)
+BtnFrame.BackgroundColor3 = Color3.new(0.0784, 0.0784, 0.0784)
+BtnFrame.BorderColor3 = Color3.new(0, 0, 0)
+Instance.new('UIGradient', BtnFrame).Color = ColorSequence.new{ColorSequenceKeypoint.new(0, Color3.new(0.78, 0.749, 0.8)), ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1))}
+
+local MainBtn = Instance.new('TextButton', BtnFrame)
+MainBtn.Size = UDim2.new(1, 0, 1, 0)
+MainBtn.BackgroundTransparency = 1
+MainBtn.Text = text or "Button"
+MainBtn.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+MainBtn.FontFace = Library.UIFont
+MainBtn.TextSize = Library.FontSize
+MainBtn.MouseButton1Click:Connect(callback or function() end)
+
+local tooltipText = nil
+
+function btnObj:AddTooltip(tip)
+tooltipText = tip
+return btnObj
+end
+
+function btnObj:AddButton(subText, subCallback)
+local subBtnObj = {}
+
+local oldSize = MainBtn.Size
+MainBtn.Size = UDim2.new(0.5, 0, 1, 0)
+
+local Sep = Instance.new('Frame', BtnFrame)
+Sep.Size = UDim2.new(0, 1, 1, 0)
+Sep.Position = UDim2.new(0.5, 0, 0, 0)
+Sep.BackgroundColor3 = Color3.new(0.1098, 0.1098, 0.1098)
+Sep.BorderSizePixel = 0
+
+local SubBtn = Instance.new('TextButton', BtnFrame)
+SubBtn.Size = UDim2.new(0.5, -1, 1, 0)
+SubBtn.Position = UDim2.new(0.5, 1, 0, 0)
+SubBtn.BackgroundTransparency = 1
+SubBtn.Text = subText or "Sub"
+SubBtn.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+SubBtn.FontFace = Library.UIFont
+SubBtn.TextSize = Library.FontSize
+SubBtn.MouseButton1Click:Connect(subCallback or function() end)
+
+function subBtnObj:AddTooltip(tip) return subBtnObj end
+
+btnObj._subButtons[#btnObj._subButtons + 1] = subBtnObj
+return subBtnObj
+end
+
+return btnObj
+end
+
+function gb:AddLabel(text, doesWrap)
+local L = Instance.new('TextLabel', Content)
+L.Size = UDim2.new(1, 0, 0, doesWrap and 0 or 16)
+L.AutomaticSize = doesWrap and Enum.AutomaticSize.Y or Enum.AutomaticSize.None
+L.BackgroundTransparency = 1
+L.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+L.FontFace = Library.UIFont
+L.TextSize = Library.FontSize
+L.TextXAlignment = Enum.TextXAlignment.Left
+L.Text = text or "Label"
+L.TextWrapped = doesWrap or false
+
+local lblObj = {_instance = L, _colorPickers = {}, _keyPickers = {}}
+function lblObj:SetText(t) L.Text = t end
+
+function lblObj:AddColorPicker(cpIdx, cpOpts)
+cpOpts = cpOpts or {}
+local cpFlag = cpIdx or Library.NextFlag()
+local cpObj = {Value = cpOpts.Default or Color3.fromRGB(255, 255, 255), Type = "ColorPicker", _changedCbs = {}}
+local pickerCount = #lblObj._colorPickers
+local cpt = Library:NewPicker(cpObj.Value, 1, L, pickerCount, cpFlag, function(color)
+cpObj.Value = color
+for _, cb in ipairs(cpObj._changedCbs) do task.spawn(pcall, cb) end
+end)
+function cpObj:SetValueRGB(color) cpt:Set(color); cpObj.Value = color end
+function cpObj:OnChanged(cb) cpObj._changedCbs[#cpObj._changedCbs + 1] = cb end
+lblObj._colorPickers[#lblObj._colorPickers + 1] = cpObj
+Options[cpIdx] = cpObj
+return lblObj
+end
+
+function lblObj:AddKeyPicker(kpIdx, kpOpts)
+kpOpts = kpOpts or {}
+local kpObj = {Value = kpOpts.Default or "Unknown", Type = "KeyPicker", Mode = kpOpts.Mode or "Toggle", Key = nil, Active = false, Binding = false, _keyDown = false, _onClick = nil, _changedCbs = {}, Flag = kpIdx, NoUI = kpOpts.NoUI or false}
+
+local initKey = resolveKeyFromString(kpOpts.Default)
+if initKey then kpObj.Key = initKey; kpObj.Value = getKeyName(initKey) end
+
+local V = Instance.new('TextButton', L)
+V.Position = UDim2.new(1, -50, 0, 0)
+V.Size = UDim2.new(0, 45, 1, 0)
+V.BackgroundTransparency = 1
+V.Text = kpObj.Value or "Unknown"
+V.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+V.FontFace = Library.UIFont
+V.TextSize = Library.FontSize
+V.AutoButtonColor = false
+V.TextXAlignment = Enum.TextXAlignment.Right
+
+function kpObj:_updateFlag()
+Library.Flags[kpIdx] = {key = kpObj.Key, mode = kpObj.Mode, active = kpObj.Active}
+Library:FireFlagCallbacks(kpIdx, Library.Flags[kpIdx])
+end
+
+function kpObj:GetState() return kpObj.Active end
+function kpObj:OnClick(cb) kpObj._onClick = cb end
+function kpObj:OnChanged(cb) kpObj._changedCbs[#kpObj._changedCbs + 1] = cb end
+
+function kpObj:SetValue(tbl)
+if type(tbl) == "table" then
+local keyStr = tbl[1] or "Unknown"
+local mode = tbl[2] or "Toggle"
+local resolved = resolveKeyFromString(keyStr)
+if resolved then
+kpObj.Key = resolved; kpObj.Value = getKeyName(resolved)
+else
+kpObj.Key = nil; kpObj.Value = "Unknown"
+end
+kpObj.Mode = mode
+V.Text = kpObj.Value
+kpObj:_updateFlag()
+for _, cb in ipairs(kpObj._changedCbs) do task.spawn(pcall, cb) end
+end
+end
+
+V.MouseButton1Click:Connect(function()
+if kpObj.Binding then return end
+kpObj.Binding = true; V.Text = "..."
+end)
+
+Library:Connection(UIS.InputBegan, function(input, gp)
+if kpObj.Binding then
+local key
+if input.UserInputType == Enum.UserInputType.Keyboard then key = input.KeyCode
+elseif input.UserInputType == Enum.UserInputType.MouseButton1 then key = Enum.UserInputType.MouseButton1
+elseif input.UserInputType == Enum.UserInputType.MouseButton2 then key = Enum.UserInputType.MouseButton2
+elseif input.UserInputType == Enum.UserInputType.MouseButton3 then key = Enum.UserInputType.MouseButton3 end
+if key then
+if key == Enum.KeyCode.Backspace or key == Enum.KeyCode.Escape then
+kpObj.Key = nil; kpObj.Value = "Unknown"; V.Text = "Unknown"
+else
+kpObj.Key = key; kpObj.Value = getKeyName(key); V.Text = kpObj.Value
+end
+kpObj.Active = false; kpObj._keyDown = false; kpObj:_updateFlag(); kpObj.Binding = false
+for _, cb in ipairs(kpObj._changedCbs) do task.spawn(pcall, cb) end
+end
+end
+end)
+
+kpObj:_updateFlag()
+Library._keybinds[#Library._keybinds + 1] = kpObj
+lblObj._keyPickers[#lblObj._keyPickers + 1] = kpObj
+Options[kpIdx] = kpObj
+return lblObj
+end
+
+return lblObj
+end
+
+function gb:AddDivider()
+local D = Instance.new('Frame', Content)
+D.Size = UDim2.new(1, 0, 0, 1)
+D.BackgroundColor3 = Color3.new(0.1098, 0.1098, 0.1098)
+D.BorderSizePixel = 0
+end
+
+function gb:AddSlider(idx, opts)
+opts = opts or {}
+local flag = idx or Library.NextFlag()
+local slObj = {Value = opts.Default or opts.Min or 0, Type = "Slider", _changedCbs = {}}
+local mn = opts.Min or 0
+local mx = opts.Max or 100
+local rounding = opts.Rounding or 1
+local decimals = math.pow(10, rounding)
+local suffix = opts.Suffix or ""
+local compact = opts.Compact or false
+
+local parent = Content
+local H = Instance.new('Frame', parent)
+H.Size = compact and UDim2.new(1, 0, 0, 18) or UDim2.new(1, 0, 0, 32)
+H.BackgroundTransparency = 1
+
+local F = Instance.new('TextButton', H)
+F.Position = compact and UDim2.new(0, 0, 0, 4) or UDim2.new(0, 0, 0, 18)
 F.Size = UDim2.new(1, -15, 0, 10)
 F.BackgroundColor3 = Color3.new(0.0784, 0.0784, 0.0784)
 F.BorderColor3 = Color3.new(0, 0, 0)
 F.AutoButtonColor = false
 F.Text = ""
+Instance.new('UIGradient', F).Color = ColorSequence.new{ColorSequenceKeypoint.new(0, Color3.new(0.78, 0.749, 0.8)), ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1))}
 
+local Fill = Instance.new('Frame', F)
 Fill.Size = UDim2.new(0, 0, 1, 0)
 Fill.BackgroundColor3 = Library.Accent
 Fill.BorderSizePixel = 0
+Instance.new('UIGradient', Fill).Color = ColorSequence.new{ColorSequenceKeypoint.new(0, Color3.new(0.78, 0.749, 0.8)), ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1))}
+table.insert(Library.ThemeObjects, Fill)
 
-if Slider.Name then
+local TitleSL = Instance.new('TextLabel', H)
+if not compact then
 TitleSL.Visible = true
 TitleSL.Size = UDim2.new(1, 0, 0, 16)
 TitleSL.BackgroundTransparency = 1
@@ -1072,37 +1308,42 @@ TitleSL.TextColor3 = Color3.new(0.306, 0.306, 0.306)
 TitleSL.FontFace = Library.UIFont
 TitleSL.TextSize = Library.FontSize
 TitleSL.TextXAlignment = Enum.TextXAlignment.Left
-TitleSL.Text = Slider.Name
+TitleSL.Text = opts.Text or "Slider"
 else
 TitleSL.Visible = false
 end
 
-ValSL.Position = Slider.Name and UDim2.new(0, 0, 0, 0) or UDim2.new(0, 0, 0, -1)
-ValSL.Size = Slider.Name and UDim2.new(1, -15, 0, 16) or UDim2.new(1, 0, 1, 0)
+local ValSL = Instance.new('TextLabel', compact and F or H)
+ValSL.Position = compact and UDim2.new(0, 0, 0, -1) or UDim2.new(0, 0, 0, 0)
+ValSL.Size = compact and UDim2.new(1, 0, 1, 0) or UDim2.new(1, -15, 0, 16)
 ValSL.BackgroundTransparency = 1
 ValSL.TextColor3 = Color3.new(0.306, 0.306, 0.306)
 ValSL.FontFace = Library.UIFont
 ValSL.TextSize = Library.FontSize
-ValSL.TextXAlignment = Slider.Name and Enum.TextXAlignment.Right or Enum.TextXAlignment.Center
+ValSL.TextXAlignment = compact and Enum.TextXAlignment.Center or Enum.TextXAlignment.Right
 
 local Sliding = false
 
 local function Set(value)
-value = math.clamp(Library:Round(value, Slider.Decimals), Slider.Min, Slider.Max)
-ValSL.Text = string.format("%.14g", value) .. Slider.Sub
-Fill.Size = UDim2.new((value - Slider.Min) / (Slider.Max - Slider.Min), 0, 1, 0)
-Library.Flags[Slider.Flag] = value
-Slider.Callback(value)
-Library:FireFlagCallbacks(Slider.Flag, value)
+value = math.clamp(math.floor(value * decimals + 0.5) / decimals, mn, mx)
+slObj.Value = value
+ValSL.Text = tostring(value) .. suffix
+Fill.Size = UDim2.new((value - mn) / (mx - mn), 0, 1, 0)
+Library.Flags[flag] = value
+Library:FireFlagCallbacks(flag, value)
+for _, cb in ipairs(slObj._changedCbs) do task.spawn(pcall, cb) end
 end
 
-Set(Props.State or 0)
+function slObj:SetValue(v) Set(v) end
+function slObj:OnChanged(cb) slObj._changedCbs[#slObj._changedCbs + 1] = cb end
+
+Set(slObj.Value)
 
 F.InputBegan:Connect(function(i)
 if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
 Sliding = true
 local p = math.clamp((i.Position.X - F.AbsolutePosition.X) / F.AbsoluteSize.X, 0, 1)
-Set(Slider.Min + ((Slider.Max - Slider.Min) * p))
+Set(mn + ((mx - mn) * p))
 end
 end)
 F.InputEnded:Connect(function(i)
@@ -1111,38 +1352,122 @@ end)
 Library:Connection(UIS.InputChanged, function(i)
 if Sliding and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
 local p = math.clamp((i.Position.X - F.AbsolutePosition.X) / F.AbsoluteSize.X, 0, 1)
-Set(Slider.Min + ((Slider.Max - Slider.Min) * p))
+Set(mn + ((mx - mn) * p))
 end
 end)
 
-function Slider:Set(v) Set(v) end
-Flags[Slider.Flag] = Set
-return Slider
+Options[idx] = slObj
+Library._Flags[flag] = function(v) Set(v) end
+return slObj
 end
 
-function Sections:List(Options)
-local Props = Options or {}
-local DD = {
-Section = self, Open = false, Name = Props.Name,
-Options = Props.Options or {}, Multi = Props.Multi or false,
-Callback = Props.Callback or function() end,
-Flag = Props.Flag or Library.NextFlag(),
-OptionInsts = {}, Holder = nil, Selected = {}, CurrentIndex = 1,
-}
+function gb:AddInput(idx, opts)
+opts = opts or {}
+local flag = idx or Library.NextFlag()
+local inObj = {Value = opts.Default or "", Type = "Input", _changedCbs = {}}
 
-local parent = Props.Side == "Right" and self.Elements.Right or self.Elements.Left
+local parent = Content
+local hasName = opts.Text ~= nil
 local H = Instance.new('Frame', parent)
-DD.Holder = H
-local F = Instance.new('TextButton', H)
-local Val = Instance.new('TextLabel', F)
-local Arrow = Instance.new('TextLabel', F)
-local Content = Instance.new('ScrollingFrame', F)
-local LL = Instance.new('UIListLayout', Content)
-local TitleDD = Instance.new('TextLabel', H)
+H.Size = UDim2.new(1, 0, 0, hasName and 42 or 20)
+H.BackgroundTransparency = 1
 
+local TitleTB = Instance.new('TextLabel', H)
+if hasName then
+TitleTB.Size = UDim2.new(1, 0, 0, 16)
+TitleTB.BackgroundTransparency = 1
+TitleTB.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+TitleTB.FontFace = Library.UIFont
+TitleTB.TextSize = Library.FontSize
+TitleTB.TextXAlignment = Enum.TextXAlignment.Left
+TitleTB.Text = opts.Text
+else
+TitleTB.Visible = false
+end
+
+local TF = Instance.new('Frame', H)
+TF.Position = UDim2.new(0, 0, 0, hasName and 18 or 0)
+TF.Size = UDim2.new(1, -15, 0, 20)
+TF.BackgroundColor3 = Color3.new(0.0784, 0.0784, 0.0784)
+TF.BorderColor3 = Color3.new(0, 0, 0)
+TF.ClipsDescendants = true
+Instance.new('UIGradient', TF).Color = ColorSequence.new{ColorSequenceKeypoint.new(0, Color3.new(0.78, 0.749, 0.8)), ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1))}
+
+local TBox = Instance.new('TextBox', TF)
+TBox.Size = UDim2.new(1, -8, 1, 0)
+TBox.Position = UDim2.new(0, 4, 0, 0)
+TBox.BackgroundTransparency = 1
+TBox.Text = opts.Default or ""
+TBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+TBox.FontFace = Library.UIFont
+TBox.TextSize = Library.FontSize
+TBox.PlaceholderText = opts.Placeholder or ""
+TBox.PlaceholderColor3 = Color3.new(0.25, 0.25, 0.25)
+TBox.ClearTextOnFocus = false
+TBox.TextXAlignment = Enum.TextXAlignment.Left
+
+if opts.MaxLength then
+TBox:GetPropertyChangedSignal("Text"):Connect(function()
+if #TBox.Text > opts.MaxLength then
+TBox.Text = TBox.Text:sub(1, opts.MaxLength)
+end
+end)
+end
+
+if opts.Numeric then
+TBox:GetPropertyChangedSignal("Text"):Connect(function()
+local filtered = TBox.Text:gsub("[^%d%.%-]", "")
+if filtered ~= TBox.Text then TBox.Text = filtered end
+end)
+end
+
+Library.Flags[flag] = inObj.Value
+
+function inObj:SetValue(str)
+TBox.Text = tostring(str)
+inObj.Value = TBox.Text
+Library.Flags[flag] = inObj.Value
+Library:FireFlagCallbacks(flag, inObj.Value)
+for _, cb in ipairs(inObj._changedCbs) do task.spawn(pcall, cb) end
+end
+
+function inObj:OnChanged(cb) inObj._changedCbs[#inObj._changedCbs + 1] = cb end
+
+if opts.Finished then
+TBox.FocusLost:Connect(function()
+inObj.Value = TBox.Text
+Library.Flags[flag] = inObj.Value
+Library:FireFlagCallbacks(flag, inObj.Value)
+for _, cb in ipairs(inObj._changedCbs) do task.spawn(pcall, cb) end
+end)
+else
+TBox:GetPropertyChangedSignal("Text"):Connect(function()
+inObj.Value = TBox.Text
+Library.Flags[flag] = inObj.Value
+Library:FireFlagCallbacks(flag, inObj.Value)
+for _, cb in ipairs(inObj._changedCbs) do task.spawn(pcall, cb) end
+end)
+end
+
+Options[idx] = inObj
+Library._Flags[flag] = function(v) inObj:SetValue(v) end
+return inObj
+end
+
+function gb:AddDropdown(idx, opts)
+opts = opts or {}
+local flag = idx or Library.NextFlag()
+local multi = opts.Multi or false
+local ddObj = {Value = nil, Type = "Dropdown", Multi = multi, _changedCbs = {}, _options = opts.Values or {}, _optInsts = {}, _selected = {}}
+
+if multi then ddObj.Value = {} end
+
+local parent = Content
+local H = Instance.new('Frame', parent)
 H.Size = UDim2.new(1, 0, 0, 42)
 H.BackgroundTransparency = 1
 
+local F = Instance.new('TextButton', H)
 F.Position = UDim2.new(0, 0, 0, 18)
 F.Size = UDim2.new(1, -15, 0, 20)
 F.BackgroundColor3 = Color3.new(0.0784, 0.0784, 0.0784)
@@ -1151,6 +1476,7 @@ F.Text = ""
 F.AutoButtonColor = false
 Instance.new('UIGradient', F).Color = ColorSequence.new{ColorSequenceKeypoint.new(0, Color3.new(0.78, 0.749, 0.8)), ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1))}
 
+local Val = Instance.new('TextLabel', F)
 Val.Position = UDim2.new(0, 4, 0, 0)
 Val.Size = UDim2.new(1, -20, 1, 0)
 Val.BackgroundTransparency = 1
@@ -1161,6 +1487,7 @@ Val.TextSize = Library.FontSize
 Val.TextXAlignment = Enum.TextXAlignment.Left
 Val.ClipsDescendants = true
 
+local Arrow = Instance.new('TextLabel', F)
 Arrow.Position = UDim2.new(1, -15, 0, 0)
 Arrow.Size = UDim2.new(0, 15, 1, 0)
 Arrow.BackgroundTransparency = 1
@@ -1169,72 +1496,72 @@ Arrow.TextColor3 = Color3.new(0.306, 0.306, 0.306)
 Arrow.FontFace = Library.UIFont
 Arrow.TextSize = 10
 
-Content.Position = UDim2.new(0, 0, 0, 22)
-Content.BackgroundColor3 = Color3.new(0.0784, 0.0784, 0.0784)
-Content.BorderColor3 = Color3.new(0, 0, 0)
-Content.Visible = false
-Content.ZIndex = 110
-Content.ScrollBarThickness = 2
-Content.ScrollBarImageColor3 = Color3.new(0.4, 0.4, 0.4)
-Content.CanvasSize = UDim2.new(0, 0, 0, 0)
-Content.AutomaticCanvasSize = Enum.AutomaticSize.Y
-LL.SortOrder = Enum.SortOrder.LayoutOrder
+local DDContent = Instance.new('ScrollingFrame', F)
+DDContent.Position = UDim2.new(0, 0, 0, 22)
+DDContent.BackgroundColor3 = Color3.new(0.0784, 0.0784, 0.0784)
+DDContent.BorderColor3 = Color3.new(0, 0, 0)
+DDContent.Visible = false
+DDContent.ZIndex = 110
+DDContent.ScrollBarThickness = 2
+DDContent.ScrollBarImageColor3 = Color3.new(0.4, 0.4, 0.4)
+DDContent.CanvasSize = UDim2.new(0, 0, 0, 0)
+DDContent.AutomaticCanvasSize = Enum.AutomaticSize.Y
+Instance.new('UIListLayout', DDContent).SortOrder = Enum.SortOrder.LayoutOrder
 
+local TitleDD = Instance.new('TextLabel', H)
 TitleDD.Size = UDim2.new(1, 0, 0, 16)
 TitleDD.BackgroundTransparency = 1
 TitleDD.TextColor3 = Color3.new(0.306, 0.306, 0.306)
 TitleDD.FontFace = Library.UIFont
 TitleDD.TextSize = Library.FontSize
 TitleDD.TextXAlignment = Enum.TextXAlignment.Left
-TitleDD.Text = DD.Name or ""
+TitleDD.Text = opts.Text or ""
 
-local function updateSize()
-local c = 0
-for _ in pairs(DD.OptionInsts) do c = c + 1 end
-Content.Size = UDim2.new(1, 0, 0, math.min(c, 6) * 18)
+local ddOpen = false
+local function closeDD() ddOpen = false; DDContent.Visible = false; Arrow.Text = "▼" end
+local function openDD() ddOpen = true; DDContent.Visible = true; Arrow.Text = "▲"
+local c = 0; for _ in pairs(ddObj._optInsts) do c = c + 1 end
+DDContent.Size = UDim2.new(1, 0, 0, math.min(c, 6) * 18)
 end
 
-local function close() DD.Open = false; Content.Visible = false; Arrow.Text = "▼" end
-local function open() DD.Open = true; Content.Visible = true; Arrow.Text = "▲"; updateSize() end
-
-F.MouseButton1Click:Connect(function() if DD.Open then close() else open() end end)
+F.MouseButton1Click:Connect(function() if ddOpen then closeDD() else openDD() end end)
 Library:Connection(UIS.InputBegan, function(I)
-if DD.Open and I.UserInputType == Enum.UserInputType.MouseButton1 then
+if ddOpen and I.UserInputType == Enum.UserInputType.MouseButton1 then
 task.defer(function()
-if not Library:IsMouseOverFrame(Content) and not Library:IsMouseOverFrame(F) then close() end
+if not Library:IsMouseOverFrame(DDContent) and not Library:IsMouseOverFrame(F) then closeDD() end
 end)
 end
 end)
 
 local function updateDisplay()
-if DD.Multi then
+if multi then
 local names = {}
-for _, opt in ipairs(DD.Options) do if DD.Selected[opt] then names[#names+1] = opt end end
+for _, opt in ipairs(ddObj._options) do if ddObj._selected[opt] then names[#names+1] = opt end end
 Val.Text = #names > 0 and table.concat(names, ", ") or "..."
-local arr = {}
-for k, v in pairs(DD.Selected) do if v then arr[#arr+1] = k end end
-Library.Flags[DD.Flag] = arr
-DD.Callback(DD.Selected)
-Library:FireFlagCallbacks(DD.Flag, arr)
+local tbl = {}
+for k, v in pairs(ddObj._selected) do if v then tbl[k] = true end end
+ddObj.Value = tbl
+Library.Flags[flag] = tbl
 else
 local sel
-for k, v in pairs(DD.Selected) do if v then sel = k; break end end
+for k, v in pairs(ddObj._selected) do if v then sel = k; break end end
 Val.Text = sel or ""
-Library.Flags[DD.Flag] = sel
-DD.Callback(sel)
-Library:FireFlagCallbacks(DD.Flag, sel)
+ddObj.Value = sel
+Library.Flags[flag] = sel
 end
+Library:FireFlagCallbacks(flag, ddObj.Value)
+for _, cb in ipairs(ddObj._changedCbs) do task.spawn(pcall, cb) end
 end
 
 local function updateColors()
-for opt, tbl in pairs(DD.OptionInsts) do
-tbl.text.TextColor3 = DD.Selected[opt] and Color3.fromRGB(255, 255, 255) or Color3.new(0.306, 0.306, 0.306)
+for opt, tbl in pairs(ddObj._optInsts) do
+tbl.text.TextColor3 = ddObj._selected[opt] and Color3.fromRGB(255, 255, 255) or Color3.new(0.306, 0.306, 0.306)
 end
 end
 
-local function createOptions(tbl)
+local function createOpts(tbl)
 for i, option in ipairs(tbl) do
-local Opt = Instance.new('TextButton', Content)
+local Opt = Instance.new('TextButton', DDContent)
 local OptName = Instance.new('TextLabel', Opt)
 Opt.Size = UDim2.new(1, 0, 0, 18)
 Opt.BackgroundTransparency = 1
@@ -1242,7 +1569,7 @@ Opt.Text = ""
 Opt.AutoButtonColor = false
 Opt.ZIndex = 111
 Opt.LayoutOrder = i
-DD.OptionInsts[option] = {button = Opt, text = OptName, index = i}
+ddObj._optInsts[option] = {button = Opt, text = OptName}
 OptName.Position = UDim2.new(0, 4, 0, 0)
 OptName.Size = UDim2.new(1, 0, 1, 0)
 OptName.BackgroundTransparency = 1
@@ -1253,419 +1580,360 @@ OptName.TextSize = Library.FontSize
 OptName.TextXAlignment = Enum.TextXAlignment.Left
 OptName.ZIndex = 111
 Opt.MouseButton1Click:Connect(function()
-if DD.Multi then
-DD.Selected[option] = not DD.Selected[option]
+if multi then
+ddObj._selected[option] = not ddObj._selected[option]
 else
-for k in pairs(DD.Selected) do DD.Selected[k] = false end
-DD.Selected[option] = true
-close()
+for k in pairs(ddObj._selected) do ddObj._selected[k] = false end
+ddObj._selected[option] = true
+closeDD()
 end
 updateColors()
 updateDisplay()
 end)
 end
-updateSize()
 end
 
-createOptions(DD.Options)
+createOpts(ddObj._options)
 
-function DD:Set(option)
-if DD.Multi then
-if type(option) == "table" then
-for k in pairs(DD.Selected) do DD.Selected[k] = false end
-if #option > 0 then for _, v in ipairs(option) do DD.Selected[v] = true end
-else for k, v in pairs(option) do DD.Selected[k] = v end end
+function ddObj:SetValue(val)
+if multi then
+for k in pairs(ddObj._selected) do ddObj._selected[k] = false end
+if type(val) == "table" then
+for k, v in pairs(val) do
+if v then ddObj._selected[k] = true end
+end
 end
 else
-for k in pairs(DD.Selected) do DD.Selected[k] = false end
-if option and DD.OptionInsts[option] then DD.Selected[option] = true end
+for k in pairs(ddObj._selected) do ddObj._selected[k] = false end
+if type(val) == "string" and ddObj._optInsts[val] then
+ddObj._selected[val] = true
+elseif type(val) == "number" and ddObj._options[val] then
+ddObj._selected[ddObj._options[val]] = true
+end
 end
 updateColors()
 updateDisplay()
 end
 
-function DD:Refresh(tbl)
-DD.Options = tbl
-for _, opt in pairs(DD.OptionInsts) do pcall(function() opt.button:Destroy() end) end
-table.clear(DD.OptionInsts)
-table.clear(DD.Selected)
-createOptions(tbl)
+function ddObj:OnChanged(cb) ddObj._changedCbs[#ddObj._changedCbs + 1] = cb end
+
+function ddObj:Refresh(newValues)
+ddObj._options = newValues
+for _, opt in pairs(ddObj._optInsts) do pcall(function() opt.button:Destroy() end) end
+table.clear(ddObj._optInsts)
+table.clear(ddObj._selected)
+createOpts(newValues)
 updateDisplay()
 end
 
-function DD:GetValue()
-if DD.Multi then
-local arr = {}
-for k, v in pairs(DD.Selected) do if v then arr[#arr+1] = k end end
-return arr
+if opts.Default then
+if multi then
+if type(opts.Default) == "table" then
+for k, v in pairs(opts.Default) do if v then ddObj._selected[k] = true end end
+end
 else
-for k, v in pairs(DD.Selected) do if v then return k end end
+if type(opts.Default) == "number" and ddObj._options[opts.Default] then
+ddObj._selected[ddObj._options[opts.Default]] = true
+elseif type(opts.Default) == "string" then
+ddObj._selected[opts.Default] = true
 end
-end
-
-local state = Props.State
-if state then
-if DD.Multi and type(state) == "table" then
-for _, v in ipairs(state) do DD.Selected[v] = true end
-elseif type(state) == "string" then
-DD.Selected[state] = true
 end
 end
 updateColors()
 updateDisplay()
 
-Flags[DD.Flag] = DD
-return DD
+Options[idx] = ddObj
+Library._Flags[flag] = ddObj
+return ddObj
 end
 
-function Sections:Textbox(Options)
-local Props = Options or {}
-local TB = {
-Section = self, Name = Props.Name,
-Placeholder = Props.Placeholder or "",
-Callback = Props.Callback or function() end,
-OnChange = Props.OnChange,
-Flag = Props.Flag or Library.NextFlag(),
-Holder = nil, _textbox = nil,
-}
-
-local parent = Props.Side == "Right" and self.Elements.Right or self.Elements.Left
-local H = Instance.new('Frame', parent)
-TB.Holder = H
-local TitleTB = Instance.new('TextLabel', H)
-local TF = Instance.new('Frame', H)
-local TBox = Instance.new('TextBox', TF)
-TB._textbox = TBox
-
-Instance.new('UIGradient', TF).Color = ColorSequence.new{ColorSequenceKeypoint.new(0, Color3.new(0.78, 0.749, 0.8)), ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1))}
-
-local hasName = TB.Name ~= nil
-H.Size = UDim2.new(1, 0, 0, hasName and 42 or 20)
-H.BackgroundTransparency = 1
-
-if hasName then
-TitleTB.Size = UDim2.new(1, 0, 0, 16)
-TitleTB.BackgroundTransparency = 1
-TitleTB.TextColor3 = Color3.new(0.306, 0.306, 0.306)
-TitleTB.FontFace = Library.UIFont
-TitleTB.TextSize = Library.FontSize
-TitleTB.TextXAlignment = Enum.TextXAlignment.Left
-TitleTB.Text = TB.Name
-else
-TitleTB.Visible = false
+return gb
 end
 
-TF.Position = UDim2.new(0, 0, 0, hasName and 18 or 0)
-TF.Size = UDim2.new(1, -15, 0, 20)
-TF.BackgroundColor3 = Color3.new(0.0784, 0.0784, 0.0784)
-TF.BorderColor3 = Color3.new(0, 0, 0)
-TF.ClipsDescendants = true
+function Page:AddLeftGroupbox(name)
+return createGroupbox(name, LeftCol)
+end
 
-TBox.Size = UDim2.new(1, -8, 1, 0)
-TBox.Position = UDim2.new(0, 4, 0, 0)
-TBox.BackgroundTransparency = 1
-TBox.Text = Props.State or ""
-TBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-TBox.FontFace = Library.UIFont
-TBox.TextSize = Library.FontSize
-TBox.PlaceholderText = TB.Placeholder
-TBox.PlaceholderColor3 = Color3.new(0.25, 0.25, 0.25)
-TBox.ClearTextOnFocus = false
-TBox.TextXAlignment = Enum.TextXAlignment.Left
+function Page:AddRightGroupbox(name)
+return createGroupbox(name, RightCol)
+end
 
-Library.Flags[TB.Flag] = TBox.Text
+function Page:AddLeftTabbox()
+local tbFrame = Instance.new('Frame', LeftCol)
+tbFrame.Size = UDim2.new(1, 0, 0, 0)
+tbFrame.AutomaticSize = Enum.AutomaticSize.Y
+tbFrame.BackgroundColor3 = Color3.new(0.0314, 0.0314, 0.0314)
+tbFrame.BorderColor3 = Color3.new(0.1098, 0.1098, 0.1098)
 
-TBox:GetPropertyChangedSignal("Text"):Connect(function()
-Library.Flags[TB.Flag] = TBox.Text
-if TB.OnChange then task.spawn(pcall, TB.OnChange, TBox.Text) end
-Library:FireFlagCallbacks(TB.Flag, TBox.Text)
+local TabBar = Instance.new('Frame', tbFrame)
+TabBar.Size = UDim2.new(1, 0, 0, 20)
+TabBar.BackgroundColor3 = Color3.new(0.0431, 0.0431, 0.0431)
+TabBar.BorderColor3 = Color3.new(0.1098, 0.1098, 0.1098)
+Instance.new('UIListLayout', TabBar).FillDirection = Enum.FillDirection.Horizontal
+TabBar:FindFirstChildOfClass("UIListLayout").SortOrder = Enum.SortOrder.LayoutOrder
+
+local ContentHolder = Instance.new('Frame', tbFrame)
+ContentHolder.Position = UDim2.new(0, 0, 0, 20)
+ContentHolder.Size = UDim2.new(1, 0, 0, 0)
+ContentHolder.AutomaticSize = Enum.AutomaticSize.Y
+ContentHolder.BackgroundTransparency = 1
+Instance.new('UIPadding', tbFrame).PaddingBottom = UDim.new(0, 8)
+
+local tabbox = {_tabs = {}, _activeTab = nil}
+
+function tabbox:AddTab(tabName)
+local tabContent = Instance.new('Frame', ContentHolder)
+tabContent.Size = UDim2.new(1, 0, 0, 0)
+tabContent.AutomaticSize = Enum.AutomaticSize.Y
+tabContent.BackgroundTransparency = 1
+tabContent.Visible = false
+Instance.new('UIListLayout', tabContent).SortOrder = Enum.SortOrder.LayoutOrder
+tabContent:FindFirstChildOfClass("UIListLayout").Padding = UDim.new(0, 4)
+local pad = Instance.new('UIPadding', tabContent)
+pad.PaddingLeft = UDim.new(0, 10)
+pad.PaddingRight = UDim.new(0, 10)
+pad.PaddingTop = UDim.new(0, 5)
+
+local tabBtn = Instance.new('TextButton', TabBar)
+tabBtn.Size = UDim2.new(0, 60, 1, 0)
+tabBtn.BackgroundTransparency = 1
+tabBtn.Text = tabName
+tabBtn.TextColor3 = Color3.fromRGB(78, 78, 78)
+tabBtn.FontFace = Library.UIFont
+tabBtn.TextSize = Library.FontSize
+tabBtn.AutoButtonColor = false
+
+task.defer(function()
+tabBtn.Size = UDim2.new(0, tabBtn.TextBounds.X + 16, 1, 0)
 end)
 
-TBox.FocusLost:Connect(function(ep)
-TB.Callback(TBox.Text, ep)
-end)
+local tabData = {name = tabName, content = tabContent, btn = tabBtn}
+tabbox._tabs[#tabbox._tabs + 1] = tabData
 
-local function set(str)
-TBox.Text = str
-Library.Flags[TB.Flag] = str
-Library:FireFlagCallbacks(TB.Flag, str)
+local function activate()
+for _, t in ipairs(tabbox._tabs) do
+t.content.Visible = false
+t.btn.TextColor3 = Color3.fromRGB(78, 78, 78)
+end
+tabContent.Visible = true
+tabBtn.TextColor3 = Library.Accent
+tabbox._activeTab = tabData
 end
 
-function TB:Set(str) set(str) end
-function TB:SetValue(str) set(str) end
-function TB:SetLive(str) TBox.Text = str; Library.Flags[TB.Flag] = str end
-function TB:SetIfNotFocused(str) if not TBox:IsFocused() then set(str) end end
-function TB:GetText() return TBox.Text end
-function TB:IsFocused() return TBox:IsFocused() end
-function TB:Focus() TBox:CaptureFocus() end
+tabBtn.MouseButton1Click:Connect(activate)
 
-Flags[TB.Flag] = set
-return TB
+if #tabbox._tabs == 1 then activate() end
+
+local tabGb = {}
+tabGb._content = tabContent
+
+function tabGb:AddToggle(i, o) return Page:AddLeftGroupbox(""):AddToggle(i, o) end
+
+local fakeSection = {Elements = {Left = tabContent, Right = tabContent}}
+setmetatable(fakeSection, Library.Sections)
+tabGb._section = fakeSection
+
+local function wrapGroupbox()
+local wgb = {}
+wgb._content = tabContent
+
+function wgb:AddToggle(tIdx, tOpts)
+tOpts = tOpts or {}
+local flag2 = tIdx or Library.NextFlag()
+local togObj2 = {Value = tOpts.Default or false, Type = "Toggle", _changedCbs = {}, _colorPickers = {}, _keyPickers = {}}
+
+local H2 = Instance.new('TextButton', tabContent)
+local F2 = Instance.new('Frame', H2)
+local Inner2 = Instance.new('Frame', F2)
+local AccentF2 = Instance.new('Frame', Inner2)
+Instance.new('UIGradient', AccentF2).Color = ColorSequence.new{ColorSequenceKeypoint.new(0, Color3.new(0.78, 0.749, 0.8)), ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1))}
+AccentF2:FindFirstChildOfClass("UIGradient").Rotation = -90
+local T2 = Instance.new('TextLabel', H2)
+
+table.insert(Library.ThemeObjects, AccentF2)
+
+H2.Size = UDim2.new(1, 0, 0, 18)
+H2.BackgroundTransparency = 1; H2.Text = ""; H2.AutoButtonColor = false
+F2.Position = UDim2.new(0, 0, 0, 3); F2.Size = UDim2.new(0, 12, 0, 12)
+F2.BackgroundColor3 = Color3.new(0.0784, 0.0784, 0.0784); F2.BorderColor3 = Color3.new(0, 0, 0)
+Inner2.Position = UDim2.new(0, 2, 0, 2); Inner2.Size = UDim2.new(1, -4, 1, -4)
+Inner2.BackgroundTransparency = 1; Inner2.BorderSizePixel = 0
+AccentF2.Size = UDim2.new(1, 0, 1, 0); AccentF2.BackgroundColor3 = Library.Accent
+AccentF2.BorderSizePixel = 0; AccentF2.Visible = false
+T2.Position = UDim2.new(0, 20, 0, 0); T2.Size = UDim2.new(1, -70, 1, 0)
+T2.BackgroundTransparency = 1; T2.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+T2.FontFace = Library.UIFont; T2.TextSize = Library.FontSize; T2.ZIndex = 105
+T2.TextXAlignment = Enum.TextXAlignment.Left; T2.Text = tOpts.Text or "Toggle"
+
+local function uv2()
+AccentF2.Visible = togObj2.Value
+T2.TextColor3 = togObj2.Value and Color3.fromRGB(255, 255, 255) or Color3.new(0.306, 0.306, 0.306)
 end
 
-function Sections:Button(Options)
-local Props = Options or {}
-local parent = Props.Side == "Right" and self.Elements.Right or self.Elements.Left
-local H = Instance.new('Frame', parent)
-local TF = Instance.new('Frame', H)
-local Btn = Instance.new('TextButton', TF)
+function togObj2:SetValue(b)
+if typeof(b) ~= "boolean" then return end
+togObj2.Value = b; uv2()
+Library.Flags[flag2] = b
+for _, cb in ipairs(togObj2._changedCbs) do task.spawn(pcall, cb) end
+end
+function togObj2:OnChanged(cb) togObj2._changedCbs[#togObj2._changedCbs + 1] = cb end
 
-Instance.new('UIGradient', TF).Color = ColorSequence.new{ColorSequenceKeypoint.new(0, Color3.new(0.78, 0.749, 0.8)), ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1))}
-
-H.Size = UDim2.new(1, 0, 0, 24)
-H.BackgroundTransparency = 1
-TF.Size = UDim2.new(1, -15, 1, 0)
-TF.BackgroundColor3 = Color3.new(0.0784, 0.0784, 0.0784)
-TF.BorderColor3 = Color3.new(0, 0, 0)
-Btn.Size = UDim2.new(1, 0, 1, 0)
-Btn.BackgroundTransparency = 1
-Btn.Text = Props.Name or "button"
-Btn.TextColor3 = Color3.new(0.306, 0.306, 0.306)
-Btn.FontFace = Library.UIFont
-Btn.TextSize = Library.FontSize
-Btn.MouseButton1Click:Connect(Props.Callback or function() end)
-
-return {Holder = H}
+Library.Flags[flag2] = togObj2.Value; uv2()
+H2.MouseButton1Click:Connect(function() togObj2:SetValue(not togObj2.Value) end)
+Toggles[tIdx] = togObj2
+Library._Flags[flag2] = function(v) togObj2:SetValue(v) end
+return togObj2
 end
 
-function Sections:Colorpicker(Options)
-local Props = Options or {}
-local CP = {
-Section = self, Name = Props.Name or "Color",
-State = Props.State or Color3.fromRGB(255, 0, 0),
-Callback = Props.Callback or function() end,
-Flag = Props.Flag or Library.NextFlag(),
-}
-
-local parent = Props.Side == "Right" and self.Elements.Right or self.Elements.Left
-local ColorBtn = Instance.new('TextButton', parent)
-local T = Instance.new('TextLabel', ColorBtn)
-
-ColorBtn.Size = UDim2.new(1, 0, 0, 16)
-ColorBtn.BackgroundTransparency = 1
-ColorBtn.Text = ""
-ColorBtn.AutoButtonColor = false
-
-T.Size = UDim2.new(1, 0, 1, 0)
-T.BackgroundTransparency = 1
-T.TextColor3 = Color3.new(0.306, 0.306, 0.306)
-T.FontFace = Library.UIFont
-T.TextSize = Library.FontSize
-T.TextXAlignment = Enum.TextXAlignment.Left
-T.Text = CP.Name
-
-local cpt = Library:NewPicker(CP.State, 1, ColorBtn, 0, CP.Flag, CP.Callback)
-function CP:Set(color) cpt:Set(color) end
-return CP
+function wgb:AddLabel(text, wrap)
+local L = Instance.new('TextLabel', tabContent)
+L.Size = UDim2.new(1, 0, 0, wrap and 0 or 16)
+L.AutomaticSize = wrap and Enum.AutomaticSize.Y or Enum.AutomaticSize.None
+L.BackgroundTransparency = 1; L.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+L.FontFace = Library.UIFont; L.TextSize = Library.FontSize
+L.TextXAlignment = Enum.TextXAlignment.Left; L.Text = text or "Label"
+L.TextWrapped = wrap or false
+local o = {_instance = L}
+function o:SetText(t) L.Text = t end
+return o
 end
 
-function Sections:Label(Options)
-local Props = Options or {}
-local parent = Props.Side == "Right" and self.Elements.Right or self.Elements.Left
-local L = Instance.new('TextLabel', parent)
-
-L.Size = UDim2.new(1, 0, 0, 16)
-L.BackgroundTransparency = 1
-L.TextColor3 = Color3.new(0.306, 0.306, 0.306)
-L.FontFace = Library.UIFont
-L.TextSize = Library.FontSize
-L.TextXAlignment = Enum.TextXAlignment.Left
-L.Text = Props.Name or "Label"
-L.TextWrapped = true
-
-local lbl = {_instance = L}
-function lbl:SetText(text) L.Text = text end
-return lbl
-end
-
-function Sections:Divider(Options)
-local parent = (Options and Options.Side == "Right") and self.Elements.Right or self.Elements.Left
-local D = Instance.new('Frame', parent)
+function wgb:AddDivider()
+local D = Instance.new('Frame', tabContent)
 D.Size = UDim2.new(1, 0, 0, 1)
 D.BackgroundColor3 = Color3.new(0.1098, 0.1098, 0.1098)
 D.BorderSizePixel = 0
 end
 
-function Sections:Keybind(Options)
-local Props = Options or {}
-local KB = {
-Section = self, Name = Props.Name or "Keybind",
-Mode = Props.Mode or "Toggle",
-Callback = Props.Callback,
-Flag = Props.Flag or Library.NextFlag(),
-Key = nil, Active = false, Binding = false,
-Holder = nil, _keyDown = false,
-}
-
-local initKey = Props.State or Props.Key
-if initKey and typeof(initKey) == "EnumItem" and initKey ~= Enum.KeyCode.Unknown then
-KB.Key = initKey
+function wgb:AddButton(text, callback)
+local H = Instance.new('Frame', tabContent)
+H.Size = UDim2.new(1, 0, 0, 24); H.BackgroundTransparency = 1
+local TF = Instance.new('Frame', H)
+TF.Size = UDim2.new(1, -15, 1, 0)
+TF.BackgroundColor3 = Color3.new(0.0784, 0.0784, 0.0784); TF.BorderColor3 = Color3.new(0, 0, 0)
+Instance.new('UIGradient', TF).Color = ColorSequence.new{ColorSequenceKeypoint.new(0, Color3.new(0.78, 0.749, 0.8)), ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1))}
+local Btn = Instance.new('TextButton', TF)
+Btn.Size = UDim2.new(1, 0, 1, 0); Btn.BackgroundTransparency = 1
+Btn.Text = text or "Button"; Btn.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+Btn.FontFace = Library.UIFont; Btn.TextSize = Library.FontSize
+Btn.MouseButton1Click:Connect(callback or function() end)
+return {Holder = H}
 end
 
-local parent = Props.Side == "Right" and self.Elements.Right or self.Elements.Left
-local H = Instance.new('TextButton', parent)
-local T = Instance.new('TextLabel', H)
-local V = Instance.new('TextButton', H)
-local MW = Instance.new('Frame', H)
-Instance.new('UIListLayout', MW).SortOrder = Enum.SortOrder.LayoutOrder
-
-KB.Holder = H
-
-H.Size = UDim2.new(1, 0, 0, 16)
-H.BackgroundTransparency = 1
-H.Text = ""
-H.AutoButtonColor = false
-
-T.Size = UDim2.new(1, -55, 1, 0)
-T.BackgroundTransparency = 1
-T.TextColor3 = Color3.new(0.306, 0.306, 0.306)
-T.FontFace = Library.UIFont
-T.TextSize = Library.FontSize
-T.TextXAlignment = Enum.TextXAlignment.Left
-T.Text = KB.Name
-
-V.Position = UDim2.new(1, -50, 0, 0)
-V.Size = UDim2.new(0, 45, 1, 0)
-V.BackgroundTransparency = 1
-V.Text = "Unknown"
-V.TextColor3 = Color3.new(0.306, 0.306, 0.306)
-V.FontFace = Library.UIFont
-V.TextSize = Library.FontSize
-V.AutoButtonColor = false
-V.TextXAlignment = Enum.TextXAlignment.Right
-
-MW.Position = UDim2.new(1, -60, 0, 18)
-MW.Size = UDim2.new(0, 70, 0, 0)
-MW.BackgroundColor3 = Color3.new(0.0431, 0.0431, 0.0431)
-MW.BorderColor3 = Color3.new(0.1098, 0.1098, 0.1098)
-MW.ZIndex = 1220
-MW.Visible = false
-MW.AutomaticSize = Enum.AutomaticSize.Y
-
-local modeButtons = {}
-
-local function getKeyName(key)
-if not key or key == Enum.KeyCode.Unknown then return "Unknown" end
-if Library.Keys[key] then return Library.Keys[key] end
-return tostring(key):gsub("Enum.KeyCode.", ""):gsub("Enum.UserInputType.", "")
+return wgb
 end
 
-function KB:_updateFlag()
-local k = KB.Key
-if k == Enum.KeyCode.Unknown then k = nil end
-Library.Flags[KB.Flag] = {key = k, mode = KB.Mode, active = KB.Active}
-Library:FireFlagCallbacks(KB.Flag, Library.Flags[KB.Flag])
+return wrapGroupbox()
 end
 
-local function updateModeColors()
-for m, btn in pairs(modeButtons) do
-btn.TextColor3 = m == KB.Mode and Color3.fromRGB(255, 255, 255) or Color3.new(0.306, 0.306, 0.306)
-end
+return tabbox
 end
 
-for _, mode in ipairs({"Toggle", "Hold"}) do
-local MBtn = Instance.new('TextButton', MW)
-MBtn.Size = UDim2.new(1, 0, 0, 18)
-MBtn.BackgroundTransparency = 1
-MBtn.Text = mode
-MBtn.TextColor3 = KB.Mode == mode and Color3.fromRGB(255, 255, 255) or Color3.new(0.306, 0.306, 0.306)
-MBtn.FontFace = Library.UIFont
-MBtn.TextSize = Library.FontSize
-MBtn.ZIndex = 1221
-modeButtons[mode] = MBtn
-MBtn.MouseButton1Click:Connect(function()
-KB.Mode = mode; KB.Active = false
-updateModeColors(); MW.Visible = false; KB:_updateFlag()
-end)
+function Page:AddRightTabbox()
+local tbFrame = Instance.new('Frame', RightCol)
+tbFrame.Size = UDim2.new(1, 0, 0, 0)
+tbFrame.AutomaticSize = Enum.AutomaticSize.Y
+tbFrame.BackgroundColor3 = Color3.new(0.0314, 0.0314, 0.0314)
+tbFrame.BorderColor3 = Color3.new(0.1098, 0.1098, 0.1098)
+
+local TabBar = Instance.new('Frame', tbFrame)
+TabBar.Size = UDim2.new(1, 0, 0, 20)
+TabBar.BackgroundColor3 = Color3.new(0.0431, 0.0431, 0.0431)
+TabBar.BorderColor3 = Color3.new(0.1098, 0.1098, 0.1098)
+Instance.new('UIListLayout', TabBar).FillDirection = Enum.FillDirection.Horizontal
+TabBar:FindFirstChildOfClass("UIListLayout").SortOrder = Enum.SortOrder.LayoutOrder
+
+local ContentHolder = Instance.new('Frame', tbFrame)
+ContentHolder.Position = UDim2.new(0, 0, 0, 20)
+ContentHolder.Size = UDim2.new(1, 0, 0, 0)
+ContentHolder.AutomaticSize = Enum.AutomaticSize.Y
+ContentHolder.BackgroundTransparency = 1
+Instance.new('UIPadding', tbFrame).PaddingBottom = UDim.new(0, 8)
+
+local tabbox = {_tabs = {}, _activeTab = nil}
+
+function tabbox:AddTab(tabName)
+local tabContent = Instance.new('Frame', ContentHolder)
+tabContent.Size = UDim2.new(1, 0, 0, 0)
+tabContent.AutomaticSize = Enum.AutomaticSize.Y
+tabContent.BackgroundTransparency = 1
+tabContent.Visible = false
+Instance.new('UIListLayout', tabContent).SortOrder = Enum.SortOrder.LayoutOrder
+tabContent:FindFirstChildOfClass("UIListLayout").Padding = UDim.new(0, 4)
+local pad = Instance.new('UIPadding', tabContent)
+pad.PaddingLeft = UDim.new(0, 10); pad.PaddingRight = UDim.new(0, 10); pad.PaddingTop = UDim.new(0, 5)
+
+local tabBtn = Instance.new('TextButton', TabBar)
+tabBtn.Size = UDim2.new(0, 60, 1, 0)
+tabBtn.BackgroundTransparency = 1; tabBtn.Text = tabName
+tabBtn.TextColor3 = Color3.fromRGB(78, 78, 78)
+tabBtn.FontFace = Library.UIFont; tabBtn.TextSize = Library.FontSize; tabBtn.AutoButtonColor = false
+
+task.defer(function() tabBtn.Size = UDim2.new(0, tabBtn.TextBounds.X + 16, 1, 0) end)
+
+local tabData = {name = tabName, content = tabContent, btn = tabBtn}
+tabbox._tabs[#tabbox._tabs + 1] = tabData
+
+local function activate()
+for _, t in ipairs(tabbox._tabs) do t.content.Visible = false; t.btn.TextColor3 = Color3.fromRGB(78, 78, 78) end
+tabContent.Visible = true; tabBtn.TextColor3 = Library.Accent; tabbox._activeTab = tabData
 end
 
-if KB.Key then V.Text = getKeyName(KB.Key) end
-KB:_updateFlag()
+tabBtn.MouseButton1Click:Connect(activate)
+if #tabbox._tabs == 1 then activate() end
 
-V.MouseButton1Click:Connect(function()
-if KB.Binding then return end
-KB.Binding = true; V.Text = "..."
-end)
-
-V.MouseButton2Click:Connect(function() MW.Visible = not MW.Visible end)
-
-Library:Connection(UIS.InputBegan, function(input, gp)
-if MW.Visible and input.UserInputType == Enum.UserInputType.MouseButton1 then
-task.defer(function()
-if not Library:IsMouseOverFrame(MW) and not Library:IsMouseOverFrame(V) then MW.Visible = false end
-end)
+local wgb = {}
+wgb._content = tabContent
+function wgb:AddToggle(i, o) end
+function wgb:AddLabel(t, w)
+local L = Instance.new('TextLabel', tabContent)
+L.Size = UDim2.new(1, 0, 0, w and 0 or 16)
+L.AutomaticSize = w and Enum.AutomaticSize.Y or Enum.AutomaticSize.None
+L.BackgroundTransparency = 1; L.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+L.FontFace = Library.UIFont; L.TextSize = Library.FontSize
+L.TextXAlignment = Enum.TextXAlignment.Left; L.Text = t or "Label"; L.TextWrapped = w or false
+return {_instance = L, SetText = function(s, tx) L.Text = tx end}
+end
+function wgb:AddDivider()
+local D = Instance.new('Frame', tabContent)
+D.Size = UDim2.new(1, 0, 0, 1); D.BackgroundColor3 = Color3.new(0.1098, 0.1098, 0.1098); D.BorderSizePixel = 0
+end
+function wgb:AddButton(text, callback)
+local H = Instance.new('Frame', tabContent); H.Size = UDim2.new(1, 0, 0, 24); H.BackgroundTransparency = 1
+local TF = Instance.new('Frame', H); TF.Size = UDim2.new(1, -15, 1, 0)
+TF.BackgroundColor3 = Color3.new(0.0784, 0.0784, 0.0784); TF.BorderColor3 = Color3.new(0, 0, 0)
+Instance.new('UIGradient', TF).Color = ColorSequence.new{ColorSequenceKeypoint.new(0, Color3.new(0.78, 0.749, 0.8)), ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1))}
+local Btn = Instance.new('TextButton', TF); Btn.Size = UDim2.new(1, 0, 1, 0); Btn.BackgroundTransparency = 1
+Btn.Text = text or "Button"; Btn.TextColor3 = Color3.new(0.306, 0.306, 0.306)
+Btn.FontFace = Library.UIFont; Btn.TextSize = Library.FontSize
+Btn.MouseButton1Click:Connect(callback or function() end)
+return {Holder = H}
+end
+return wgb
 end
 
-if KB.Binding then
-local key
-if input.UserInputType == Enum.UserInputType.Keyboard then key = input.KeyCode
-elseif input.UserInputType == Enum.UserInputType.MouseButton1 then key = Enum.UserInputType.MouseButton1
-elseif input.UserInputType == Enum.UserInputType.MouseButton2 then key = Enum.UserInputType.MouseButton2
-elseif input.UserInputType == Enum.UserInputType.MouseButton3 then key = Enum.UserInputType.MouseButton3 end
-
-if key then
-if key == Enum.KeyCode.Backspace or key == Enum.KeyCode.Escape then
-KB.Key = nil; V.Text = "Unknown"
-else
-KB.Key = key; V.Text = getKeyName(key)
-end
-KB.Active = false; KB._keyDown = false; KB:_updateFlag(); KB.Binding = false
-end
-end
-end)
-
-function KB:Set(key)
-if key == nil or (typeof(key) == "EnumItem" and key == Enum.KeyCode.Unknown) then
-KB.Key = nil; V.Text = "Unknown"
-elseif typeof(key) == "EnumItem" then
-KB.Key = key; V.Text = getKeyName(key)
-end
-KB.Active = false; KB._keyDown = false; KB:_updateFlag()
+return tabbox
 end
 
-function KB:GetState() return KB.Active end
-function KB:SetMode(mode)
-if mode == "Toggle" or mode == "Hold" then
-KB.Mode = mode; KB.Active = false; KB._keyDown = false
-updateModeColors(); KB:_updateFlag()
-end
-end
-function KB:SetCallback(cb) KB.Callback = cb end
-
-Library._keybinds[#Library._keybinds + 1] = KB
-Flags[KB.Flag] = KB
-return KB
+return setmetatable(Page, Library.Pages)
 end
 end
 end
 
 local ESPPreview = {}
 
-local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
-
 local SNAP_ZONES = {"Top", "Bottom", "Left", "Right"}
 local PREVIEW_MODES = {"Character", "Avenir Anime Girl"}
 local ANIME_GIRL_IMAGE = "rbxassetid://138507241500989"
 local ANIME_GIRL_NAME = "discord.gg/avenir"
 
-function ESPPreview.Create(library, screenGui)
+function ESPPreview.Create(lib, screenGui)
 local preview = {
-Enabled = true,
-_connections = {},
-_elementPositions = {},
-_currentMode = "Character",
-_previewHealth = 100,
-_previewMaxHealth = 100,
-_previewArmor = 100,
-_previewMaxArmor = 100,
-_previewDistance = 120,
-_previewTool = "AK-47",
-_previewName = Players.LocalPlayer.DisplayName,
-_liveMode = true,
-_renderedImageW = 0,
-_renderedImageH = 0,
+Enabled = true, _connections = {}, _elementPositions = {},
+_currentMode = "Character", _previewHealth = 100, _previewMaxHealth = 100,
+_previewArmor = 100, _previewMaxArmor = 100, _previewDistance = 120,
+_previewTool = "AK-47", _previewName = Players.LocalPlayer.DisplayName,
+_liveMode = true, _renderedImageW = 0, _renderedImageH = 0,
 }
 local panelWidth = 350
 
@@ -1692,11 +1960,10 @@ Inner.BackgroundColor3 = Color3.new(0.0431, 0.0431, 0.0431)
 Inner.BorderColor3 = Color3.new(0, 0, 0)
 Inner.BorderMode = Enum.BorderMode.Inset
 
-local TopLine = Instance.new('Frame', Inner)
-TopLine.Position = UDim2.new(0, -1, 0, 0)
-TopLine.Size = UDim2.new(1, 2, 0, 1)
-TopLine.BackgroundColor3 = Color3.new(0.1098, 0.1098, 0.1098)
-TopLine.BorderSizePixel = 0
+Instance.new('Frame', Inner).Position = UDim2.new(0, -1, 0, 0)
+Inner:GetChildren()[#Inner:GetChildren()].Size = UDim2.new(1, 2, 0, 1)
+Inner:GetChildren()[#Inner:GetChildren()].BackgroundColor3 = Color3.new(0.1098, 0.1098, 0.1098)
+Inner:GetChildren()[#Inner:GetChildren()].BorderSizePixel = 0
 
 local BotLine = Instance.new('Frame', Inner)
 BotLine.Position = UDim2.new(0, -1, 1, -1)
@@ -1730,7 +1997,6 @@ ModeButton.FontFace = Library.UIFont
 ModeButton.TextSize = 11
 ModeButton.AutoButtonColor = false
 ModeButton.TextXAlignment = Enum.TextXAlignment.Left
-preview._modeButton = ModeButton
 
 local ModeDropdown = Instance.new('Frame', ModeButton)
 ModeDropdown.Position = UDim2.new(0, 0, 1, 2)
@@ -1739,7 +2005,6 @@ ModeDropdown.BackgroundColor3 = Color3.new(0.0784, 0.0784, 0.0784)
 ModeDropdown.BorderColor3 = Color3.new(0, 0, 0)
 ModeDropdown.Visible = false
 ModeDropdown.ZIndex = 200
-
 Instance.new('UIListLayout', ModeDropdown).SortOrder = Enum.SortOrder.LayoutOrder
 
 local modeDropdownOpen = false
@@ -1766,48 +2031,21 @@ CharBox.BorderSizePixel = 0
 CharBox.Visible = true
 preview._charBox = CharBox
 
-local Head = Instance.new('Frame', CharBox)
-Head.Name = "Head"
-Head.BackgroundColor3 = Color3.new(0.35, 0.35, 0.35)
-Head.BorderSizePixel = 0
-Instance.new('UICorner', Head).CornerRadius = UDim.new(0, 3)
-
-local Torso = Instance.new('Frame', CharBox)
-Torso.Name = "Torso"
-Torso.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
-Torso.BorderSizePixel = 0
-
-local LArm = Instance.new('Frame', CharBox)
-LArm.Name = "LArm"
-LArm.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
-LArm.BorderSizePixel = 0
-
-local RArm = Instance.new('Frame', CharBox)
-RArm.Name = "RArm"
-RArm.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
-RArm.BorderSizePixel = 0
-
-local LLeg = Instance.new('Frame', CharBox)
-LLeg.Name = "LLeg"
-LLeg.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
-LLeg.BorderSizePixel = 0
-
-local RLeg = Instance.new('Frame', CharBox)
-RLeg.Name = "RLeg"
-RLeg.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
-RLeg.BorderSizePixel = 0
-
+local Head = Instance.new('Frame', CharBox); Head.BackgroundColor3 = Color3.new(0.35, 0.35, 0.35); Head.BorderSizePixel = 0; Instance.new('UICorner', Head).CornerRadius = UDim.new(0, 3)
+local Torso = Instance.new('Frame', CharBox); Torso.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3); Torso.BorderSizePixel = 0
+local LArm = Instance.new('Frame', CharBox); LArm.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3); LArm.BorderSizePixel = 0
+local RArm = Instance.new('Frame', CharBox); RArm.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3); RArm.BorderSizePixel = 0
+local LLeg = Instance.new('Frame', CharBox); LLeg.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3); LLeg.BorderSizePixel = 0
+local RLeg = Instance.new('Frame', CharBox); RLeg.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3); RLeg.BorderSizePixel = 0
 preview._charParts = {Head, Torso, LArm, RArm, LLeg, RLeg}
 
 local ImageContainer = Instance.new('Frame', PreviewArea)
 ImageContainer.Name = "ImageContainer"
 ImageContainer.AnchorPoint = Vector2.new(0.5, 0.5)
 ImageContainer.Position = UDim2.new(0.5, 0, 0.5, 0)
-ImageContainer.Size = UDim2.new(1, 0, 1, 0)
 ImageContainer.BackgroundTransparency = 1
 ImageContainer.BorderSizePixel = 0
 ImageContainer.Visible = false
-ImageContainer.ClipsDescendants = false
 preview._imageContainer = ImageContainer
 
 local PreviewImage = Instance.new('ImageLabel', ImageContainer)
@@ -1820,861 +2058,304 @@ PreviewImage.ScaleType = Enum.ScaleType.Fit
 preview._previewImage = PreviewImage
 
 local BoxESP = Instance.new('Frame', PreviewArea)
-BoxESP.Name = "BoxESP"
 BoxESP.AnchorPoint = Vector2.new(0.5, 0.5)
 BoxESP.Position = UDim2.new(0.5, 0, 0.5, 0)
-BoxESP.Size = UDim2.new(0, 100, 0, 150)
 BoxESP.BackgroundTransparency = 1
 BoxESP.Visible = false
-
 local BoxStroke = Instance.new('UIStroke', BoxESP)
-BoxStroke.Color = Color3.fromRGB(255, 255, 255)
-BoxStroke.Thickness = 1
+BoxStroke.Color = Color3.fromRGB(255, 255, 255); BoxStroke.Thickness = 1
+preview._boxESP = BoxESP; preview._boxStroke = BoxStroke
 
-preview._boxESP = BoxESP
-preview._boxStroke = BoxStroke
-
-local function getArmorColor(armorValue)
-local pct = math.clamp(armorValue / 100, 0, 1)
-if pct >= 0.75 then return Color3.fromRGB(0, 120, 255)
-elseif pct >= 0.5 then return Color3.fromRGB(0, 200, 150)
-elseif pct >= 0.25 then return Color3.fromRGB(255, 200, 0)
-elseif pct > 0 then return Color3.fromRGB(255, 130, 0)
+local function getArmorColor(v)
+local p = math.clamp(v / 100, 0, 1)
+if p >= 0.75 then return Color3.fromRGB(0, 120, 255)
+elseif p >= 0.5 then return Color3.fromRGB(0, 200, 150)
+elseif p >= 0.25 then return Color3.fromRGB(255, 200, 0)
+elseif p > 0 then return Color3.fromRGB(255, 130, 0)
 else return Color3.fromRGB(255, 60, 60) end
 end
 
-local NameESP = Instance.new('TextButton', PreviewArea)
-NameESP.Name = "NameESP"
-NameESP.AnchorPoint = Vector2.new(0.5, 1)
-NameESP.Position = UDim2.new(0.5, 0, 0.15, 0)
-NameESP.Size = UDim2.new(0, 100, 0, 16)
-NameESP.BackgroundTransparency = 1
-NameESP.Text = Players.LocalPlayer.DisplayName
-NameESP.TextColor3 = Color3.fromRGB(255, 255, 255)
-NameESP.FontFace = Library.UIFont
-NameESP.TextSize = 13
-NameESP.Visible = false
-NameESP.AutoButtonColor = false
-NameESP.AutomaticSize = Enum.AutomaticSize.X
-preview._nameESP = NameESP
-preview._elementPositions["Name"] = "Top"
+local NameESP = Instance.new('TextButton', PreviewArea); NameESP.AnchorPoint = Vector2.new(0.5, 1); NameESP.BackgroundTransparency = 1; NameESP.Text = Players.LocalPlayer.DisplayName; NameESP.TextColor3 = Color3.fromRGB(255, 255, 255); NameESP.FontFace = Library.UIFont; NameESP.TextSize = 13; NameESP.Visible = false; NameESP.AutoButtonColor = false; NameESP.AutomaticSize = Enum.AutomaticSize.X; NameESP.Size = UDim2.new(0, 100, 0, 16)
+preview._nameESP = NameESP; preview._elementPositions["Name"] = "Top"
 
-local HealthBarBG = Instance.new('TextButton', PreviewArea)
-HealthBarBG.Name = "HealthBarBG"
-HealthBarBG.AnchorPoint = Vector2.new(1, 0.5)
-HealthBarBG.Position = UDim2.new(0.15, 0, 0.5, 0)
-HealthBarBG.Size = UDim2.new(0, 4, 0, 150)
-HealthBarBG.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
-HealthBarBG.BorderColor3 = Color3.new(0, 0, 0)
-HealthBarBG.Visible = false
-HealthBarBG.Text = ""
-HealthBarBG.AutoButtonColor = false
+local HealthBarBG = Instance.new('TextButton', PreviewArea); HealthBarBG.AnchorPoint = Vector2.new(1, 0.5); HealthBarBG.Size = UDim2.new(0, 4, 0, 150); HealthBarBG.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1); HealthBarBG.BorderColor3 = Color3.new(0, 0, 0); HealthBarBG.Visible = false; HealthBarBG.Text = ""; HealthBarBG.AutoButtonColor = false
+local HealthBarFill = Instance.new('Frame', HealthBarBG); HealthBarFill.AnchorPoint = Vector2.new(0, 1); HealthBarFill.Position = UDim2.new(0, 0, 1, 0); HealthBarFill.Size = UDim2.new(1, 0, 1, 0); HealthBarFill.BackgroundColor3 = Color3.fromRGB(0, 255, 0); HealthBarFill.BorderSizePixel = 0
+local HealthText = Instance.new('TextLabel', HealthBarBG); HealthText.AnchorPoint = Vector2.new(0.5, 0); HealthText.Position = UDim2.new(0.5, 0, 1, 2); HealthText.Size = UDim2.new(0, 30, 0, 10); HealthText.BackgroundTransparency = 1; HealthText.Text = "100"; HealthText.TextColor3 = Color3.fromRGB(255, 255, 255); HealthText.FontFace = Library.UIFont; HealthText.TextSize = 9; HealthText.Visible = false
+preview._healthBarBG = HealthBarBG; preview._healthBarFill = HealthBarFill; preview._healthText = HealthText; preview._elementPositions["Health"] = "Left"
 
-local HealthBarFill = Instance.new('Frame', HealthBarBG)
-HealthBarFill.AnchorPoint = Vector2.new(0, 1)
-HealthBarFill.Position = UDim2.new(0, 0, 1, 0)
-HealthBarFill.Size = UDim2.new(1, 0, 1, 0)
-HealthBarFill.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-HealthBarFill.BorderSizePixel = 0
+local DistESP = Instance.new('TextButton', PreviewArea); DistESP.AnchorPoint = Vector2.new(0.5, 0); DistESP.BackgroundTransparency = 1; DistESP.Text = "[120m]"; DistESP.TextColor3 = Color3.fromRGB(200, 200, 200); DistESP.FontFace = Library.UIFont; DistESP.TextSize = 11; DistESP.Visible = false; DistESP.AutoButtonColor = false; DistESP.AutomaticSize = Enum.AutomaticSize.X; DistESP.Size = UDim2.new(0, 60, 0, 14)
+preview._distESP = DistESP; preview._distanceESP = DistESP; preview._elementPositions["Distance"] = "Bottom"
 
-local HealthText = Instance.new('TextLabel', HealthBarBG)
-HealthText.AnchorPoint = Vector2.new(0.5, 0)
-HealthText.Position = UDim2.new(0.5, 0, 1, 2)
-HealthText.Size = UDim2.new(0, 30, 0, 10)
-HealthText.BackgroundTransparency = 1
-HealthText.Text = "100"
-HealthText.TextColor3 = Color3.fromRGB(255, 255, 255)
-HealthText.FontFace = Library.UIFont
-HealthText.TextSize = 9
-HealthText.Visible = false
+local ToolESP = Instance.new('TextButton', PreviewArea); ToolESP.AnchorPoint = Vector2.new(0.5, 0); ToolESP.BackgroundTransparency = 1; ToolESP.Text = "[AK-47]"; ToolESP.TextColor3 = Color3.fromRGB(180, 180, 180); ToolESP.FontFace = Library.UIFont; ToolESP.TextSize = 10; ToolESP.Visible = false; ToolESP.AutoButtonColor = false; ToolESP.AutomaticSize = Enum.AutomaticSize.X; ToolESP.Size = UDim2.new(0, 60, 0, 14)
+preview._toolESP = ToolESP; preview._elementPositions["Tool"] = "Bottom"
 
-preview._healthBarBG = HealthBarBG
-preview._healthBarFill = HealthBarFill
-preview._healthText = HealthText
-preview._elementPositions["Health"] = "Left"
+local ArmorESP = Instance.new('TextButton', PreviewArea); ArmorESP.AnchorPoint = Vector2.new(0.5, 0); ArmorESP.BackgroundTransparency = 1; ArmorESP.Text = "Armor: 100"; ArmorESP.TextColor3 = Color3.fromRGB(0, 150, 255); ArmorESP.FontFace = Library.UIFont; ArmorESP.TextSize = 11; ArmorESP.Visible = false; ArmorESP.AutoButtonColor = false; ArmorESP.AutomaticSize = Enum.AutomaticSize.X; ArmorESP.Size = UDim2.new(0, 80, 0, 14)
+preview._armorESP = ArmorESP; preview._elementPositions["Armor"] = "Bottom"
 
-local DistESP = Instance.new('TextButton', PreviewArea)
-DistESP.Name = "DistESP"
-DistESP.AnchorPoint = Vector2.new(0.5, 0)
-DistESP.Position = UDim2.new(0.5, 0, 0.85, 0)
-DistESP.Size = UDim2.new(0, 60, 0, 14)
-DistESP.BackgroundTransparency = 1
-DistESP.Text = "[120m]"
-DistESP.TextColor3 = Color3.fromRGB(200, 200, 200)
-DistESP.FontFace = Library.UIFont
-DistESP.TextSize = 11
-DistESP.Visible = false
-DistESP.AutoButtonColor = false
-DistESP.AutomaticSize = Enum.AutomaticSize.X
-preview._distESP = DistESP
-preview._distanceESP = DistESP
-preview._elementPositions["Distance"] = "Bottom"
-
-local ToolESP = Instance.new('TextButton', PreviewArea)
-ToolESP.Name = "ToolESP"
-ToolESP.AnchorPoint = Vector2.new(0.5, 0)
-ToolESP.Position = UDim2.new(0.5, 0, 0.88, 0)
-ToolESP.Size = UDim2.new(0, 60, 0, 14)
-ToolESP.BackgroundTransparency = 1
-ToolESP.Text = "[AK-47]"
-ToolESP.TextColor3 = Color3.fromRGB(180, 180, 180)
-ToolESP.FontFace = Library.UIFont
-ToolESP.TextSize = 10
-ToolESP.Visible = false
-ToolESP.AutoButtonColor = false
-ToolESP.AutomaticSize = Enum.AutomaticSize.X
-preview._toolESP = ToolESP
-preview._elementPositions["Tool"] = "Bottom"
-
-local ArmorESP = Instance.new('TextButton', PreviewArea)
-ArmorESP.Name = "ArmorESP"
-ArmorESP.AnchorPoint = Vector2.new(0.5, 0)
-ArmorESP.Position = UDim2.new(0.5, 0, 0.91, 0)
-ArmorESP.Size = UDim2.new(0, 80, 0, 14)
-ArmorESP.BackgroundTransparency = 1
-ArmorESP.Text = "Armor: 100"
-ArmorESP.TextColor3 = Color3.fromRGB(0, 150, 255)
-ArmorESP.FontFace = Library.UIFont
-ArmorESP.TextSize = 11
-ArmorESP.Visible = false
-ArmorESP.AutoButtonColor = false
-ArmorESP.AutomaticSize = Enum.AutomaticSize.X
-preview._armorESP = ArmorESP
-preview._elementPositions["Armor"] = "Bottom"
-
-local ArmorBarBG = Instance.new('TextButton', PreviewArea)
-ArmorBarBG.Name = "ArmorBarBG"
-ArmorBarBG.AnchorPoint = Vector2.new(0, 0.5)
-ArmorBarBG.Position = UDim2.new(0.85, 0, 0.5, 0)
-ArmorBarBG.Size = UDim2.new(0, 4, 0, 150)
-ArmorBarBG.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
-ArmorBarBG.BorderColor3 = Color3.new(0, 0, 0)
-ArmorBarBG.Visible = false
-ArmorBarBG.Text = ""
-ArmorBarBG.AutoButtonColor = false
-
-local ArmorBarFill = Instance.new('Frame', ArmorBarBG)
-ArmorBarFill.AnchorPoint = Vector2.new(0, 1)
-ArmorBarFill.Position = UDim2.new(0, 0, 1, 0)
-ArmorBarFill.Size = UDim2.new(1, 0, 1, 0)
-ArmorBarFill.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-ArmorBarFill.BorderSizePixel = 0
-
-local ArmorText = Instance.new('TextLabel', ArmorBarBG)
-ArmorText.AnchorPoint = Vector2.new(0.5, 0)
-ArmorText.Position = UDim2.new(0.5, 0, 1, 2)
-ArmorText.Size = UDim2.new(0, 30, 0, 10)
-ArmorText.BackgroundTransparency = 1
-ArmorText.Text = "100"
-ArmorText.TextColor3 = Color3.fromRGB(0, 150, 255)
-ArmorText.FontFace = Library.UIFont
-ArmorText.TextSize = 9
-ArmorText.Visible = false
-
-preview._armorBarBG = ArmorBarBG
-preview._armorBarFill = ArmorBarFill
-preview._armorText = ArmorText
-preview._elementPositions["ArmorBar"] = "Right"
+local ArmorBarBG = Instance.new('TextButton', PreviewArea); ArmorBarBG.AnchorPoint = Vector2.new(0, 0.5); ArmorBarBG.Size = UDim2.new(0, 4, 0, 150); ArmorBarBG.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1); ArmorBarBG.BorderColor3 = Color3.new(0, 0, 0); ArmorBarBG.Visible = false; ArmorBarBG.Text = ""; ArmorBarBG.AutoButtonColor = false
+local ArmorBarFill = Instance.new('Frame', ArmorBarBG); ArmorBarFill.AnchorPoint = Vector2.new(0, 1); ArmorBarFill.Position = UDim2.new(0, 0, 1, 0); ArmorBarFill.Size = UDim2.new(1, 0, 1, 0); ArmorBarFill.BackgroundColor3 = Color3.fromRGB(0, 150, 255); ArmorBarFill.BorderSizePixel = 0
+local ArmorText = Instance.new('TextLabel', ArmorBarBG); ArmorText.AnchorPoint = Vector2.new(0.5, 0); ArmorText.Position = UDim2.new(0.5, 0, 1, 2); ArmorText.Size = UDim2.new(0, 30, 0, 10); ArmorText.BackgroundTransparency = 1; ArmorText.Text = "100"; ArmorText.TextColor3 = Color3.fromRGB(0, 150, 255); ArmorText.FontFace = Library.UIFont; ArmorText.TextSize = 9; ArmorText.Visible = false
+preview._armorBarBG = ArmorBarBG; preview._armorBarFill = ArmorBarFill; preview._armorText = ArmorText; preview._elementPositions["ArmorBar"] = "Right"
 
 local skeletonLines = {}
 local lineData = {
-{name = "neck", x1 = 0.5, y1 = 0.10, x2 = 0.5, y2 = 0.20},
-{name = "spine", x1 = 0.5, y1 = 0.20, x2 = 0.5, y2 = 0.55},
-{name = "lshoulder", x1 = 0.5, y1 = 0.20, x2 = 0.25, y2 = 0.22},
-{name = "rshoulder", x1 = 0.5, y1 = 0.20, x2 = 0.75, y2 = 0.22},
-{name = "larm", x1 = 0.25, y1 = 0.22, x2 = 0.22, y2 = 0.52},
-{name = "rarm", x1 = 0.75, y1 = 0.22, x2 = 0.78, y2 = 0.52},
-{name = "lhip", x1 = 0.5, y1 = 0.55, x2 = 0.38, y2 = 0.58},
-{name = "rhip", x1 = 0.5, y1 = 0.55, x2 = 0.62, y2 = 0.58},
-{name = "lleg", x1 = 0.38, y1 = 0.58, x2 = 0.36, y2 = 0.92},
-{name = "rleg", x1 = 0.62, y1 = 0.58, x2 = 0.64, y2 = 0.92},
+{name="neck",x1=0.5,y1=0.10,x2=0.5,y2=0.20},{name="spine",x1=0.5,y1=0.20,x2=0.5,y2=0.55},
+{name="lshoulder",x1=0.5,y1=0.20,x2=0.25,y2=0.22},{name="rshoulder",x1=0.5,y1=0.20,x2=0.75,y2=0.22},
+{name="larm",x1=0.25,y1=0.22,x2=0.22,y2=0.52},{name="rarm",x1=0.75,y1=0.22,x2=0.78,y2=0.52},
+{name="lhip",x1=0.5,y1=0.55,x2=0.38,y2=0.58},{name="rhip",x1=0.5,y1=0.55,x2=0.62,y2=0.58},
+{name="lleg",x1=0.38,y1=0.58,x2=0.36,y2=0.92},{name="rleg",x1=0.62,y1=0.58,x2=0.64,y2=0.92},
 }
-
 for _, ld in ipairs(lineData) do
-local line = Instance.new('Frame', PreviewArea)
-line.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-line.BorderSizePixel = 0
-line.Visible = false
-local cx, cy = (ld.x1 + ld.x2) / 2, (ld.y1 + ld.y2) / 2
-local dx, dy = ld.x2 - ld.x1, ld.y2 - ld.y1
-local len = math.sqrt(dx * dx + dy * dy)
+local line = Instance.new('Frame', PreviewArea); line.BackgroundColor3 = Color3.fromRGB(255, 255, 255); line.BorderSizePixel = 0; line.Visible = false
+local cx, cy = (ld.x1+ld.x2)/2, (ld.y1+ld.y2)/2
+local dx, dy = ld.x2-ld.x1, ld.y2-ld.y1
 line.AnchorPoint = Vector2.new(0.5, 0.5)
 line.Position = UDim2.new(cx, 0, cy, 0)
-line.Size = UDim2.new(len, 0, 0, 2)
+line.Size = UDim2.new(math.sqrt(dx*dx+dy*dy), 0, 0, 2)
 line.Rotation = -math.deg(math.atan2(dx, dy))
 skeletonLines[ld.name] = line
 end
 preview._skeletonLines = skeletonLines
-
-preview._currentArmor = 100
-preview._maxArmor = 100
+preview._currentArmor = 100; preview._maxArmor = 100
 
 local function recalculateCharacter()
 local areaSize = PreviewArea.AbsoluteSize
 if areaSize.X < 50 or areaSize.Y < 50 then return end
-
 local espMargin = 30
-
 if preview._currentMode == "Character" then
-local availableHeight = areaSize.Y - espMargin * 2
-local availableWidth = areaSize.X - espMargin * 2
-
+local availH = areaSize.Y - espMargin * 2
+local availW = areaSize.X - espMargin * 2
 local gap = 2
-local scaleY = availableHeight / (5 * 20 + gap * 2)
-local scaleX = availableWidth / (4 * 20 + gap * 2)
-local scale = math.min(scaleY, scaleX)
-scale = math.clamp(scale, 1, 20)
-
-local headW = 20 * scale
-local headH = 20 * scale
-local torsoW = 40 * scale
-local torsoH = 40 * scale
-local armW = 20 * scale
-local armH = 40 * scale
-local legW = 20 * scale
-local legH = 40 * scale
-
+local scaleY = availH / (5 * 20 + gap * 2)
+local scaleX = availW / (4 * 20 + gap * 2)
+local scale = math.clamp(math.min(scaleY, scaleX), 1, 20)
+local headW, headH = 20*scale, 20*scale
+local torsoW, torsoH = 40*scale, 40*scale
+local armW, armH = 20*scale, 40*scale
+local legW, legH = 20*scale, 40*scale
 local charW = torsoW + (armW + gap) * 2
 local charH = headH + gap + torsoH + gap + legH
-
 CharBox.Size = UDim2.new(0, charW, 0, charH)
-
-Head.Size = UDim2.new(0, headW, 0, headH)
-Head.Position = UDim2.new(0.5, -headW/2, 0, 0)
-
-Torso.Size = UDim2.new(0, torsoW, 0, torsoH)
-Torso.Position = UDim2.new(0.5, -torsoW/2, 0, headH + gap)
-
-LArm.Size = UDim2.new(0, armW, 0, armH)
-LArm.Position = UDim2.new(0.5, -torsoW/2 - gap - armW, 0, headH + gap)
-
-RArm.Size = UDim2.new(0, armW, 0, armH)
-RArm.Position = UDim2.new(0.5, torsoW/2 + gap, 0, headH + gap)
-
-LLeg.Size = UDim2.new(0, legW, 0, legH)
-LLeg.Position = UDim2.new(0.5, -torsoW/2, 0, headH + gap + torsoH + gap)
-
-RLeg.Size = UDim2.new(0, legW, 0, legH)
-RLeg.Position = UDim2.new(0.5, torsoW/2 - legW, 0, headH + gap + torsoH + gap)
-
-preview._charW = charW
-preview._charH = charH
+Head.Size = UDim2.new(0, headW, 0, headH); Head.Position = UDim2.new(0.5, -headW/2, 0, 0)
+Torso.Size = UDim2.new(0, torsoW, 0, torsoH); Torso.Position = UDim2.new(0.5, -torsoW/2, 0, headH+gap)
+LArm.Size = UDim2.new(0, armW, 0, armH); LArm.Position = UDim2.new(0.5, -torsoW/2-gap-armW, 0, headH+gap)
+RArm.Size = UDim2.new(0, armW, 0, armH); RArm.Position = UDim2.new(0.5, torsoW/2+gap, 0, headH+gap)
+LLeg.Size = UDim2.new(0, legW, 0, legH); LLeg.Position = UDim2.new(0.5, -torsoW/2, 0, headH+gap+torsoH+gap)
+RLeg.Size = UDim2.new(0, legW, 0, legH); RLeg.Position = UDim2.new(0.5, torsoW/2-legW, 0, headH+gap+torsoH+gap)
+preview._charW = charW; preview._charH = charH
 else
-local availableW = areaSize.X - espMargin * 2
-local availableH = areaSize.Y - espMargin * 2
-
+local availW = areaSize.X - espMargin * 2
+local availH = areaSize.Y - espMargin * 2
 local imageAspect = 9 / 16
-local containerAspect = availableW / availableH
-
+local containerAspect = availW / availH
 local renderedW, renderedH
 if containerAspect > imageAspect then
-renderedH = availableH
-renderedW = renderedH * imageAspect
+renderedH = availH; renderedW = renderedH * imageAspect
 else
-renderedW = availableW
-renderedH = renderedW / imageAspect
+renderedW = availW; renderedH = renderedW / imageAspect
 end
-
 ImageContainer.Size = UDim2.new(0, renderedW, 0, renderedH)
 ImageContainer.Position = UDim2.new(0.5, 0, 0.5, 0)
 ImageContainer.AnchorPoint = Vector2.new(0.5, 0.5)
-
 PreviewImage.Size = UDim2.new(1, 0, 1, 0)
 PreviewImage.Position = UDim2.new(0.5, 0, 0.5, 0)
 PreviewImage.AnchorPoint = Vector2.new(0.5, 0.5)
 PreviewImage.ScaleType = Enum.ScaleType.Fit
-
-preview._renderedImageW = renderedW
-preview._renderedImageH = renderedH
-preview._charW = renderedW
-preview._charH = renderedH
+preview._renderedImageW = renderedW; preview._renderedImageH = renderedH
+preview._charW = renderedW; preview._charH = renderedH
 end
-
-if preview._boxESP then
-preview._boxESP.Size = UDim2.new(0, preview._charW + boxPad * 2, 0, preview._charH + boxPad * 2)
-end
-
-if preview._healthBarBG then
-preview._healthBarBG.Size = UDim2.new(0, 4, 0, preview._charH + boxPad * 2)
-end
-
-if preview._armorBarBG then
-preview._armorBarBG.Size = UDim2.new(0, 4, 0, preview._charH + boxPad * 2)
-end
-
-return preview._charW, preview._charH
+if preview._boxESP then preview._boxESP.Size = UDim2.new(0, preview._charW + boxPad*2, 0, preview._charH + boxPad*2) end
+if preview._healthBarBG then preview._healthBarBG.Size = UDim2.new(0, 4, 0, preview._charH + boxPad*2) end
+if preview._armorBarBG then preview._armorBarBG.Size = UDim2.new(0, 4, 0, preview._charH + boxPad*2) end
 end
 
 local function getSnapZone(element)
-local areaPos = PreviewArea.AbsolutePosition
-local areaSize = PreviewArea.AbsoluteSize
-local elemPos = element.AbsolutePosition
-local elemSize = element.AbsoluteSize
-
-local elemCenterX = elemPos.X + elemSize.X / 2
-local elemCenterY = elemPos.Y + elemSize.Y / 2
-local areaCenterX = areaPos.X + areaSize.X / 2
-local areaCenterY = areaPos.Y + areaSize.Y / 2
-
-local relX = elemCenterX - areaCenterX
-local relY = elemCenterY - areaCenterY
-
-if math.abs(relY) > math.abs(relX) then
-return relY < 0 and "Top" or "Bottom"
-else
-return relX < 0 and "Left" or "Right"
-end
+local aP, aS = PreviewArea.AbsolutePosition, PreviewArea.AbsoluteSize
+local eP, eS = element.AbsolutePosition, element.AbsoluteSize
+local rx = (eP.X + eS.X/2) - (aP.X + aS.X/2)
+local ry = (eP.Y + eS.Y/2) - (aP.Y + aS.Y/2)
+if math.abs(ry) > math.abs(rx) then return ry < 0 and "Top" or "Bottom" else return rx < 0 and "Left" or "Right" end
 end
 
 local function getElementsInZone(zone)
-local elements = {}
-local order = {"Name", "Distance", "Armor", "Tool"}
-for _, name in ipairs(order) do
-if preview._elementPositions[name] == zone then
-table.insert(elements, name)
-end
-end
-return elements
+local e = {}
+for _, n in ipairs({"Name", "Distance", "Armor", "Tool"}) do if preview._elementPositions[n] == zone then e[#e+1] = n end end
+return e
 end
 
 local function updateAllPositions()
-local charH = preview._charH
-local charW = preview._charW
-local areaSize = PreviewArea.AbsoluteSize
-
-if charH == 0 or charW == 0 or areaSize.X < 50 then return end
-
-local spacing = 14
-
+local cH, cW, aS = preview._charH, preview._charW, PreviewArea.AbsoluteSize
+if cH == 0 or cW == 0 or aS.X < 50 then return end
+local sp = 14
 for _, zone in ipairs(SNAP_ZONES) do
-local elementsInZone = getElementsInZone(zone)
-for stackIndex, elementName in ipairs(elementsInZone) do
-local element = preview["_" .. elementName:lower() .. "ESP"]
-if element then
-local x, y = 0.5, 0.5
-local anchorX, anchorY = 0.5, 0.5
-local idx = stackIndex - 1
-
-if zone == "Top" then
-y = 0.5 - (charH/2 + boxPad + 6 + idx * spacing) / areaSize.Y
-anchorY = 1
-elseif zone == "Bottom" then
-y = 0.5 + (charH/2 + boxPad + 6 + idx * spacing) / areaSize.Y
-anchorY = 0
-elseif zone == "Left" then
-x = 0.5 - (charW/2 + boxPad + 12) / areaSize.X
-y = 0.5 - (charH/2 - idx * spacing) / areaSize.Y
-anchorX = 1
-anchorY = 0
-elseif zone == "Right" then
-x = 0.5 + (charW/2 + boxPad + 12) / areaSize.X
-y = 0.5 - (charH/2 - idx * spacing) / areaSize.Y
-anchorX = 0
-anchorY = 0
-end
-
-element.Position = UDim2.new(x, 0, y, 0)
-element.AnchorPoint = Vector2.new(anchorX, anchorY)
+for si, en in ipairs(getElementsInZone(zone)) do
+local el = preview["_" .. en:lower() .. "ESP"]
+if el then
+local x, y, ax, ay = 0.5, 0.5, 0.5, 0.5
+local idx = si - 1
+if zone == "Top" then y = 0.5 - (cH/2+boxPad+6+idx*sp)/aS.Y; ay = 1
+elseif zone == "Bottom" then y = 0.5 + (cH/2+boxPad+6+idx*sp)/aS.Y; ay = 0
+elseif zone == "Left" then x = 0.5-(cW/2+boxPad+12)/aS.X; y = 0.5-(cH/2-idx*sp)/aS.Y; ax = 1; ay = 0
+elseif zone == "Right" then x = 0.5+(cW/2+boxPad+12)/aS.X; y = 0.5-(cH/2-idx*sp)/aS.Y; ax = 0; ay = 0 end
+el.Position = UDim2.new(x, 0, y, 0); el.AnchorPoint = Vector2.new(ax, ay)
 end
 end
 end
-
-if preview._healthBarBG and preview._elementPositions["Health"] then
-local zone = preview._elementPositions["Health"]
-local x, anchorX = 0.5, 0.5
-if zone == "Left" then
-x = 0.5 - (charW/2 + boxPad + 6) / areaSize.X
-anchorX = 1
-elseif zone == "Right" then
-x = 0.5 + (charW/2 + boxPad + 6) / areaSize.X
-anchorX = 0
+for _, info in ipairs({{preview._healthBarBG, "Health"}, {preview._armorBarBG, "ArmorBar"}}) do
+local bar, name = info[1], info[2]
+if bar and preview._elementPositions[name] then
+local zone = preview._elementPositions[name]
+local x, ax = 0.5, 0.5
+if zone == "Left" then x = 0.5-(cW/2+boxPad+6)/aS.X; ax = 1
+elseif zone == "Right" then x = 0.5+(cW/2+boxPad+6)/aS.X; ax = 0 end
+bar.Position = UDim2.new(x, 0, 0.5, 0); bar.AnchorPoint = Vector2.new(ax, 0.5)
 end
-preview._healthBarBG.Position = UDim2.new(x, 0, 0.5, 0)
-preview._healthBarBG.AnchorPoint = Vector2.new(anchorX, 0.5)
-end
-
-if preview._armorBarBG and preview._elementPositions["ArmorBar"] then
-local zone = preview._elementPositions["ArmorBar"]
-local x, anchorX = 0.5, 0.5
-if zone == "Left" then
-x = 0.5 - (charW/2 + boxPad + 6) / areaSize.X
-anchorX = 1
-elseif zone == "Right" then
-x = 0.5 + (charW/2 + boxPad + 6) / areaSize.X
-anchorX = 0
-end
-preview._armorBarBG.Position = UDim2.new(x, 0, 0.5, 0)
-preview._armorBarBG.AnchorPoint = Vector2.new(anchorX, 0.5)
 end
 end
 
 local function updatePreviewValues()
 if preview._liveMode then return end
 if preview._healthBarBG and preview._healthBarBG.Visible then
-local pct = math.clamp(preview._previewHealth / preview._previewMaxHealth, 0, 1)
-preview._healthBarFill.Size = UDim2.new(1, 0, pct, 0)
-preview._healthBarFill.BackgroundColor3 = Color3.new(1 - pct, pct, 0)
+local p = math.clamp(preview._previewHealth/preview._previewMaxHealth, 0, 1)
+preview._healthBarFill.Size = UDim2.new(1, 0, p, 0)
+preview._healthBarFill.BackgroundColor3 = Color3.new(1-p, p, 0)
 preview._healthText.Text = tostring(math.floor(preview._previewHealth))
 end
 if preview._armorBarBG and (preview._armorBarBG.Visible or preview._armorESP.Visible) then
-local pct = math.clamp(preview._previewArmor / preview._previewMaxArmor, 0, 1)
-local color = getArmorColor(preview._previewArmor)
-preview._armorBarFill.Size = UDim2.new(1, 0, pct, 0)
-preview._armorBarFill.BackgroundColor3 = color
-preview._armorText.Text = tostring(math.floor(preview._previewArmor))
-preview._armorText.TextColor3 = color
-preview._armorESP.Text = "Armor: " .. tostring(math.floor(preview._previewArmor))
-preview._armorESP.TextColor3 = color
+local p = math.clamp(preview._previewArmor/preview._previewMaxArmor, 0, 1)
+local c = getArmorColor(preview._previewArmor)
+preview._armorBarFill.Size = UDim2.new(1, 0, p, 0); preview._armorBarFill.BackgroundColor3 = c
+preview._armorText.Text = tostring(math.floor(preview._previewArmor)); preview._armorText.TextColor3 = c
+preview._armorESP.Text = "Armor: "..tostring(math.floor(preview._previewArmor)); preview._armorESP.TextColor3 = c
 end
-if preview._distESP and preview._distESP.Visible then
-preview._distESP.Text = "[" .. tostring(preview._previewDistance) .. "m]"
-end
-if preview._toolESP and preview._toolESP.Visible then
-preview._toolESP.Text = "[" .. preview._previewTool .. "]"
-end
+if preview._distESP and preview._distESP.Visible then preview._distESP.Text = "["..tostring(preview._previewDistance).."m]" end
+if preview._toolESP and preview._toolESP.Visible then preview._toolESP.Text = "["..preview._previewTool.."]" end
 if preview._nameESP and preview._nameESP.Visible then
-if preview._currentMode == "Avenir Anime Girl" then
-preview._nameESP.Text = ANIME_GIRL_NAME
-else
-preview._nameESP.Text = preview._previewName
-end
-end
-end
-
-local function updateNameForMode()
-if preview._nameESP and preview._nameESP.Visible then
-if preview._currentMode == "Avenir Anime Girl" then
-preview._nameESP.Text = ANIME_GIRL_NAME
-else
-if preview._liveMode then
-preview._nameESP.Text = Players.LocalPlayer.DisplayName
-else
-preview._nameESP.Text = preview._previewName
-end
-end
+preview._nameESP.Text = preview._currentMode == "Avenir Anime Girl" and ANIME_GIRL_NAME or preview._previewName
 end
 end
 
 local function switchMode(newMode)
 preview._currentMode = newMode
-ModeButton.Text = "  " .. newMode .. " ▼"
-modeDropdownOpen = false
-ModeDropdown.Visible = false
-if newMode == "Character" then
-CharBox.Visible = true
-ImageContainer.Visible = false
-preview._liveMode = true
-else
-CharBox.Visible = false
-ImageContainer.Visible = true
-preview._liveMode = false
+ModeButton.Text = "  "..newMode.." ▼"
+modeDropdownOpen = false; ModeDropdown.Visible = false
+if newMode == "Character" then CharBox.Visible = true; ImageContainer.Visible = false; preview._liveMode = true
+else CharBox.Visible = false; ImageContainer.Visible = true; preview._liveMode = false end
+recalculateCharacter(); updateAllPositions(); updatePreviewValues()
+if preview._nameESP and preview._nameESP.Visible then
+if preview._currentMode == "Avenir Anime Girl" then preview._nameESP.Text = ANIME_GIRL_NAME
+elseif preview._liveMode then preview._nameESP.Text = Players.LocalPlayer.DisplayName
+else preview._nameESP.Text = preview._previewName end
 end
-recalculateCharacter()
-updateAllPositions()
-updatePreviewValues()
-updateNameForMode()
 end
 
 local function makeSnapDraggable(element, elementName)
-local dragging = false
-local dragOffset = Vector2.new(0, 0)
-
-element.InputBegan:Connect(function(input)
-if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-dragging = true
-local ePos = element.AbsolutePosition
-dragOffset = Vector2.new(input.Position.X - ePos.X, input.Position.Y - ePos.Y)
-end
-end)
-
-element.InputEnded:Connect(function(input)
-if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-if dragging then
-preview._elementPositions[elementName] = getSnapZone(element)
-updateAllPositions()
-end
-dragging = false
-end
-end)
-
-Library:Connection(UserInputService.InputChanged, function(input)
-if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-local areaPos = PreviewArea.AbsolutePosition
-local areaSize = PreviewArea.AbsoluteSize
-local newX = math.clamp(input.Position.X - dragOffset.X - areaPos.X, 0, areaSize.X - element.AbsoluteSize.X)
-local newY = math.clamp(input.Position.Y - dragOffset.Y - areaPos.Y, 0, areaSize.Y - element.AbsoluteSize.Y)
-element.Position = UDim2.new(0, newX, 0, newY)
-element.AnchorPoint = Vector2.new(0, 0)
-end
-end)
+local dragging, dragOffset = false, Vector2.new(0, 0)
+element.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then dragging = true; dragOffset = Vector2.new(i.Position.X - element.AbsolutePosition.X, i.Position.Y - element.AbsolutePosition.Y) end end)
+element.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then if dragging then preview._elementPositions[elementName] = getSnapZone(element); updateAllPositions() end; dragging = false end end)
+Library:Connection(UIS.InputChanged, function(i) if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then local aP, aS = PreviewArea.AbsolutePosition, PreviewArea.AbsoluteSize; element.Position = UDim2.new(0, math.clamp(i.Position.X-dragOffset.X-aP.X, 0, aS.X-element.AbsoluteSize.X), 0, math.clamp(i.Position.Y-dragOffset.Y-aP.Y, 0, aS.Y-element.AbsoluteSize.Y)); element.AnchorPoint = Vector2.new(0, 0) end end)
 end
 
 local function makeSnapDraggableBar(element, elementName)
-local dragging = false
-local dragOffsetX = 0
-
-element.InputBegan:Connect(function(input)
-if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-dragging = true
-dragOffsetX = input.Position.X - element.AbsolutePosition.X
-end
-end)
-
-element.InputEnded:Connect(function(input)
-if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-if dragging then
-local areaPos = PreviewArea.AbsolutePosition
-local areaSize = PreviewArea.AbsoluteSize
-local elemCenterX = element.AbsolutePosition.X + element.AbsoluteSize.X / 2
-local areaCenterX = areaPos.X + areaSize.X / 2
-preview._elementPositions[elementName] = elemCenterX < areaCenterX and "Left" or "Right"
-updateAllPositions()
-end
-dragging = false
-end
-end)
-
-Library:Connection(UserInputService.InputChanged, function(input)
-if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-local areaPos = PreviewArea.AbsolutePosition
-local areaSize = PreviewArea.AbsoluteSize
-local clampX = math.clamp(input.Position.X - dragOffsetX - areaPos.X, 0, areaSize.X - element.AbsoluteSize.X)
-element.Position = UDim2.new(0, clampX, 0.5, 0)
-element.AnchorPoint = Vector2.new(0, 0.5)
-end
-end)
+local dragging, dragOffsetX = false, 0
+element.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then dragging = true; dragOffsetX = i.Position.X - element.AbsolutePosition.X end end)
+element.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then if dragging then local aC = PreviewArea.AbsolutePosition.X + PreviewArea.AbsoluteSize.X/2; preview._elementPositions[elementName] = (element.AbsolutePosition.X + element.AbsoluteSize.X/2) < aC and "Left" or "Right"; updateAllPositions() end; dragging = false end end)
+Library:Connection(UIS.InputChanged, function(i) if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then local aP, aS = PreviewArea.AbsolutePosition, PreviewArea.AbsoluteSize; element.Position = UDim2.new(0, math.clamp(i.Position.X-dragOffsetX-aP.X, 0, aS.X-element.AbsoluteSize.X), 0.5, 0); element.AnchorPoint = Vector2.new(0, 0.5) end end)
 end
 
-makeSnapDraggable(NameESP, "Name")
-makeSnapDraggable(DistESP, "Distance")
-makeSnapDraggable(ToolESP, "Tool")
-makeSnapDraggable(ArmorESP, "Armor")
-makeSnapDraggableBar(HealthBarBG, "Health")
-makeSnapDraggableBar(ArmorBarBG, "ArmorBar")
+makeSnapDraggable(NameESP, "Name"); makeSnapDraggable(DistESP, "Distance"); makeSnapDraggable(ToolESP, "Tool"); makeSnapDraggable(ArmorESP, "Armor")
+makeSnapDraggableBar(HealthBarBG, "Health"); makeSnapDraggableBar(ArmorBarBG, "ArmorBar")
 
-ModeButton.MouseButton1Click:Connect(function()
-modeDropdownOpen = not modeDropdownOpen
-ModeDropdown.Visible = modeDropdownOpen
-end)
-
-Library:Connection(UserInputService.InputBegan, function(input)
-if modeDropdownOpen and input.UserInputType == Enum.UserInputType.MouseButton1 then
-task.defer(function()
-if not Library:IsMouseOverFrame(ModeDropdown) and not Library:IsMouseOverFrame(ModeButton) then
-modeDropdownOpen = false
-ModeDropdown.Visible = false
-end
-end)
-end
-end)
+ModeButton.MouseButton1Click:Connect(function() modeDropdownOpen = not modeDropdownOpen; ModeDropdown.Visible = modeDropdownOpen end)
+Library:Connection(UIS.InputBegan, function(i) if modeDropdownOpen and i.UserInputType == Enum.UserInputType.MouseButton1 then task.defer(function() if not Library:IsMouseOverFrame(ModeDropdown) and not Library:IsMouseOverFrame(ModeButton) then modeDropdownOpen = false; ModeDropdown.Visible = false end end) end end)
 
 for i, mode in ipairs(PREVIEW_MODES) do
-local ModeOption = Instance.new('TextButton', ModeDropdown)
-ModeOption.Size = UDim2.new(1, 0, 0, 20)
-ModeOption.BackgroundTransparency = 1
-ModeOption.Text = "  " .. mode
-ModeOption.TextColor3 = Color3.new(0.6, 0.6, 0.6)
-ModeOption.FontFace = Library.UIFont
-ModeOption.TextSize = 11
-ModeOption.TextXAlignment = Enum.TextXAlignment.Left
-ModeOption.ZIndex = 201
-ModeOption.LayoutOrder = i
-ModeOption.MouseButton1Click:Connect(function() switchMode(mode) end)
-ModeOption.MouseEnter:Connect(function() ModeOption.TextColor3 = Color3.fromRGB(255, 255, 255) end)
-ModeOption.MouseLeave:Connect(function() ModeOption.TextColor3 = Color3.new(0.6, 0.6, 0.6) end)
+local MO = Instance.new('TextButton', ModeDropdown); MO.Size = UDim2.new(1, 0, 0, 20); MO.BackgroundTransparency = 1; MO.Text = "  "..mode; MO.TextColor3 = Color3.new(0.6, 0.6, 0.6); MO.FontFace = Library.UIFont; MO.TextSize = 11; MO.TextXAlignment = Enum.TextXAlignment.Left; MO.ZIndex = 201; MO.LayoutOrder = i
+MO.MouseButton1Click:Connect(function() switchMode(mode) end)
+MO.MouseEnter:Connect(function() MO.TextColor3 = Color3.fromRGB(255, 255, 255) end)
+MO.MouseLeave:Connect(function() MO.TextColor3 = Color3.new(0.6, 0.6, 0.6) end)
 end
 
-local function getHumanoid()
-local char = Players.LocalPlayer.Character
-if char then return char:FindFirstChildOfClass("Humanoid") end
-return nil
-end
+local function getHumanoid() local c = Players.LocalPlayer.Character; return c and c:FindFirstChildOfClass("Humanoid") end
+local function updateHealthLive() if not preview._liveMode then return end; local h = getHumanoid(); if h and HealthBarBG.Visible then local p = math.clamp(h.Health/h.MaxHealth, 0, 1); HealthBarFill.Size = UDim2.new(1, 0, p, 0); HealthBarFill.BackgroundColor3 = Color3.new(1-p, p, 0); HealthText.Text = tostring(math.floor(h.Health)); HealthText.Visible = true end end
+local function updateToolLive() if not preview._liveMode or not ToolESP.Visible then return end; local c = Players.LocalPlayer.Character; if c then local t = c:FindFirstChildOfClass("Tool"); ToolESP.Text = t and ("["..t.Name.."]") or "[None]" end end
 
-local function updateHealthLive()
-if not preview._liveMode then return end
-local hum = getHumanoid()
-if hum and HealthBarBG.Visible then
-local pct = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
-HealthBarFill.Size = UDim2.new(1, 0, pct, 0)
-HealthBarFill.BackgroundColor3 = Color3.new(1 - pct, pct, 0)
-HealthText.Text = tostring(math.floor(hum.Health))
-HealthText.Visible = true
-end
-end
-
-local function getArmorValueLive()
-local char = Players.LocalPlayer.Character
-if not char then return preview._currentArmor end
-local hum = char:FindFirstChildOfClass("Humanoid")
-if hum and hum:GetAttribute("Armor") then return hum:GetAttribute("Armor") end
-local armorVal = char:FindFirstChild("Armor") or char:FindFirstChild("ArmorValue")
-if armorVal and (armorVal:IsA("NumberValue") or armorVal:IsA("IntValue")) then return armorVal.Value end
-local leaderstats = Players.LocalPlayer:FindFirstChild("leaderstats")
-if leaderstats then
-local armor = leaderstats:FindFirstChild("Armor")
-if armor and (armor:IsA("NumberValue") or armor:IsA("IntValue")) then return armor.Value end
-end
-return preview._currentArmor
-end
-
-local function updateArmorLive()
-if not preview._liveMode then return end
-if not ArmorBarBG.Visible and not ArmorESP.Visible then return end
-local armorValue = getArmorValueLive()
-preview._currentArmor = armorValue
-local pct = math.clamp(armorValue / preview._maxArmor, 0, 1)
-local color = getArmorColor(armorValue)
-ArmorBarFill.Size = UDim2.new(1, 0, pct, 0)
-ArmorBarFill.BackgroundColor3 = color
-ArmorText.Text = tostring(math.floor(armorValue))
-ArmorText.TextColor3 = color
-ArmorESP.Text = "Armor: " .. tostring(math.floor(armorValue))
-ArmorESP.TextColor3 = color
-end
-
-local healthCon = nil
-local function connectHealth()
-if healthCon then healthCon:Disconnect() end
-local hum = getHumanoid()
-if hum then
-healthCon = hum:GetPropertyChangedSignal("Health"):Connect(updateHealthLive)
-updateHealthLive()
-end
-end
-
-Library:Connection(Players.LocalPlayer.CharacterAdded, function(char)
-char:WaitForChild("Humanoid")
-task.wait(0.1)
-connectHealth()
-end)
+local healthCon
+local function connectHealth() if healthCon then healthCon:Disconnect() end; local h = getHumanoid(); if h then healthCon = h:GetPropertyChangedSignal("Health"):Connect(updateHealthLive); updateHealthLive() end end
+Library:Connection(Players.LocalPlayer.CharacterAdded, function(c) c:WaitForChild("Humanoid"); task.wait(0.1); connectHealth() end)
 task.defer(connectHealth)
 
-local function updateToolLive()
-if not preview._liveMode then return end
-if not ToolESP.Visible then return end
-local char = Players.LocalPlayer.Character
-if char then
-local tool = char:FindFirstChildOfClass("Tool")
-ToolESP.Text = tool and ("[" .. tool.Name .. "]") or "[None]"
-end
-end
-
-local function connectTool()
-local char = Players.LocalPlayer.Character
-if char then
-char.ChildAdded:Connect(function(child) if child:IsA("Tool") then updateToolLive() end end)
-char.ChildRemoved:Connect(function(child) if child:IsA("Tool") then updateToolLive() end end)
-updateToolLive()
-end
-end
-
-Library:Connection(Players.LocalPlayer.CharacterAdded, function()
-task.wait(0.1)
-connectTool()
-end)
+local function connectTool() local c = Players.LocalPlayer.Character; if c then c.ChildAdded:Connect(function(ch) if ch:IsA("Tool") then updateToolLive() end end); c.ChildRemoved:Connect(function(ch) if ch:IsA("Tool") then updateToolLive() end end); updateToolLive() end end
+Library:Connection(Players.LocalPlayer.CharacterAdded, function() task.wait(0.1); connectTool() end)
 task.defer(connectTool)
 
 local lastAreaSize = Vector2.new(0, 0)
-
 Library:Connection(RunService.Heartbeat, function()
 if Library.Holder then
-local mp = Library.Holder.AbsolutePosition
-local ms = Library.Holder.AbsoluteSize
+local mp, ms = Library.Holder.AbsolutePosition, Library.Holder.AbsoluteSize
 Panel.Size = UDim2.new(0, panelWidth, 0, ms.Y)
 Panel.Position = UDim2.new(0, mp.X + ms.X + 5, 0, mp.Y)
 Panel.Visible = Library.Open
-local currentSize = PreviewArea.AbsoluteSize
-if math.abs(currentSize.X - lastAreaSize.X) > 1 or math.abs(currentSize.Y - lastAreaSize.Y) > 1 then
-lastAreaSize = currentSize
-recalculateCharacter()
-updateAllPositions()
-end
-else
-Panel.Visible = false
-end
-if preview._liveMode then
-if HealthBarBG.Visible then updateHealthLive() end
-if ToolESP.Visible then updateToolLive() end
-if ArmorBarBG.Visible or ArmorESP.Visible then updateArmorLive() end
-end
+local cs = PreviewArea.AbsoluteSize
+if math.abs(cs.X - lastAreaSize.X) > 1 or math.abs(cs.Y - lastAreaSize.Y) > 1 then lastAreaSize = cs; recalculateCharacter(); updateAllPositions() end
+else Panel.Visible = false end
+if preview._liveMode then if HealthBarBG.Visible then updateHealthLive() end; if ToolESP.Visible then updateToolLive() end end
 end)
 
-function preview:SetBoxESP(enabled, color)
-self._boxESP.Visible = enabled
-if color then self._boxStroke.Color = color end
-end
-
-function preview:SetNameESP(enabled, color, text)
-self._nameESP.Visible = enabled
-if color then self._nameESP.TextColor3 = color end
-if text then self._previewName = text end
-if self._currentMode == "Avenir Anime Girl" then
-self._nameESP.Text = ANIME_GIRL_NAME
-elseif self._liveMode then
-self._nameESP.Text = Players.LocalPlayer.DisplayName
-else
-self._nameESP.Text = self._previewName
-end
-if enabled then updateAllPositions() end
-end
-
-function preview:SetHealthBar(enabled)
-self._healthBarBG.Visible = enabled
-self._healthText.Visible = enabled
-if enabled then
-if self._liveMode then updateHealthLive() else updatePreviewValues() end
-updateAllPositions()
-end
-end
-
-function preview:SetDistanceESP(enabled, text, color)
-self._distESP.Visible = enabled
-if text then
-local num = tonumber(text:match("%d+"))
-if num then self._previewDistance = num end
-self._distESP.Text = text
-elseif not self._liveMode then
-self._distESP.Text = "[" .. tostring(self._previewDistance) .. "m]"
-end
-if color then self._distESP.TextColor3 = color end
-if enabled then updateAllPositions() end
-end
-
-function preview:SetToolESP(enabled, color, tool)
-self._toolESP.Visible = enabled
-if color then self._toolESP.TextColor3 = color end
-if tool then
-self._previewTool = tool
-self._toolESP.Text = "[" .. tool .. "]"
-elseif self._liveMode then
-updateToolLive()
-else
-self._toolESP.Text = "[" .. self._previewTool .. "]"
-end
-if enabled then updateAllPositions() end
-end
-
-function preview:SetArmorESP(enabled, armorValue, maxArmor)
-self._armorESP.Visible = enabled
-self._armorBarBG.Visible = enabled
-self._armorText.Visible = enabled
-if maxArmor then self._maxArmor = maxArmor; self._previewMaxArmor = maxArmor end
-if armorValue ~= nil then self._currentArmor = armorValue; self._previewArmor = armorValue end
-if enabled then
-if self._liveMode then updateArmorLive() else updatePreviewValues() end
-updateAllPositions()
-end
-end
-
-function preview:SetArmorValue(value)
-self._currentArmor = value
-self._previewArmor = value
-if self._liveMode then updateArmorLive() else updatePreviewValues() end
-end
-
-function preview:SetSkeleton(enabled, color)
-for _, line in pairs(self._skeletonLines) do
-line.Visible = enabled
-if color then line.BackgroundColor3 = color end
-end
-end
-
-function preview:SetChams(enabled, color)
-for _, part in ipairs(self._charParts) do
-if enabled then
-part.BackgroundColor3 = color or Library.Accent
-part.BackgroundTransparency = 0.3
-else
-part.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
-part.BackgroundTransparency = 0
-end
-end
-end
-
-function preview:SetElementPosition(elementName, zone)
-self._elementPositions[elementName] = zone
-updateAllPositions()
-end
-
-function preview:GetElementPosition(elementName)
-return self._elementPositions[elementName]
-end
-
-function preview:SetMode(mode)
-if mode == "Character" or mode == "Avenir Anime Girl" then switchMode(mode) end
-end
-
+function preview:SetBoxESP(e, c) self._boxESP.Visible = e; if c then self._boxStroke.Color = c end end
+function preview:SetNameESP(e, c, t) self._nameESP.Visible = e; if c then self._nameESP.TextColor3 = c end; if t then self._previewName = t end; if self._currentMode == "Avenir Anime Girl" then self._nameESP.Text = ANIME_GIRL_NAME elseif self._liveMode then self._nameESP.Text = Players.LocalPlayer.DisplayName else self._nameESP.Text = self._previewName end; if e then updateAllPositions() end end
+function preview:SetHealthBar(e) self._healthBarBG.Visible = e; self._healthText.Visible = e; if e then if self._liveMode then updateHealthLive() else updatePreviewValues() end; updateAllPositions() end end
+function preview:SetDistanceESP(e, t, c) self._distESP.Visible = e; if t then local n = tonumber(t:match("%d+")); if n then self._previewDistance = n end; self._distESP.Text = t elseif not self._liveMode then self._distESP.Text = "["..tostring(self._previewDistance).."m]" end; if c then self._distESP.TextColor3 = c end; if e then updateAllPositions() end end
+function preview:SetToolESP(e, c, t) self._toolESP.Visible = e; if c then self._toolESP.TextColor3 = c end; if t then self._previewTool = t; self._toolESP.Text = "["..t.."]" elseif self._liveMode then updateToolLive() else self._toolESP.Text = "["..self._previewTool.."]" end; if e then updateAllPositions() end end
+function preview:SetArmorESP(e, av, mx) self._armorESP.Visible = e; self._armorBarBG.Visible = e; self._armorText.Visible = e; if mx then self._maxArmor = mx; self._previewMaxArmor = mx end; if av then self._currentArmor = av; self._previewArmor = av end; if e then updatePreviewValues(); updateAllPositions() end end
+function preview:SetSkeleton(e, c) for _, l in pairs(self._skeletonLines) do l.Visible = e; if c then l.BackgroundColor3 = c end end end
+function preview:SetChams(e, c) for _, p in ipairs(self._charParts) do if e then p.BackgroundColor3 = c or Library.Accent; p.BackgroundTransparency = 0.3 else p.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3); p.BackgroundTransparency = 0 end end end
+function preview:SetElementPosition(n, z) self._elementPositions[n] = z; updateAllPositions() end
+function preview:GetElementPosition(n) return self._elementPositions[n] end
+function preview:SetMode(m) if m == "Character" or m == "Avenir Anime Girl" then switchMode(m) end end
 function preview:GetMode() return self._currentMode end
-
-function preview:SetPreviewHealth(health, maxHealth)
-self._previewHealth = health
-if maxHealth then self._previewMaxHealth = maxHealth end
-if not self._liveMode then updatePreviewValues() end
-end
-
-function preview:SetPreviewArmor(armor, maxArmor)
-self._previewArmor = armor
-if maxArmor then self._previewMaxArmor = maxArmor end
-if not self._liveMode then updatePreviewValues() end
-end
-
-function preview:SetPreviewDistance(distance)
-self._previewDistance = distance
-if not self._liveMode then updatePreviewValues() end
-end
-
-function preview:SetPreviewTool(tool)
-self._previewTool = tool
-if not self._liveMode then updatePreviewValues() end
-end
-
-function preview:SetPreviewName(name)
-self._previewName = name
-if not self._liveMode and self._currentMode == "Character" then self._nameESP.Text = name end
-end
-
-function preview:SetLiveMode(enabled)
-self._liveMode = enabled
-if not enabled then updatePreviewValues() end
-end
-
+function preview:SetPreviewHealth(h, m) self._previewHealth = h; if m then self._previewMaxHealth = m end; if not self._liveMode then updatePreviewValues() end end
+function preview:SetPreviewArmor(a, m) self._previewArmor = a; if m then self._previewMaxArmor = m end; if not self._liveMode then updatePreviewValues() end end
+function preview:SetPreviewDistance(d) self._previewDistance = d; if not self._liveMode then updatePreviewValues() end end
+function preview:SetPreviewTool(t) self._previewTool = t; if not self._liveMode then updatePreviewValues() end end
+function preview:SetPreviewName(n) self._previewName = n; if not self._liveMode and self._currentMode == "Character" then self._nameESP.Text = n end end
+function preview:SetLiveMode(e) self._liveMode = e; if not e then updatePreviewValues() end end
 function preview:Show() Panel.Visible = true end
 function preview:Hide() Panel.Visible = false end
 
-task.defer(function()
-task.wait(0.15)
-recalculateCharacter()
-updateAllPositions()
-updatePreviewValues()
-end)
-
+task.defer(function() task.wait(0.15); recalculateCharacter(); updateAllPositions(); updatePreviewValues() end)
 return preview
 end
 
-local library = {
-flags = Library.Flags,
-_lib = Library,
-}
+local library = { flags = Library.Flags, _lib = Library }
 
 function library:window(opts)
 local win = Library:Window({
 Name = opts.name or opts.Name or "Avenir",
+Title = opts.name or opts.Name or opts.title or opts.Title or "Avenir",
 Suffix = opts.suffix or opts.Suffix or "",
 Project = opts.project or opts.Project or "",
 Size = opts.size or opts.Size or UDim2.fromOffset(650, 550),
+Center = opts.center or opts.Center or true,
+AutoShow = opts.autoshow or opts.AutoShow or false,
 })
-
-local wrapper = {}
-wrapper._win = win
-
-function wrapper:tab(opts2)
-return win:Page({Name = opts2.name or opts2.Name or "tab"})
-end
-
+local wrapper = {}; wrapper._win = win
+function wrapper:tab(o) return win:AddTab(o.name or o.Name or "tab") end
 local sg = Library.Holder.Parent
 wrapper.esp_preview = ESPPreview.Create(library, sg)
-
 return wrapper
+end
+
+function library:CreateWindow(opts)
+return Library:Window({
+Name = opts.Title or opts.Name or "Avenir",
+Title = opts.Title or opts.Name or "Avenir",
+Suffix = opts.Suffix or "",
+Project = opts.Project or opts.Title or "default",
+Size = opts.Size or UDim2.fromOffset(650, 550),
+Center = opts.Center or false,
+AutoShow = opts.AutoShow or false,
+})
 end
 
 function library:unload() Library:Unload() end
@@ -2683,14 +2364,8 @@ function library:hide() Library.Open = false; if Library.Holder then Library.Hol
 
 function library:init_config()
 Library:InitFolders()
-Library:LoadLibrarySettings()
-if Library.AutoLoadConfigName then
-Library:LoadConfigFile(Library.AutoLoadConfigName)
-end
-task.defer(function()
-Library.Open = true
-if Library.Holder then Library.Holder.Visible = true end
-end)
+Library:LoadAutoloadConfig()
+task.defer(function() Library.Open = true; if Library.Holder then Library.Holder.Visible = true end end)
 end
 
 function library:get_config() return Library:GetConfig() end
@@ -2707,6 +2382,7 @@ function library:set_auto_load(name) Library:SetAutoLoad(name) end
 function library:clear_auto_load() Library:ClearAutoLoad() end
 function library:get_auto_load() return Library.AutoLoadConfigName end
 function library:ignore_flag(flag) Library:IgnoreFlag(flag) end
+function library:load_autoload_config() return Library:LoadAutoloadConfig() end
 
 function library:get_flag(flag) return Library.Flags[flag] end
 function library:set_flag(flag, value)
@@ -2714,9 +2390,7 @@ local s = Library._Flags[flag]
 if s then
 if type(s) == "function" then pcall(s, value)
 elseif type(s) == "table" and s.Set then pcall(function() s:Set(value) end) end
-else
-Library.Flags[flag] = value
-end
+else Library.Flags[flag] = value end
 end
 
 return library
