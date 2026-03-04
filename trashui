@@ -2787,7 +2787,7 @@ function ESPPreview.Create(library, screenGui)
     return preview
 end
 
-return ESPPreview
+
 
 
 
