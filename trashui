@@ -1,4 +1,3 @@
-
 local Library = {};
 do
     Library = {
@@ -14,14 +13,12 @@ do
         UnNamedFlags = 0;
         ThemeObjects = {};
         Instances = {};
-        OriginalTransparency = {};
         Holder = nil;
         PageHolder = nil;
         Gradient = nil;
         UIGradient = nil;
         Dependencies = {};
         ProjectName = "default";
-        NotificationsEnabled = false;
         DPIScale = 1;
         IsMobile = game:GetService("UserInputService").TouchEnabled and not game:GetService("UserInputService").KeyboardEnabled;
         Keys = {
@@ -88,16 +85,12 @@ do
     local Flags = {}
     local Dropdowns = {}
     local Pickers = {}
-
-    Library._Flags = Flags 
+    
+    Library._Flags = Flags
 
     Library.__index = Library
     Library.Pages.__index = Library.Pages
     Library.Sections.__index = Library.Sections
-
-    local function AddInstance(inst)
-        table.insert(Library.Instances, inst)
-    end
 
     function Library:FireFlagCallbacks(flag, value)
         if Library._flagCallbacks[flag] then
@@ -246,96 +239,101 @@ do
         Library:SaveLibrarySettings()
     end
 
-    function Library:DoAutoLoad()
-        Library:LoadLibrarySettings()
-        if Library.AutoLoadConfigName then
-            local configPath = Library:GetConfigPath() .. "/" .. Library.AutoLoadConfigName .. ".cfg"
-            pcall(function()
-                if isfile(configPath) then
-                    task.spawn(function()
-                        task.wait(0.5)
-                        Library:LoadConfig(readfile(configPath))
-                    end)
-                end
-            end)
-        end
-    end
-
     function Library:GetConfig()
-    local Config = {}
-    for flag, value in pairs(Library.Flags) do
-        if flag == "cfg_selected" or flag == "cfg_name" then continue end
-        if typeof(value) == "Color3" then
-            Config[flag] = {_type = "Color3", hex = value:ToHex()}
-        elseif type(value) == "table" and value.key ~= nil and value.mode ~= nil then
-            -- FIXED: Save keybind properly
-            local keyStr = "NONE"
-            if value.key then
-                keyStr = tostring(value.key):gsub("Enum%.KeyCode%.", ""):gsub("Enum%.UserInputType%.", "")
-            end
-            Config[flag] = {_type = "Keybind", mode = value.mode, key = keyStr}
-        else
-            Config[flag] = value
-        end
-    end
-    return game:GetService("HttpService"):JSONEncode(Config)
-end
-
-function Library:LoadConfig(configJson)
-    local success, config = pcall(function()
-        return game:GetService("HttpService"):JSONDecode(configJson)
-    end)
-    if not success then return end
-    
-    for flag, value in pairs(config) do
-        if flag == "cfg_selected" or flag == "cfg_name" then continue end
-        
-        if type(value) == "table" and value._type == "Keybind" then
-            -- FIXED: Load keybind data
-            local setter = Flags[flag]
-            if setter and type(setter) == "table" then
-                -- Reconstruct the key EnumItem
-                local key = nil
-                if value.key and value.key ~= "NONE" then
-                    -- Try KeyCode first
-                    pcall(function()
-                        key = Enum.KeyCode[value.key]
-                    end)
-                    -- If that fails, try UserInputType
-                    if not key then
-                        pcall(function()
-                            key = Enum.UserInputType[value.key]
-                        end)
+        local Config = {}
+        for flag, value in pairs(Library.Flags) do
+            if flag == "cfg_selected" or flag == "cfg_name" then continue end
+            
+            if typeof(value) == "Color3" then
+                Config[flag] = {_type = "Color3", hex = value:ToHex()}
+            elseif type(value) == "table" and value.mode ~= nil and value.active ~= nil then
+                local keyData = {
+                    _type = "Keybind", 
+                    mode = value.mode, 
+                    key = nil, 
+                    keyType = nil
+                }
+                
+                if value.key then
+                    local keyString = tostring(value.key)
+                    if keyString:find("Enum%.KeyCode%.") then
+                        keyData.keyType = "KeyCode"
+                        keyData.key = keyString:gsub("Enum%.KeyCode%.", "")
+                    elseif keyString:find("Enum%.UserInputType%.") then
+                        keyData.keyType = "UserInputType"
+                        keyData.key = keyString:gsub("Enum%.UserInputType%.", "")
                     end
                 end
                 
-                -- Set the key
-                if setter.Set then
-                    pcall(function() setter:Set(key) end)
+                Config[flag] = keyData
+            else
+                Config[flag] = value
+            end
+        end
+        return game:GetService("HttpService"):JSONEncode(Config)
+    end
+
+    function Library:LoadConfig(configJson)
+        local success, config = pcall(function()
+            return game:GetService("HttpService"):JSONDecode(configJson)
+        end)
+        if not success then return end
+        
+        for flag, value in pairs(config) do
+            if flag == "cfg_selected" or flag == "cfg_name" then continue end
+            
+            if type(value) == "table" and value._type == "Keybind" then
+                local keybindObj = nil
+                for _, kb in ipairs(Library._keybinds) do
+                    if kb.Flag == flag then
+                        keybindObj = kb
+                        break
+                    end
                 end
                 
-                -- Set the mode
-                if setter.SetMode and value.mode then
-                    pcall(function() setter:SetMode(value.mode) end)
+                if not keybindObj then
+                    local setter = Library._Flags[flag]
+                    if setter and type(setter) == "table" and setter.Set then
+                        keybindObj = setter
+                    end
                 end
-            end
-        elseif type(value) == "table" and value._type == "Color3" then
-            local setter = Flags[flag]
-            if setter and type(setter) == "function" then
-                pcall(function() setter(Color3.fromHex(value.hex)) end)
-            end
-        else
-            local setter = Flags[flag]
-            if setter then
-                if type(setter) == "function" then
-                    pcall(function() setter(value) end)
-                elseif type(setter) == "table" and setter.Set then
-                    pcall(function() setter:Set(value) end)
+                
+                if keybindObj then
+                    local key = nil
+                    if value.key and value.keyType then
+                        if value.keyType == "KeyCode" then
+                            pcall(function() key = Enum.KeyCode[value.key] end)
+                        elseif value.keyType == "UserInputType" then
+                            pcall(function() key = Enum.UserInputType[value.key] end)
+                        end
+                    end
+                    
+                    if keybindObj.Set then
+                        pcall(function() keybindObj:Set(key) end)
+                    end
+                    
+                    if keybindObj.SetMode and value.mode then
+                        pcall(function() keybindObj:SetMode(value.mode) end)
+                    end
+                end
+                
+            elseif type(value) == "table" and value._type == "Color3" then
+                local setter = Library._Flags[flag]
+                if setter and type(setter) == "function" then
+                    pcall(function() setter(Color3.fromHex(value.hex)) end)
+                end
+            else
+                local setter = Library._Flags[flag]
+                if setter then
+                    if type(setter) == "function" then
+                        pcall(function() setter(value) end)
+                    elseif type(setter) == "table" and setter.Set then
+                        pcall(function() setter:Set(value) end)
+                    end
                 end
             end
         end
     end
-end
 
     function Library:SaveConfig(name)
         pcall(function()
@@ -372,10 +370,6 @@ end
         local Sat = Instance.new('ImageButton', Window)
         local Hue = Instance.new('ImageButton', Window)
 
-        AddInstance(Icon)
-        AddInstance(Window)
-        AddInstance(Sat)
-        AddInstance(Hue)
         table.insert(Pickers, Window)
 
         Icon.Name = "Icon"
@@ -497,11 +491,8 @@ end
         return colorpickertypes
     end
 
-    -- SETUP GLOBAL KEYBIND HANDLER
     local function SetupKeybindHandler()
         local UIS = game:GetService("UserInputService")
-        
-       
         
         Library:Connection(UIS.InputBegan, function(input, gameProcessed)
             if gameProcessed then return end
@@ -568,35 +559,7 @@ end
                 end
             end
         end)
-        
-        
     end
-
-    -- Setup menu toggle keybind handler
-Library:Connection(game:GetService("UserInputService").InputBegan, function(input, gameProcessed)
-    if gameProcessed then return end
-    
-    -- Check if UI_MenuKeybind flag exists and matches
-    local menuKeybind = Library.Flags["UI_MenuKeybind"]
-    if menuKeybind and typeof(menuKeybind) == "table" and menuKeybind.key then
-        local inputKey = nil
-        if input.UserInputType == Enum.UserInputType.Keyboard then
-            inputKey = input.KeyCode
-        elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
-            inputKey = Enum.UserInputType.MouseButton1
-        elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
-            inputKey = Enum.UserInputType.MouseButton2
-        elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
-            inputKey = Enum.UserInputType.MouseButton3
-        end
-        
-        if inputKey and inputKey == menuKeybind.key then
-            Library.Open = not Library.Open
-            Main.Visible = Library.Open
-            return
-        end
-    end
-end)
 
     do
         local Pages = Library.Pages
@@ -610,13 +573,11 @@ end)
                 Dragging = {false, UDim2.new(0, 0, 0, 0)};
                 Title = Options.Name or Options.name or "Avenir";
                 Suffix = Options.Suffix or Options.suffix or "";
-                GameInfo = Options.GameInfo or Options.gameInfo or "";
-                Project = Options.Project or Options.project or "";
                 Size = Options.Size or Options.size or UDim2.fromOffset(650, 550);
                 AutoShow = Options.auto_show;
             }
 
-            Library.ProjectName = Base.Project ~= "" and Base.Project or Base.Title or "default"
+            Library.ProjectName = Options.Project or Options.project or Base.Title or "default"
             Library:InitFolders()
             Library:LoadLibrarySettings()
 
@@ -649,12 +610,8 @@ end)
             Main.BackgroundColor3 = Color3.new(0.1098, 0.1098, 0.1098)
             Main.BorderColor3 = Color3.new(0, 0, 0)
             Main.AnchorPoint = Vector2.new(0.5, 0.5)
+            Main.Visible = false
             Library.Holder = Main
-
-            if Base.AutoShow == false then
-                Main.Visible = false
-                Library.Open = false
-            end
 
             Inline.Name = "Inline"
             Inline.Position = UDim2.new(0, 2, 0, 2)
@@ -742,15 +699,10 @@ end)
                 PagesFrame.Size = UDim2.new(1, -tabOffset, 1, 0)
             end)
 
-            local versionText = '<font color="#4e4e4e">build: </font>live'
-            if Base.GameInfo and Base.GameInfo ~= "" then
-                versionText = versionText .. '  <font color="#4e4e4e">| </font>' .. Base.GameInfo
-            end
-
             version.Position = UDim2.new(0, 4, 0, 0)
             version.Size = UDim2.new(1, -4, 1, 0)
             version.BackgroundTransparency = 1
-            version.Text = versionText
+            version.Text = '<font color="#4e4e4e">build: </font>Beta Version'
             version.TextColor3 = Library.Accent
             version.FontFace = Library.UIFont
             version.TextSize = Library.FontSize
@@ -779,10 +731,8 @@ end)
                 end
             end)
 
-            -- Setup keybind handler when window is created
             SetupKeybindHandler()
 
-            -- Menu toggle keybind handler (supports custom keybind)
             Library:Connection(game:GetService("UserInputService").InputBegan, function(input, gameProcessed)
                 if gameProcessed then return end
                 
@@ -799,7 +749,6 @@ end)
                 
                 if not inputKey then return end
                 
-                -- Check for custom menu keybind
                 local menuKeybind = Library.Flags["UI_MenuKeybind"]
                 if menuKeybind and typeof(menuKeybind) == "table" and menuKeybind.key then
                     if inputKey == menuKeybind.key then
@@ -809,7 +758,6 @@ end)
                         end
                     end
                 else
-                    -- Default keybinds (Insert or RightControl)
                     if inputKey == Enum.KeyCode.Insert or inputKey == Enum.KeyCode.RightControl then
                         Library.Open = not Library.Open
                         if Library.Holder then
@@ -822,8 +770,7 @@ end)
             Base.Elements = {Main = Main, Title = Title, Middle = Middle, PageHolder = PagesFrame, SectionHolder = SectionsFrame}
 
             return setmetatable(Base, Library)
-end
-            
+        end
 
         function Library:Page(Options)
             local Page = {
@@ -1045,7 +992,8 @@ end
                     contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
                     contentLayout.Padding = UDim.new(0, 4)
 
-                    Instance.new('UIPadding', SectionFrame).PaddingBottom = UDim.new(0, 10)
+                    local padding = Instance.new('UIPadding', SectionFrame)
+                    padding.PaddingBottom = UDim.new(0, 8)
 
                     local sect = {}
                     sect._content = Content
@@ -1707,6 +1655,7 @@ end
                 OnChange = Props.OnChange or Props.onChange or nil,
                 Flag = Props.Flag or Props.flag or Library.NextFlag(),
                 Holder = nil,
+                _textbox = nil,
             }
 
             local parent = Options.Side == "Right" and TB.Section.Elements.Right or TB.Section.Elements.Left
@@ -1715,7 +1664,8 @@ end
             local TitleTB = Instance.new('TextLabel', HolderTB)
             local TextFrameTB = Instance.new('Frame', HolderTB)
             local TextBoxTB = Instance.new('TextBox', TextFrameTB)
-            local PredictionLabel = Instance.new('TextLabel', TextFrameTB)
+
+            TB._textbox = TextBoxTB
 
             Instance.new('UIGradient', TextFrameTB).Color = ColorSequence.new{
                 ColorSequenceKeypoint.new(0, Color3.new(0.78, 0.749, 0.8)),
@@ -1727,7 +1677,7 @@ end
             HolderTB.BackgroundTransparency = 1
 
             if hasName then
-                                TitleTB.Position = UDim2.new(0, 0, 0, 0)
+                TitleTB.Position = UDim2.new(0, 0, 0, 0)
                 TitleTB.Size = UDim2.new(1, 0, 0, 16)
                 TitleTB.BackgroundTransparency = 1
                 TitleTB.TextColor3 = Color3.new(0.306, 0.306, 0.306)
@@ -1758,34 +1708,21 @@ end
             TextBoxTB.TextXAlignment = Enum.TextXAlignment.Left
             TextBoxTB.ZIndex = 2
 
-            PredictionLabel.Size = UDim2.new(1, -8, 1, 0)
-            PredictionLabel.Position = UDim2.new(0, 4, 0, 0)
-            PredictionLabel.BackgroundTransparency = 1
-            PredictionLabel.Text = ""
-            PredictionLabel.TextColor3 = Color3.new(0.4, 0.4, 0.4)
-            PredictionLabel.FontFace = Library.UIFont
-            PredictionLabel.TextSize = Library.FontSize
-            PredictionLabel.TextXAlignment = Enum.TextXAlignment.Left
-            PredictionLabel.ZIndex = 1
-
             Library.Flags[TB.Flag] = TB.State
 
             TextBoxTB:GetPropertyChangedSignal("Text"):Connect(function()
                 Library.Flags[TB.Flag] = TextBoxTB.Text
-
                 if TB.OnChange then
                     task.spawn(function()
                         pcall(TB.OnChange, TextBoxTB.Text)
                     end)
                 end
-
                 Library:FireFlagCallbacks(TB.Flag, TextBoxTB.Text)
             end)
 
             TextBoxTB.FocusLost:Connect(function(enterPressed)
                 TB.Callback(TextBoxTB.Text, enterPressed)
                 Library.Flags[TB.Flag] = TextBoxTB.Text
-                PredictionLabel.Text = ""
             end)
 
             local function set(str)
@@ -1802,16 +1739,23 @@ end
                 set(str)
             end
 
-            function TB:SetPrediction(prediction)
-                if prediction and prediction ~= "" then
-                    PredictionLabel.Text = prediction
-                else
-                    PredictionLabel.Text = ""
+            function TB:SetLive(str)
+                TextBoxTB.Text = str
+                Library.Flags[TB.Flag] = str
+            end
+
+            function TB:SetIfNotFocused(str)
+                if not TextBoxTB:IsFocused() then
+                    set(str)
                 end
             end
 
             function TB:GetText()
                 return TextBoxTB.Text
+            end
+
+            function TB:IsFocused()
+                return TextBoxTB:IsFocused()
             end
 
             function TB:Focus()
@@ -1920,6 +1864,7 @@ end
                 LabelInst.Text = text
             end
 
+            Lbl._instance = LabelInst
             return Lbl
         end
 
@@ -1931,7 +1876,6 @@ end
             Div.BorderSizePixel = 0
         end
 
-        -- KEYBIND - USES GLOBAL HANDLER
         function Sections:Keybind(Options)
             local Props = Options or {}
             local KB = {
@@ -2051,21 +1995,17 @@ end
             end
             KB:_updateFlag()
 
-            -- Click to bind
             ValueKB.MouseButton1Click:Connect(function()
                 if KB.Binding then return end
                 KB.Binding = true
                 ValueKB.Text = "..."
             end)
 
-            -- Right click for mode
             ValueKB.MouseButton2Click:Connect(function()
                 ModeWindow.Visible = not ModeWindow.Visible
             end)
 
-            -- Handle binding input
             Library:Connection(game:GetService("UserInputService").InputBegan, function(input, gameProcessed)
-                -- Close mode window
                 if ModeWindow.Visible and input.UserInputType == Enum.UserInputType.MouseButton1 then
                     task.defer(function()
                         if not Library:IsMouseOverFrame(ModeWindow) and not Library:IsMouseOverFrame(ValueKB) then
@@ -2074,7 +2014,6 @@ end
                     end)
                 end
 
-                -- Handle binding
                 if KB.Binding then
                     local keyToSet = nil
                     if input.UserInputType == Enum.UserInputType.Keyboard then
@@ -2137,9 +2076,7 @@ end
                 KB.Callback = callback
             end
 
-            -- Register this keybind with the global system
             table.insert(Library._keybinds, KB)
-           
 
             Flags[KB.Flag] = KB
             return KB
@@ -2156,7 +2093,6 @@ function library:window(opts)
     local win = Library:Window({
         Name = opts.name or opts.Name or "Avenir",
         Suffix = opts.suffix or opts.Suffix or "",
-        GameInfo = opts.gameInfo or opts.GameInfo or "",
         Project = opts.project or opts.Project or "",
         Size = opts.size or opts.Size or UDim2.fromOffset(650, 550),
         auto_show = opts.auto_show,
@@ -2168,7 +2104,6 @@ function library:window(opts)
     function wrapper:tab(opts2)
         return win:Page({
             Name = opts2.name or opts2.Name or "tab",
-            Icon = opts2.icon or opts2.Icon,
         })
     end
 
@@ -2179,9 +2114,39 @@ function library:unload()
     Library:Unload()
 end
 
+function library:show()
+    Library.Open = true
+    if Library.Holder then
+        Library.Holder.Visible = true
+    end
+end
+
+function library:hide()
+    Library.Open = false
+    if Library.Holder then
+        Library.Holder.Visible = false
+    end
+end
+
 function library:init_config(w)
     Library:InitFolders()
-    Library:DoAutoLoad()
+    Library:LoadLibrarySettings()
+    
+    if Library.AutoLoadConfigName then
+        local configPath = Library:GetConfigPath() .. "/" .. Library.AutoLoadConfigName .. ".cfg"
+        pcall(function()
+            if isfile(configPath) then
+                Library:LoadConfig(readfile(configPath))
+            end
+        end)
+    end
+    
+    task.defer(function()
+        Library.Open = true
+        if Library.Holder then
+            Library.Holder.Visible = true
+        end
+    end)
 end
 
 function library:get_config()
@@ -2227,199 +2192,5 @@ end
 function library:get_auto_load()
     return Library.AutoLoadConfigName
 end
-
-Library:OnUnload(function() end)
-
-local LibraryInternal = library._internal
-
-Toggles = setmetatable({}, {
-    __index = function(self, key)
-        local val = library.flags[key]
-
-        return {
-            Value = (typeof(val) == "boolean") and val or false,
-            SetValue = function(_, newVal)
-                if typeof(newVal) == "boolean" then
-                    local flagSetter = LibraryInternal.Flags[key]
-                    if flagSetter then
-                        if typeof(flagSetter) == "function" then
-                            flagSetter(newVal)
-                        elseif typeof(flagSetter) == "table" and flagSetter.Set then
-                            flagSetter:Set(newVal)
-                        end
-                    else
-                        library.flags[key] = newVal
-                    end
-                end
-            end,
-            OnChanged = function(_, cb)
-                if LibraryInternal then
-                    LibraryInternal:OnFlagChanged(key, function(newVal)
-                        pcall(cb, newVal)
-                    end)
-                end
-            end
-        }
-    end
-})
-
-Options = setmetatable({}, {
-    __index = function(self, key)
-        local val = library.flags[key]
-
-        local isKeybind = typeof(val) == "table" and val.mode ~= nil
-        local isColor = typeof(val) == "Color3"
-        local isTable = typeof(val) == "table" and not isKeybind
-
-        if isKeybind then
-            return {
-                Value = val.key,
-                GetState = function()
-                    local d = library.flags[key]
-                    return d and d.active or false
-                end,
-                OnClick = function(_, cb)
-                    if LibraryInternal then
-                        LibraryInternal:OnFlagChanged(key, function(newData)
-                            if typeof(newData) == "table" and newData.active then
-                                pcall(cb)
-                            end
-                        end)
-                    end
-                end,
-                OnChanged = function(_, cb)
-                    if LibraryInternal then
-                        LibraryInternal:OnFlagChanged(key, function(newData)
-                            pcall(cb, newData)
-                        end)
-                    end
-                end,
-                SetValue = function(_, newVal)
-                    local flagSetter = LibraryInternal.Flags[key]
-                    if flagSetter and typeof(flagSetter) == "table" and flagSetter.Set then
-                        flagSetter:Set(newVal)
-                    else
-                        library.flags[key] = newVal
-                    end
-                end
-            }
-        elseif isColor then
-            return {
-                Value = val or Color3.fromRGB(255, 255, 255),
-                OnChanged = function(_, cb)
-                    if LibraryInternal then
-                        LibraryInternal:OnFlagChanged(key, function(newColor)
-                            pcall(cb, newColor)
-                        end)
-                    end
-                end,
-                SetValue = function(_, newVal)
-                    local flagSetter = LibraryInternal.Flags[key]
-                    if flagSetter and typeof(flagSetter) == "function" then
-                        flagSetter(newVal)
-                    else
-                        library.flags[key] = newVal
-                    end
-                end
-            }
-        elseif isTable then
-            local dictVal = {}
-            if type(val) == "table" then
-                for _, item in ipairs(val) do
-                    dictVal[item] = true
-                end
-            end
-            return {
-                Value = dictVal,
-                SetValue = function(_, newVal)
-                    local flagSetter = LibraryInternal.Flags[key]
-                    if flagSetter and typeof(flagSetter) == "table" and flagSetter.Set then
-                        flagSetter:Set(newVal)
-                    else
-                        if typeof(newVal) == "table" then
-                            local arr = {}
-                            for k, v in pairs(newVal) do
-                                if v then
-                                    table.insert(arr, k)
-                                end
-                            end
-                            library.flags[key] = arr
-                        else
-                            library.flags[key] = newVal
-                        end
-                    end
-                end,
-                OnChanged = function(_, cb)
-                    if LibraryInternal then
-                        LibraryInternal:OnFlagChanged(key, function(newVal)
-                            pcall(cb, newVal)
-                        end)
-                    end
-                end
-            }
-        else
-            return {
-                Value = val,
-                SetValue = function(_, newVal)
-                    local flagSetter = LibraryInternal.Flags[key]
-                    if flagSetter then
-                        if typeof(flagSetter) == "function" then
-                            flagSetter(newVal)
-                        elseif typeof(flagSetter) == "table" and flagSetter.Set then
-                            flagSetter:Set(newVal)
-                        end
-                    else
-                        library.flags[key] = newVal
-                    end
-                end,
-                OnChanged = function(_, cb)
-                    if LibraryInternal then
-                        LibraryInternal:OnFlagChanged(key, function(newVal)
-                            pcall(cb, newVal)
-                        end)
-                    end
-                end
-            }
-        end
-    end
-})
-
-LibCompat = {
-    Unloaded = false,
-    ToggleKeybind = nil,
-    _onUnloadCallbacks = {},
-    OnUnload = function(self, cb)
-        table.insert(self._onUnloadCallbacks, cb)
-    end,
-    Notify = function(self, msg, dur)
-    end,
-    Unload = function(self)
-        for _, cb in ipairs(self._onUnloadCallbacks) do
-            pcall(cb)
-        end
-        self.Unloaded = true
-        pcall(function()
-            library:unload()
-        end)
-    end
-}
-
-ThemeManager = {
-    SetLibrary = function() end,
-    SetFolder = function() end,
-    ApplyToTab = function() end,
-    ApplyTheme = function() end,
-}
-
-SaveManager = {
-    SetLibrary = function() end,
-    IgnoreThemeSettings = function() end,
-    SetIgnoreIndexes = function() end,
-    SetFolder = function() end,
-    BuildConfigSection = function() end,
-    LoadAutoloadConfig = function() end,
-}
-
-Tabs = {Combat = {}, Visuals = {}, Misc = {}, Settings = {}}
 
 return library
