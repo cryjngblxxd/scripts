@@ -742,7 +742,7 @@ end)
                 PagesFrame.Size = UDim2.new(1, -tabOffset, 1, 0)
             end)
 
-            local versionText = '<font color="#4e4e4e">build: </font>Beta Version'
+            local versionText = '<font color="#4e4e4e">build: </font>live'
             if Base.GameInfo and Base.GameInfo ~= "" then
                 versionText = versionText .. '  <font color="#4e4e4e">| </font>' .. Base.GameInfo
             end
@@ -804,13 +804,17 @@ end)
                 if menuKeybind and typeof(menuKeybind) == "table" and menuKeybind.key then
                     if inputKey == menuKeybind.key then
                         Library.Open = not Library.Open
-                        Main.Visible = Library.Open
+                        if Library.Holder then
+                            Library.Holder.Visible = Library.Open
+                        end
                     end
                 else
                     -- Default keybinds (Insert or RightControl)
                     if inputKey == Enum.KeyCode.Insert or inputKey == Enum.KeyCode.RightControl then
                         Library.Open = not Library.Open
-                        Main.Visible = Library.Open
+                        if Library.Holder then
+                            Library.Holder.Visible = Library.Open
+                        end
                     end
                 end
             end)
@@ -818,7 +822,8 @@ end)
             Base.Elements = {Main = Main, Title = Title, Middle = Middle, PageHolder = PagesFrame, SectionHolder = SectionsFrame}
 
             return setmetatable(Base, Library)
-        end
+end
+            
 
         function Library:Page(Options)
             local Page = {
