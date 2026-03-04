@@ -2,7 +2,7 @@ local Library = {}
 do
 Library = {
 Open = true,
-Folders = { main = "avenir", configs = "avenir/Configs" },
+Folders = { main = "Avenir.CC", configs = "Avenir.CC/Configs" },
 Accent = Color3.fromRGB(45, 120, 255),
 Pages = {},
 Sections = {},
@@ -51,6 +51,7 @@ AutoLoadConfigName = nil,
 _keybinds = {},
 _menuToggleSetup = false,
 _Flags = {},
+_configIgnore = {},
 }
 
 local Flags = Library._Flags
@@ -161,6 +162,10 @@ end
 end
 end
 
+function Library:IgnoreFlag(flag)
+self._configIgnore[flag] = true
+end
+
 function Library:InitFolders()
 pcall(function()
 if not isfolder(self.Folders.main) then makefolder(self.Folders.main) end
@@ -175,15 +180,21 @@ return self.Folders.configs .. "/" .. self.ProjectName
 end
 
 function Library:GetSettingsPath()
-return self:GetConfigPath() .. "/settings.json"
+return self.Folders.main .. "/settings.json"
 end
 
 function Library:SaveLibrarySettings()
 pcall(function()
 self:InitFolders()
-writefile(self:GetSettingsPath(), HttpService:JSONEncode({
+local existing = {}
+if isfile(self:GetSettingsPath()) then
+local ok, data = pcall(HttpService.JSONDecode, HttpService, readfile(self:GetSettingsPath()))
+if ok and type(data) == "table" then existing = data end
+end
+existing[self.ProjectName] = {
 auto_load_config = self.AutoLoadConfigName
-}))
+}
+writefile(self:GetSettingsPath(), HttpService:JSONEncode(existing))
 end)
 end
 
@@ -191,8 +202,10 @@ function Library:LoadLibrarySettings()
 pcall(function()
 local path = self:GetSettingsPath()
 if isfile(path) then
-local data = HttpService:JSONDecode(readfile(path))
-self.AutoLoadConfigName = data.auto_load_config
+local ok, data = pcall(HttpService.JSONDecode, HttpService, readfile(path))
+if ok and type(data) == "table" and data[self.ProjectName] then
+self.AutoLoadConfigName = data[self.ProjectName].auto_load_config
+end
 end
 end)
 end
@@ -207,76 +220,117 @@ self.AutoLoadConfigName = nil
 self:SaveLibrarySettings()
 end
 
-function Library:GetConfig()
-local Config = {}
-for flag, value in pairs(self.Flags) do
-if flag == "cfg_selected" or flag == "cfg_name" then continue end
+function Library:_serializeValue(flag, value)
+if self._configIgnore[flag] then return nil end
 if typeof(value) == "Color3" then
-Config[flag] = {_type = "Color3", hex = value:ToHex()}
-elseif typeof(value) == "boolean" or typeof(value) == "number" or typeof(value) == "string" then
-Config[flag] = value
+return {T = "Color3", R = math.floor(value.R * 255), G = math.floor(value.G * 255), B = math.floor(value.B * 255)}
+elseif typeof(value) == "boolean" then
+return {T = "Bool", V = value}
+elseif typeof(value) == "number" then
+return {T = "Num", V = value}
+elseif typeof(value) == "string" then
+return {T = "Str", V = value}
 elseif type(value) == "table" then
 if value.mode ~= nil and value.active ~= nil then
-local keyData = {_type = "Keybind", mode = value.mode, key = "NONE", keyType = "NONE"}
+local keyStr = "NONE"
+local keyType = "NONE"
 if value.key and typeof(value.key) == "EnumItem" and value.key ~= Enum.KeyCode.Unknown then
 local ks = tostring(value.key)
 if ks:find("Enum%.KeyCode%.") then
-keyData.keyType = "KeyCode"
-keyData.key = ks:gsub("Enum%.KeyCode%.", "")
+keyType = "KC"
+keyStr = ks:gsub("Enum%.KeyCode%.", "")
 elseif ks:find("Enum%.UserInputType%.") then
-keyData.keyType = "UserInputType"
-keyData.key = ks:gsub("Enum%.UserInputType%.", "")
+keyType = "UIT"
+keyStr = ks:gsub("Enum%.UserInputType%.", "")
 end
 end
-Config[flag] = keyData
-elseif #value > 0 or next(value) == nil then
-Config[flag] = {_type = "Table", data = value}
+return {T = "Key", M = value.mode, K = keyStr, KT = keyType}
+else
+local isArray = true
+local maxIdx = 0
+for k, v in pairs(value) do
+if type(k) ~= "number" then isArray = false; break end
+if k > maxIdx then maxIdx = k end
+end
+if isArray and maxIdx == #value then
+return {T = "Arr", V = value}
+else
+return {T = "Tbl", V = value}
 end
 end
 end
-return HttpService:JSONEncode(Config)
+return nil
 end
 
-function Library:LoadConfig(configJson)
-local ok, config = pcall(HttpService.JSONDecode, HttpService, configJson)
-if not ok or type(config) ~= "table" then return end
-for flag, value in pairs(config) do
-if flag == "cfg_selected" or flag == "cfg_name" then continue end
+function Library:_deserializeValue(data)
+if type(data) ~= "table" or not data.T then return nil, false end
+if data.T == "Color3" then
+return Color3.fromRGB(data.R or 255, data.G or 255, data.B or 255), true
+elseif data.T == "Bool" then
+return data.V, true
+elseif data.T == "Num" then
+return data.V, true
+elseif data.T == "Str" then
+return data.V, true
+elseif data.T == "Key" then
+return {mode = data.M, key = data.K, keyType = data.KT}, true
+elseif data.T == "Arr" then
+return data.V, true
+elseif data.T == "Tbl" then
+return data.V, true
+end
+return nil, false
+end
+
+function Library:GetConfig()
+local cfg = {}
+for flag, value in pairs(self.Flags) do
+if self._configIgnore[flag] then continue end
+local serialized = self:_serializeValue(flag, value)
+if serialized then
+cfg[flag] = serialized
+end
+end
+return HttpService:JSONEncode(cfg)
+end
+
+function Library:LoadConfig(cfgJson)
+local ok, cfg = pcall(HttpService.JSONDecode, HttpService, cfgJson)
+if not ok or type(cfg) ~= "table" then return false end
+
+for flag, serialized in pairs(cfg) do
+if self._configIgnore[flag] then continue end
+local value, valid = self:_deserializeValue(serialized)
+if not valid then continue end
+
 local setter = Flags[flag]
-if type(value) == "table" and value._type == "Keybind" then
+
+if serialized.T == "Key" then
 local kb = nil
 for _, k in ipairs(self._keybinds) do
 if k.Flag == flag then kb = k; break end
 end
 if not kb and setter and type(setter) == "table" and setter.Set then kb = setter end
 if kb then
-if kb.SetMode and value.mode then pcall(function() kb:SetMode(value.mode) end) end
+if kb.SetMode and value.mode then
+pcall(function() kb:SetMode(value.mode) end)
+end
 if value.key and value.key ~= "NONE" and value.keyType and value.keyType ~= "NONE" then
 local key = nil
-if value.keyType == "KeyCode" then
+if value.keyType == "KC" then
 local s, r = pcall(function() return Enum.KeyCode[value.key] end)
 if s and r and r ~= Enum.KeyCode.Unknown then key = r end
-elseif value.keyType == "UserInputType" then
+elseif value.keyType == "UIT" then
 local s, r = pcall(function() return Enum.UserInputType[value.key] end)
 if s and r then key = r end
 end
 if key and kb.Set then pcall(function() kb:Set(key) end) end
 end
 end
-elseif type(value) == "table" and value._type == "Color3" then
+elseif serialized.T == "Color3" then
 if setter then
-if type(setter) == "function" then pcall(setter, Color3.fromHex(value.hex))
-elseif type(setter) == "table" and setter.Set then pcall(function() setter:Set(Color3.fromHex(value.hex)) end) end
-end
-elseif type(value) == "table" and value._type == "Table" then
-if setter then
-if type(setter) == "function" then pcall(setter, value.data)
-elseif type(setter) == "table" and setter.Set then pcall(function() setter:Set(value.data) end) end
-end
-elseif type(value) == "table" then
-if setter then
-if type(setter) == "table" and setter.Set then pcall(function() setter:Set(value) end)
-elseif type(setter) == "function" then pcall(setter, value) end
+if type(setter) == "function" then pcall(setter, value)
+elseif type(setter) == "table" and setter.Set then pcall(function() setter:Set(value) end) end
 end
 else
 if setter then
@@ -285,20 +339,41 @@ elseif type(setter) == "table" and setter.Set then pcall(function() setter:Set(v
 end
 end
 end
+return true
 end
 
 function Library:SaveConfig(name)
+local success = false
 pcall(function()
 self:InitFolders()
-writefile(self:GetConfigPath() .. "/" .. name .. ".cfg", self:GetConfig())
+local path = self:GetConfigPath() .. "/" .. name .. ".cfg"
+writefile(path, self:GetConfig())
+success = true
 end)
+return success
+end
+
+function Library:LoadConfigFile(name)
+local success = false
+pcall(function()
+local path = self:GetConfigPath() .. "/" .. name .. ".cfg"
+if isfile(path) then
+success = self:LoadConfig(readfile(path))
+end
+end)
+return success
 end
 
 function Library:DeleteConfig(name)
+local success = false
 pcall(function()
 local p = self:GetConfigPath() .. "/" .. name .. ".cfg"
-if isfile(p) then delfile(p) end
+if isfile(p) then
+delfile(p)
+success = true
+end
 end)
+return success
 end
 
 function Library:ListConfigs()
@@ -313,6 +388,14 @@ end
 end
 end)
 return list
+end
+
+function Library:ConfigExists(name)
+local exists = false
+pcall(function()
+exists = isfile(self:GetConfigPath() .. "/" .. name .. ".cfg")
+end)
+return exists
 end
 
 function Library:NewPicker(default, alpha, parent, count, flag, callback)
@@ -767,7 +850,6 @@ Page._columnFrames = {}
 
 function Page:column()
 local col = {Page = Page, Sections = {}}
-local colIndex = #Page._columns + 1
 table.insert(Page._columns, col)
 
 local ColFrame = Instance.new('Frame', SectionHolder)
@@ -1568,9 +1650,6 @@ local PREVIEW_MODES = {"Character", "Avenir Anime Girl"}
 local ANIME_GIRL_IMAGE = "rbxassetid://138507241500989"
 local ANIME_GIRL_NAME = "discord.gg/avenir"
 
-local IMAGE_WIDTH = 9
-local IMAGE_HEIGHT = 16
-
 function ESPPreview.Create(library, screenGui)
 local preview = {
 Enabled = true,
@@ -1587,8 +1666,6 @@ _previewName = Players.LocalPlayer.DisplayName,
 _liveMode = true,
 _renderedImageW = 0,
 _renderedImageH = 0,
-_renderedImageOffsetX = 0,
-_renderedImageOffsetY = 0,
 }
 local panelWidth = 350
 
@@ -1663,8 +1740,7 @@ ModeDropdown.BorderColor3 = Color3.new(0, 0, 0)
 ModeDropdown.Visible = false
 ModeDropdown.ZIndex = 200
 
-local ModeList = Instance.new('UIListLayout', ModeDropdown)
-ModeList.SortOrder = Enum.SortOrder.LayoutOrder
+Instance.new('UIListLayout', ModeDropdown).SortOrder = Enum.SortOrder.LayoutOrder
 
 local modeDropdownOpen = false
 
@@ -1738,7 +1814,6 @@ local PreviewImage = Instance.new('ImageLabel', ImageContainer)
 PreviewImage.Name = "PreviewImage"
 PreviewImage.AnchorPoint = Vector2.new(0.5, 0.5)
 PreviewImage.Position = UDim2.new(0.5, 0, 0.5, 0)
-PreviewImage.Size = UDim2.new(1, 0, 1, 0)
 PreviewImage.BackgroundTransparency = 1
 PreviewImage.Image = ANIME_GIRL_IMAGE
 PreviewImage.ScaleType = Enum.ScaleType.Fit
@@ -1761,17 +1836,11 @@ preview._boxStroke = BoxStroke
 
 local function getArmorColor(armorValue)
 local pct = math.clamp(armorValue / 100, 0, 1)
-if pct >= 0.75 then
-return Color3.fromRGB(0, 120, 255)
-elseif pct >= 0.5 then
-return Color3.fromRGB(0, 200, 150)
-elseif pct >= 0.25 then
-return Color3.fromRGB(255, 200, 0)
-elseif pct > 0 then
-return Color3.fromRGB(255, 130, 0)
-else
-return Color3.fromRGB(255, 60, 60)
-end
+if pct >= 0.75 then return Color3.fromRGB(0, 120, 255)
+elseif pct >= 0.5 then return Color3.fromRGB(0, 200, 150)
+elseif pct >= 0.25 then return Color3.fromRGB(255, 200, 0)
+elseif pct > 0 then return Color3.fromRGB(255, 130, 0)
+else return Color3.fromRGB(255, 60, 60) end
 end
 
 local NameESP = Instance.new('TextButton', PreviewArea)
@@ -1950,12 +2019,9 @@ if preview._currentMode == "Character" then
 local availableHeight = areaSize.Y - espMargin * 2
 local availableWidth = areaSize.X - espMargin * 2
 
-local totalHeightStuds = 5
-local totalWidthStuds = 4
 local gap = 2
-
-local scaleY = availableHeight / (totalHeightStuds * 20 + gap * 2)
-local scaleX = availableWidth / (totalWidthStuds * 20 + gap * 2)
+local scaleY = availableHeight / (5 * 20 + gap * 2)
+local scaleX = availableWidth / (4 * 20 + gap * 2)
 local scale = math.min(scaleY, scaleX)
 scale = math.clamp(scale, 1, 20)
 
@@ -1997,11 +2063,10 @@ else
 local availableW = areaSize.X - espMargin * 2
 local availableH = areaSize.Y - espMargin * 2
 
-local imageAspect = IMAGE_WIDTH / IMAGE_HEIGHT
+local imageAspect = 9 / 16
 local containerAspect = availableW / availableH
 
 local renderedW, renderedH
-
 if containerAspect > imageAspect then
 renderedH = availableH
 renderedW = renderedH * imageAspect
@@ -2017,7 +2082,7 @@ ImageContainer.AnchorPoint = Vector2.new(0.5, 0.5)
 PreviewImage.Size = UDim2.new(1, 0, 1, 0)
 PreviewImage.Position = UDim2.new(0.5, 0, 0.5, 0)
 PreviewImage.AnchorPoint = Vector2.new(0.5, 0.5)
-PreviewImage.ScaleType = Enum.ScaleType.Stretch
+PreviewImage.ScaleType = Enum.ScaleType.Fit
 
 preview._renderedImageW = renderedW
 preview._renderedImageH = renderedH
@@ -2083,7 +2148,6 @@ local spacing = 14
 
 for _, zone in ipairs(SNAP_ZONES) do
 local elementsInZone = getElementsInZone(zone)
-
 for stackIndex, elementName in ipairs(elementsInZone) do
 local element = preview["_" .. elementName:lower() .. "ESP"]
 if element then
@@ -2117,9 +2181,7 @@ end
 
 if preview._healthBarBG and preview._elementPositions["Health"] then
 local zone = preview._elementPositions["Health"]
-local x = 0.5
-local anchorX = 0.5
-
+local x, anchorX = 0.5, 0.5
 if zone == "Left" then
 x = 0.5 - (charW/2 + boxPad + 6) / areaSize.X
 anchorX = 1
@@ -2127,16 +2189,13 @@ elseif zone == "Right" then
 x = 0.5 + (charW/2 + boxPad + 6) / areaSize.X
 anchorX = 0
 end
-
 preview._healthBarBG.Position = UDim2.new(x, 0, 0.5, 0)
 preview._healthBarBG.AnchorPoint = Vector2.new(anchorX, 0.5)
 end
 
 if preview._armorBarBG and preview._elementPositions["ArmorBar"] then
 local zone = preview._elementPositions["ArmorBar"]
-local x = 0.5
-local anchorX = 0.5
-
+local x, anchorX = 0.5, 0.5
 if zone == "Left" then
 x = 0.5 - (charW/2 + boxPad + 6) / areaSize.X
 anchorX = 1
@@ -2144,7 +2203,6 @@ elseif zone == "Right" then
 x = 0.5 + (charW/2 + boxPad + 6) / areaSize.X
 anchorX = 0
 end
-
 preview._armorBarBG.Position = UDim2.new(x, 0, 0.5, 0)
 preview._armorBarBG.AnchorPoint = Vector2.new(anchorX, 0.5)
 end
@@ -2152,14 +2210,12 @@ end
 
 local function updatePreviewValues()
 if preview._liveMode then return end
-
 if preview._healthBarBG and preview._healthBarBG.Visible then
 local pct = math.clamp(preview._previewHealth / preview._previewMaxHealth, 0, 1)
 preview._healthBarFill.Size = UDim2.new(1, 0, pct, 0)
 preview._healthBarFill.BackgroundColor3 = Color3.new(1 - pct, pct, 0)
 preview._healthText.Text = tostring(math.floor(preview._previewHealth))
 end
-
 if preview._armorBarBG and (preview._armorBarBG.Visible or preview._armorESP.Visible) then
 local pct = math.clamp(preview._previewArmor / preview._previewMaxArmor, 0, 1)
 local color = getArmorColor(preview._previewArmor)
@@ -2170,15 +2226,12 @@ preview._armorText.TextColor3 = color
 preview._armorESP.Text = "Armor: " .. tostring(math.floor(preview._previewArmor))
 preview._armorESP.TextColor3 = color
 end
-
 if preview._distESP and preview._distESP.Visible then
 preview._distESP.Text = "[" .. tostring(preview._previewDistance) .. "m]"
 end
-
 if preview._toolESP and preview._toolESP.Visible then
 preview._toolESP.Text = "[" .. preview._previewTool .. "]"
 end
-
 if preview._nameESP and preview._nameESP.Visible then
 if preview._currentMode == "Avenir Anime Girl" then
 preview._nameESP.Text = ANIME_GIRL_NAME
@@ -2207,7 +2260,6 @@ preview._currentMode = newMode
 ModeButton.Text = "  " .. newMode .. " ▼"
 modeDropdownOpen = false
 ModeDropdown.Visible = false
-
 if newMode == "Character" then
 CharBox.Visible = true
 ImageContainer.Visible = false
@@ -2217,7 +2269,6 @@ CharBox.Visible = false
 ImageContainer.Visible = true
 preview._liveMode = false
 end
-
 recalculateCharacter()
 updateAllPositions()
 updatePreviewValues()
@@ -2239,13 +2290,7 @@ end)
 element.InputEnded:Connect(function(input)
 if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 if dragging then
-local zone = getSnapZone(element)
-preview._elementPositions[elementName] = zone
-pcall(function()
-if library and library.flags then
-library.flags["RaidESP_" .. elementName .. "Position"] = zone
-end
-end)
+preview._elementPositions[elementName] = getSnapZone(element)
 updateAllPositions()
 end
 dragging = false
@@ -2256,13 +2301,9 @@ Library:Connection(UserInputService.InputChanged, function(input)
 if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
 local areaPos = PreviewArea.AbsolutePosition
 local areaSize = PreviewArea.AbsoluteSize
-local newX = input.Position.X - dragOffset.X - areaPos.X
-local newY = input.Position.Y - dragOffset.Y - areaPos.Y
-
-local clampX = math.clamp(newX, 0, areaSize.X - element.AbsoluteSize.X)
-local clampY = math.clamp(newY, 0, areaSize.Y - element.AbsoluteSize.Y)
-
-element.Position = UDim2.new(0, clampX, 0, clampY)
+local newX = math.clamp(input.Position.X - dragOffset.X - areaPos.X, 0, areaSize.X - element.AbsoluteSize.X)
+local newY = math.clamp(input.Position.Y - dragOffset.Y - areaPos.Y, 0, areaSize.Y - element.AbsoluteSize.Y)
+element.Position = UDim2.new(0, newX, 0, newY)
 element.AnchorPoint = Vector2.new(0, 0)
 end
 end)
@@ -2286,14 +2327,7 @@ local areaPos = PreviewArea.AbsolutePosition
 local areaSize = PreviewArea.AbsoluteSize
 local elemCenterX = element.AbsolutePosition.X + element.AbsoluteSize.X / 2
 local areaCenterX = areaPos.X + areaSize.X / 2
-
-local zone = elemCenterX < areaCenterX and "Left" or "Right"
-preview._elementPositions[elementName] = zone
-pcall(function()
-if library and library.flags then
-library.flags["RaidESP_" .. elementName .. "Position"] = zone
-end
-end)
+preview._elementPositions[elementName] = elemCenterX < areaCenterX and "Left" or "Right"
 updateAllPositions()
 end
 dragging = false
@@ -2304,9 +2338,7 @@ Library:Connection(UserInputService.InputChanged, function(input)
 if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
 local areaPos = PreviewArea.AbsolutePosition
 local areaSize = PreviewArea.AbsoluteSize
-local newX = input.Position.X - dragOffsetX - areaPos.X
-local clampX = math.clamp(newX, 0, areaSize.X - element.AbsoluteSize.X)
-
+local clampX = math.clamp(input.Position.X - dragOffsetX - areaPos.X, 0, areaSize.X - element.AbsoluteSize.X)
 element.Position = UDim2.new(0, clampX, 0.5, 0)
 element.AnchorPoint = Vector2.new(0, 0.5)
 end
@@ -2347,18 +2379,9 @@ ModeOption.TextSize = 11
 ModeOption.TextXAlignment = Enum.TextXAlignment.Left
 ModeOption.ZIndex = 201
 ModeOption.LayoutOrder = i
-
-ModeOption.MouseButton1Click:Connect(function()
-switchMode(mode)
-end)
-
-ModeOption.MouseEnter:Connect(function()
-ModeOption.TextColor3 = Color3.fromRGB(255, 255, 255)
-end)
-
-ModeOption.MouseLeave:Connect(function()
-ModeOption.TextColor3 = Color3.new(0.6, 0.6, 0.6)
-end)
+ModeOption.MouseButton1Click:Connect(function() switchMode(mode) end)
+ModeOption.MouseEnter:Connect(function() ModeOption.TextColor3 = Color3.fromRGB(255, 255, 255) end)
+ModeOption.MouseLeave:Connect(function() ModeOption.TextColor3 = Color3.new(0.6, 0.6, 0.6) end)
 end
 
 local function getHumanoid()
@@ -2382,44 +2405,29 @@ end
 local function getArmorValueLive()
 local char = Players.LocalPlayer.Character
 if not char then return preview._currentArmor end
-
 local hum = char:FindFirstChildOfClass("Humanoid")
-if hum and hum:GetAttribute("Armor") then
-return hum:GetAttribute("Armor")
-end
-
+if hum and hum:GetAttribute("Armor") then return hum:GetAttribute("Armor") end
 local armorVal = char:FindFirstChild("Armor") or char:FindFirstChild("ArmorValue")
-if armorVal and (armorVal:IsA("NumberValue") or armorVal:IsA("IntValue")) then
-return armorVal.Value
-end
-
-local player = Players.LocalPlayer
-local leaderstats = player:FindFirstChild("leaderstats")
+if armorVal and (armorVal:IsA("NumberValue") or armorVal:IsA("IntValue")) then return armorVal.Value end
+local leaderstats = Players.LocalPlayer:FindFirstChild("leaderstats")
 if leaderstats then
 local armor = leaderstats:FindFirstChild("Armor")
-if armor and (armor:IsA("NumberValue") or armor:IsA("IntValue")) then
-return armor.Value
+if armor and (armor:IsA("NumberValue") or armor:IsA("IntValue")) then return armor.Value end
 end
-end
-
 return preview._currentArmor
 end
 
 local function updateArmorLive()
 if not preview._liveMode then return end
 if not ArmorBarBG.Visible and not ArmorESP.Visible then return end
-
 local armorValue = getArmorValueLive()
 preview._currentArmor = armorValue
-
 local pct = math.clamp(armorValue / preview._maxArmor, 0, 1)
 local color = getArmorColor(armorValue)
-
 ArmorBarFill.Size = UDim2.new(1, 0, pct, 0)
 ArmorBarFill.BackgroundColor3 = color
 ArmorText.Text = tostring(math.floor(armorValue))
 ArmorText.TextColor3 = color
-
 ArmorESP.Text = "Armor: " .. tostring(math.floor(armorValue))
 ArmorESP.TextColor3 = color
 end
@@ -2451,17 +2459,11 @@ ToolESP.Text = tool and ("[" .. tool.Name .. "]") or "[None]"
 end
 end
 
-local toolCon = nil
 local function connectTool()
-if toolCon then toolCon:Disconnect() end
 local char = Players.LocalPlayer.Character
 if char then
-toolCon = char.ChildAdded:Connect(function(child)
-if child:IsA("Tool") then updateToolLive() end
-end)
-char.ChildRemoved:Connect(function(child)
-if child:IsA("Tool") then updateToolLive() end
-end)
+char.ChildAdded:Connect(function(child) if child:IsA("Tool") then updateToolLive() end end)
+char.ChildRemoved:Connect(function(child) if child:IsA("Tool") then updateToolLive() end end)
 updateToolLive()
 end
 end
@@ -2474,14 +2476,13 @@ task.defer(connectTool)
 
 local lastAreaSize = Vector2.new(0, 0)
 
-local function updatePosition()
+Library:Connection(RunService.Heartbeat, function()
 if Library.Holder then
 local mp = Library.Holder.AbsolutePosition
 local ms = Library.Holder.AbsoluteSize
 Panel.Size = UDim2.new(0, panelWidth, 0, ms.Y)
 Panel.Position = UDim2.new(0, mp.X + ms.X + 5, 0, mp.Y)
 Panel.Visible = Library.Open
-
 local currentSize = PreviewArea.AbsoluteSize
 if math.abs(currentSize.X - lastAreaSize.X) > 1 or math.abs(currentSize.Y - lastAreaSize.Y) > 1 then
 lastAreaSize = currentSize
@@ -2491,31 +2492,12 @@ end
 else
 Panel.Visible = false
 end
-end
-
-Library:Connection(RunService.Heartbeat, function()
-updatePosition()
 if preview._liveMode then
 if HealthBarBG.Visible then updateHealthLive() end
 if ToolESP.Visible then updateToolLive() end
 if ArmorBarBG.Visible or ArmorESP.Visible then updateArmorLive() end
 end
 end)
-
-local function syncFromFlags()
-pcall(function()
-if library and library.flags then
-for _, name in ipairs({"Name", "Distance", "Armor", "Tool", "Health", "ArmorBar"}) do
-local flagName = "RaidESP_" .. name .. "Position"
-if library.flags[flagName] then
-preview._elementPositions[name] = library.flags[flagName]
-end
-end
-updateAllPositions()
-end
-end)
-end
-task.defer(syncFromFlags)
 
 function preview:SetBoxESP(enabled, color)
 self._boxESP.Visible = enabled
@@ -2540,11 +2522,7 @@ function preview:SetHealthBar(enabled)
 self._healthBarBG.Visible = enabled
 self._healthText.Visible = enabled
 if enabled then
-if self._liveMode then
-updateHealthLive()
-else
-updatePreviewValues()
-end
+if self._liveMode then updateHealthLive() else updatePreviewValues() end
 updateAllPositions()
 end
 end
@@ -2580,20 +2558,10 @@ function preview:SetArmorESP(enabled, armorValue, maxArmor)
 self._armorESP.Visible = enabled
 self._armorBarBG.Visible = enabled
 self._armorText.Visible = enabled
-if maxArmor then
-self._maxArmor = maxArmor
-self._previewMaxArmor = maxArmor
-end
-if armorValue ~= nil then
-self._currentArmor = armorValue
-self._previewArmor = armorValue
-end
+if maxArmor then self._maxArmor = maxArmor; self._previewMaxArmor = maxArmor end
+if armorValue ~= nil then self._currentArmor = armorValue; self._previewArmor = armorValue end
 if enabled then
-if self._liveMode then
-updateArmorLive()
-else
-updatePreviewValues()
-end
+if self._liveMode then updateArmorLive() else updatePreviewValues() end
 updateAllPositions()
 end
 end
@@ -2601,11 +2569,7 @@ end
 function preview:SetArmorValue(value)
 self._currentArmor = value
 self._previewArmor = value
-if self._liveMode then
-updateArmorLive()
-else
-updatePreviewValues()
-end
+if self._liveMode then updateArmorLive() else updatePreviewValues() end
 end
 
 function preview:SetSkeleton(enabled, color)
@@ -2637,14 +2601,10 @@ return self._elementPositions[elementName]
 end
 
 function preview:SetMode(mode)
-if mode == "Character" or mode == "Avenir Anime Girl" then
-switchMode(mode)
-end
+if mode == "Character" or mode == "Avenir Anime Girl" then switchMode(mode) end
 end
 
-function preview:GetMode()
-return self._currentMode
-end
+function preview:GetMode() return self._currentMode end
 
 function preview:SetPreviewHealth(health, maxHealth)
 self._previewHealth = health
@@ -2670,25 +2630,12 @@ end
 
 function preview:SetPreviewName(name)
 self._previewName = name
-if not self._liveMode and self._currentMode == "Character" then
-self._nameESP.Text = name
-end
+if not self._liveMode and self._currentMode == "Character" then self._nameESP.Text = name end
 end
 
 function preview:SetLiveMode(enabled)
 self._liveMode = enabled
-if not enabled then
-updatePreviewValues()
-end
-end
-
-function preview:SetImageDimensions(width, height)
-IMAGE_WIDTH = width
-IMAGE_HEIGHT = height
-if self._currentMode == "Avenir Anime Girl" then
-recalculateCharacter()
-updateAllPositions()
-end
+if not enabled then updatePreviewValues() end
 end
 
 function preview:Show() Panel.Visible = true end
@@ -2738,10 +2685,7 @@ function library:init_config()
 Library:InitFolders()
 Library:LoadLibrarySettings()
 if Library.AutoLoadConfigName then
-local p = Library:GetConfigPath() .. "/" .. Library.AutoLoadConfigName .. ".cfg"
-pcall(function()
-if isfile(p) then Library:LoadConfig(readfile(p)) end
-end)
+Library:LoadConfigFile(Library.AutoLoadConfigName)
 end
 task.defer(function()
 Library.Open = true
@@ -2750,16 +2694,19 @@ end)
 end
 
 function library:get_config() return Library:GetConfig() end
-function library:load_config(json) Library:LoadConfig(json) end
-function library:save_config(name) Library:SaveConfig(name) end
-function library:delete_config(name) Library:DeleteConfig(name) end
+function library:load_config(json) return Library:LoadConfig(json) end
+function library:load_config_file(name) return Library:LoadConfigFile(name) end
+function library:save_config(name) return Library:SaveConfig(name) end
+function library:delete_config(name) return Library:DeleteConfig(name) end
 function library:list_configs() return Library:ListConfigs() end
+function library:config_exists(name) return Library:ConfigExists(name) end
 function library:change_accent(color) Library:ChangeAccent(color) end
 function library:on_flag_changed(flag, cb) Library:OnFlagChanged(flag, cb) end
 function library:get_accent() return Library.Accent end
 function library:set_auto_load(name) Library:SetAutoLoad(name) end
 function library:clear_auto_load() Library:ClearAutoLoad() end
 function library:get_auto_load() return Library.AutoLoadConfigName end
+function library:ignore_flag(flag) Library:IgnoreFlag(flag) end
 
 function library:get_flag(flag) return Library.Flags[flag] end
 function library:set_flag(flag, value)
