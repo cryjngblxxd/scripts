@@ -1576,7 +1576,7 @@ function ESPPreview.Create(library, screenGui)
         _connections = {},
     }
 
-    local panelWidth = 250
+    local panelWidth = 450
 
     local Panel = Instance.new('Frame', screenGui)
     Panel.Name = "ESPPreview"
