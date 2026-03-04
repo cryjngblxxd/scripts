@@ -1586,7 +1586,7 @@ function ESPPreview.Create(library, screenGui)
         Enabled = true, 
         _connections = {}, 
         _elementPositions = {},
-        _currentMode = "Character", -- Default mode
+        _currentMode = "Character",
         _previewHealth = 100,
         _previewMaxHealth = 100,
         _previewArmor = 100,
@@ -1594,7 +1594,7 @@ function ESPPreview.Create(library, screenGui)
         _previewDistance = 120,
         _previewTool = "AK-47",
         _previewName = Players.LocalPlayer.DisplayName,
-        _liveMode = false, -- When false, uses preview values instead of live tracking
+        _liveMode = true,
     }
     local panelWidth = 350
 
@@ -1650,20 +1650,21 @@ function ESPPreview.Create(library, screenGui)
 
     -- Mode Selector Dropdown
     local ModeButton = Instance.new('TextButton', TitleBar)
-    ModeButton.Size = UDim2.new(0, 120, 0, 18)
-    ModeButton.Position = UDim2.new(1, -125, 0, 2)
+    ModeButton.Size = UDim2.new(0, 130, 0, 18)
+    ModeButton.Position = UDim2.new(1, -135, 0, 2)
     ModeButton.BackgroundColor3 = Color3.new(0.0784, 0.0784, 0.0784)
     ModeButton.BorderColor3 = Color3.new(0, 0, 0)
-    ModeButton.Text = "Character"
+    ModeButton.Text = "  Character ▼"
     ModeButton.TextColor3 = Color3.new(0.7, 0.7, 0.7)
     ModeButton.FontFace = Library.UIFont
     ModeButton.TextSize = 11
     ModeButton.AutoButtonColor = false
+    ModeButton.TextXAlignment = Enum.TextXAlignment.Left
     preview._modeButton = ModeButton
 
     local ModeDropdown = Instance.new('Frame', ModeButton)
     ModeDropdown.Position = UDim2.new(0, 0, 1, 2)
-    ModeDropdown.Size = UDim2.new(1, 0, 0, #PREVIEW_MODES * 18)
+    ModeDropdown.Size = UDim2.new(1, 0, 0, #PREVIEW_MODES * 20)
     ModeDropdown.BackgroundColor3 = Color3.new(0.0784, 0.0784, 0.0784)
     ModeDropdown.BorderColor3 = Color3.new(0, 0, 0)
     ModeDropdown.Visible = false
@@ -1673,22 +1674,6 @@ function ESPPreview.Create(library, screenGui)
     ModeList.SortOrder = Enum.SortOrder.LayoutOrder
 
     local modeDropdownOpen = false
-
-    ModeButton.MouseButton1Click:Connect(function()
-        modeDropdownOpen = not modeDropdownOpen
-        ModeDropdown.Visible = modeDropdownOpen
-    end)
-
-    Library:Connection(UserInputService.InputBegan, function(input)
-        if modeDropdownOpen and input.UserInputType == Enum.UserInputType.MouseButton1 then
-            task.defer(function()
-                if not Library:IsMouseOverFrame(ModeDropdown) and not Library:IsMouseOverFrame(ModeButton) then
-                    modeDropdownOpen = false
-                    ModeDropdown.Visible = false
-                end
-            end)
-        end
-    end)
 
     local PreviewArea = Instance.new('Frame', Inner)
     PreviewArea.Position = UDim2.new(0, 8, 0, 8)
@@ -1766,55 +1751,214 @@ function ESPPreview.Create(library, screenGui)
     PreviewImage.ScaleType = Enum.ScaleType.Fit
     preview._previewImage = PreviewImage
 
-    -- Function to switch modes
-    local function switchMode(newMode)
-        preview._currentMode = newMode
-        ModeButton.Text = newMode
-        modeDropdownOpen = false
-        ModeDropdown.Visible = false
+    -- Box ESP
+    local BoxESP = Instance.new('Frame', PreviewArea)
+    BoxESP.Name = "BoxESP"
+    BoxESP.AnchorPoint = Vector2.new(0.5, 0.5)
+    BoxESP.Position = UDim2.new(0.5, 0, 0.5, 0)
+    BoxESP.Size = UDim2.new(0, 100, 0, 150)
+    BoxESP.BackgroundTransparency = 1
+    BoxESP.Visible = false
 
-        if newMode == "Character" then
-            CharBox.Visible = true
-            ImageContainer.Visible = false
-            preview._liveMode = true
+    local BoxStroke = Instance.new('UIStroke', BoxESP)
+    BoxStroke.Color = Color3.fromRGB(255, 255, 255)
+    BoxStroke.Thickness = 1
+
+    preview._boxESP = BoxESP
+    preview._boxStroke = BoxStroke
+
+    -- Armor color function (defined early so it can be used)
+    local function getArmorColor(armorValue)
+        local pct = math.clamp(armorValue / 100, 0, 1)
+        if pct >= 0.75 then
+            return Color3.fromRGB(0, 120, 255)
+        elseif pct >= 0.5 then
+            return Color3.fromRGB(0, 200, 150)
+        elseif pct >= 0.25 then
+            return Color3.fromRGB(255, 200, 0)
+        elseif pct > 0 then
+            return Color3.fromRGB(255, 130, 0)
         else
-            CharBox.Visible = false
-            ImageContainer.Visible = true
-            preview._liveMode = false
+            return Color3.fromRGB(255, 60, 60)
         end
-
-        -- Recalculate sizes
-        recalculateCharacter()
-        updateAllPositions()
-        updatePreviewValues()
     end
 
-    -- Create mode options
-    for i, mode in ipairs(PREVIEW_MODES) do
-        local ModeOption = Instance.new('TextButton', ModeDropdown)
-        ModeOption.Size = UDim2.new(1, 0, 0, 18)
-        ModeOption.BackgroundTransparency = 1
-        ModeOption.Text = mode
-        ModeOption.TextColor3 = Color3.new(0.6, 0.6, 0.6)
-        ModeOption.FontFace = Library.UIFont
-        ModeOption.TextSize = 11
-        ModeOption.ZIndex = 201
-        ModeOption.LayoutOrder = i
+    -- Name ESP
+    local NameESP = Instance.new('TextButton', PreviewArea)
+    NameESP.Name = "NameESP"
+    NameESP.AnchorPoint = Vector2.new(0.5, 1)
+    NameESP.Position = UDim2.new(0.5, 0, 0.15, 0)
+    NameESP.Size = UDim2.new(0, 100, 0, 16)
+    NameESP.BackgroundTransparency = 1
+    NameESP.Text = Players.LocalPlayer.DisplayName
+    NameESP.TextColor3 = Color3.fromRGB(255, 255, 255)
+    NameESP.FontFace = Library.UIFont
+    NameESP.TextSize = 13
+    NameESP.Visible = false
+    NameESP.AutoButtonColor = false
+    NameESP.AutomaticSize = Enum.AutomaticSize.X
+    preview._nameESP = NameESP
+    preview._elementPositions["Name"] = "Top"
 
-        ModeOption.MouseButton1Click:Connect(function()
-            switchMode(mode)
-        end)
+    -- Health bar
+    local HealthBarBG = Instance.new('TextButton', PreviewArea)
+    HealthBarBG.Name = "HealthBarBG"
+    HealthBarBG.AnchorPoint = Vector2.new(1, 0.5)
+    HealthBarBG.Position = UDim2.new(0.15, 0, 0.5, 0)
+    HealthBarBG.Size = UDim2.new(0, 4, 0, 150)
+    HealthBarBG.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+    HealthBarBG.BorderColor3 = Color3.new(0, 0, 0)
+    HealthBarBG.Visible = false
+    HealthBarBG.Text = ""
+    HealthBarBG.AutoButtonColor = false
 
-        ModeOption.MouseEnter:Connect(function()
-            ModeOption.TextColor3 = Color3.fromRGB(255, 255, 255)
-        end)
+    local HealthBarFill = Instance.new('Frame', HealthBarBG)
+    HealthBarFill.AnchorPoint = Vector2.new(0, 1)
+    HealthBarFill.Position = UDim2.new(0, 0, 1, 0)
+    HealthBarFill.Size = UDim2.new(1, 0, 1, 0)
+    HealthBarFill.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+    HealthBarFill.BorderSizePixel = 0
 
-        ModeOption.MouseLeave:Connect(function()
-            ModeOption.TextColor3 = Color3.new(0.6, 0.6, 0.6)
-        end)
+    local HealthText = Instance.new('TextLabel', HealthBarBG)
+    HealthText.AnchorPoint = Vector2.new(0.5, 0)
+    HealthText.Position = UDim2.new(0.5, 0, 1, 2)
+    HealthText.Size = UDim2.new(0, 30, 0, 10)
+    HealthText.BackgroundTransparency = 1
+    HealthText.Text = "100"
+    HealthText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    HealthText.FontFace = Library.UIFont
+    HealthText.TextSize = 9
+    HealthText.Visible = false
+
+    preview._healthBarBG = HealthBarBG
+    preview._healthBarFill = HealthBarFill
+    preview._healthText = HealthText
+    preview._elementPositions["Health"] = "Left"
+
+    -- Distance ESP
+    local DistESP = Instance.new('TextButton', PreviewArea)
+    DistESP.Name = "DistESP"
+    DistESP.AnchorPoint = Vector2.new(0.5, 0)
+    DistESP.Position = UDim2.new(0.5, 0, 0.85, 0)
+    DistESP.Size = UDim2.new(0, 60, 0, 14)
+    DistESP.BackgroundTransparency = 1
+    DistESP.Text = "[120m]"
+    DistESP.TextColor3 = Color3.fromRGB(200, 200, 200)
+    DistESP.FontFace = Library.UIFont
+    DistESP.TextSize = 11
+    DistESP.Visible = false
+    DistESP.AutoButtonColor = false
+    DistESP.AutomaticSize = Enum.AutomaticSize.X
+    preview._distESP = DistESP
+    preview._distanceESP = DistESP
+    preview._elementPositions["Distance"] = "Bottom"
+
+    -- Tool ESP
+    local ToolESP = Instance.new('TextButton', PreviewArea)
+    ToolESP.Name = "ToolESP"
+    ToolESP.AnchorPoint = Vector2.new(0.5, 0)
+    ToolESP.Position = UDim2.new(0.5, 0, 0.88, 0)
+    ToolESP.Size = UDim2.new(0, 60, 0, 14)
+    ToolESP.BackgroundTransparency = 1
+    ToolESP.Text = "[AK-47]"
+    ToolESP.TextColor3 = Color3.fromRGB(180, 180, 180)
+    ToolESP.FontFace = Library.UIFont
+    ToolESP.TextSize = 10
+    ToolESP.Visible = false
+    ToolESP.AutoButtonColor = false
+    ToolESP.AutomaticSize = Enum.AutomaticSize.X
+    preview._toolESP = ToolESP
+    preview._elementPositions["Tool"] = "Bottom"
+
+    -- Armor ESP
+    local ArmorESP = Instance.new('TextButton', PreviewArea)
+    ArmorESP.Name = "ArmorESP"
+    ArmorESP.AnchorPoint = Vector2.new(0.5, 0)
+    ArmorESP.Position = UDim2.new(0.5, 0, 0.91, 0)
+    ArmorESP.Size = UDim2.new(0, 80, 0, 14)
+    ArmorESP.BackgroundTransparency = 1
+    ArmorESP.Text = "Armor: 100"
+    ArmorESP.TextColor3 = Color3.fromRGB(0, 150, 255)
+    ArmorESP.FontFace = Library.UIFont
+    ArmorESP.TextSize = 11
+    ArmorESP.Visible = false
+    ArmorESP.AutoButtonColor = false
+    ArmorESP.AutomaticSize = Enum.AutomaticSize.X
+    preview._armorESP = ArmorESP
+    preview._elementPositions["Armor"] = "Bottom"
+
+    -- Armor bar
+    local ArmorBarBG = Instance.new('TextButton', PreviewArea)
+    ArmorBarBG.Name = "ArmorBarBG"
+    ArmorBarBG.AnchorPoint = Vector2.new(0, 0.5)
+    ArmorBarBG.Position = UDim2.new(0.85, 0, 0.5, 0)
+    ArmorBarBG.Size = UDim2.new(0, 4, 0, 150)
+    ArmorBarBG.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+    ArmorBarBG.BorderColor3 = Color3.new(0, 0, 0)
+    ArmorBarBG.Visible = false
+    ArmorBarBG.Text = ""
+    ArmorBarBG.AutoButtonColor = false
+
+    local ArmorBarFill = Instance.new('Frame', ArmorBarBG)
+    ArmorBarFill.AnchorPoint = Vector2.new(0, 1)
+    ArmorBarFill.Position = UDim2.new(0, 0, 1, 0)
+    ArmorBarFill.Size = UDim2.new(1, 0, 1, 0)
+    ArmorBarFill.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+    ArmorBarFill.BorderSizePixel = 0
+
+    local ArmorText = Instance.new('TextLabel', ArmorBarBG)
+    ArmorText.AnchorPoint = Vector2.new(0.5, 0)
+    ArmorText.Position = UDim2.new(0.5, 0, 1, 2)
+    ArmorText.Size = UDim2.new(0, 30, 0, 10)
+    ArmorText.BackgroundTransparency = 1
+    ArmorText.Text = "100"
+    ArmorText.TextColor3 = Color3.fromRGB(0, 150, 255)
+    ArmorText.FontFace = Library.UIFont
+    ArmorText.TextSize = 9
+    ArmorText.Visible = false
+
+    preview._armorBarBG = ArmorBarBG
+    preview._armorBarFill = ArmorBarFill
+    preview._armorText = ArmorText
+    preview._elementPositions["ArmorBar"] = "Right"
+
+    -- Skeleton
+    local skeletonLines = {}
+    local lineData = {
+        {name = "neck", x1 = 0.5, y1 = 0.10, x2 = 0.5, y2 = 0.20},
+        {name = "spine", x1 = 0.5, y1 = 0.20, x2 = 0.5, y2 = 0.55},
+        {name = "lshoulder", x1 = 0.5, y1 = 0.20, x2 = 0.25, y2 = 0.22},
+        {name = "rshoulder", x1 = 0.5, y1 = 0.20, x2 = 0.75, y2 = 0.22},
+        {name = "larm", x1 = 0.25, y1 = 0.22, x2 = 0.22, y2 = 0.52},
+        {name = "rarm", x1 = 0.75, y1 = 0.22, x2 = 0.78, y2 = 0.52},
+        {name = "lhip", x1 = 0.5, y1 = 0.55, x2 = 0.38, y2 = 0.58},
+        {name = "rhip", x1 = 0.5, y1 = 0.55, x2 = 0.62, y2 = 0.58},
+        {name = "lleg", x1 = 0.38, y1 = 0.58, x2 = 0.36, y2 = 0.92},
+        {name = "rleg", x1 = 0.62, y1 = 0.58, x2 = 0.64, y2 = 0.92},
+    }
+
+    for _, ld in ipairs(lineData) do
+        local line = Instance.new('Frame', PreviewArea)
+        line.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        line.BorderSizePixel = 0
+        line.Visible = false
+        local cx, cy = (ld.x1 + ld.x2) / 2, (ld.y1 + ld.y2) / 2
+        local dx, dy = ld.x2 - ld.x1, ld.y2 - ld.y1
+        local len = math.sqrt(dx * dx + dy * dy)
+        line.AnchorPoint = Vector2.new(0.5, 0.5)
+        line.Position = UDim2.new(cx, 0, cy, 0)
+        line.Size = UDim2.new(len, 0, 0, 2)
+        line.Rotation = -math.deg(math.atan2(dx, dy))
+        skeletonLines[ld.name] = line
     end
+    preview._skeletonLines = skeletonLines
 
-    -- Recalculate character/image to fill 85% of panel
+    preview._currentArmor = 100
+    preview._maxArmor = 100
+
+    -- DEFINE ALL FUNCTIONS FIRST
+
+    -- Recalculate character/image size
     local function recalculateCharacter()
         local areaSize = PreviewArea.AbsoluteSize
         if areaSize.X < 50 or areaSize.Y < 50 then return end
@@ -1826,7 +1970,6 @@ function ESPPreview.Create(library, screenGui)
         local availableWidth = areaSize.X * 0.6
 
         if preview._currentMode == "Character" then
-            -- R6 proportions
             local totalHeightStuds = 5
             local totalWidthStuds = 4
             local gap = 2
@@ -1870,11 +2013,9 @@ function ESPPreview.Create(library, screenGui)
 
             preview._charW = charW
             preview._charH = charH
-
         else
-            -- Anime Girl Image mode
             local imgHeight = availableHeight
-            local imgWidth = imgHeight * 0.6 -- Aspect ratio for character image
+            local imgWidth = imgHeight * 0.6
             
             if imgWidth > availableWidth then
                 imgWidth = availableWidth
@@ -1888,7 +2029,6 @@ function ESPPreview.Create(library, screenGui)
             preview._charH = imgHeight
         end
 
-        -- Update ESP elements
         if preview._boxESP then
             preview._boxESP.Size = UDim2.new(0, preview._charW + boxPad * 2, 0, preview._charH + boxPad * 2)
         end
@@ -1903,22 +2043,6 @@ function ESPPreview.Create(library, screenGui)
 
         return preview._charW, preview._charH
     end
-
-    -- Box ESP
-    local BoxESP = Instance.new('Frame', PreviewArea)
-    BoxESP.Name = "BoxESP"
-    BoxESP.AnchorPoint = Vector2.new(0.5, 0.5)
-    BoxESP.Position = UDim2.new(0.5, 0, 0.5, 0)
-    BoxESP.Size = UDim2.new(0, 100, 0, 150)
-    BoxESP.BackgroundTransparency = 1
-    BoxESP.Visible = false
-
-    local BoxStroke = Instance.new('UIStroke', BoxESP)
-    BoxStroke.Color = Color3.fromRGB(255, 255, 255)
-    BoxStroke.Thickness = 1
-
-    preview._boxESP = BoxESP
-    preview._boxStroke = BoxStroke
 
     -- Snap zone detection
     local function getSnapZone(element)
@@ -1951,46 +2075,6 @@ function ESPPreview.Create(library, screenGui)
             end
         end
         return elements
-    end
-
-    -- Update preview values (non-live mode)
-    local function updatePreviewValues()
-        if preview._liveMode then return end
-
-        -- Health
-        if preview._healthBarBG and preview._healthBarBG.Visible then
-            local pct = math.clamp(preview._previewHealth / preview._previewMaxHealth, 0, 1)
-            preview._healthBarFill.Size = UDim2.new(1, 0, pct, 0)
-            preview._healthBarFill.BackgroundColor3 = Color3.new(1 - pct, pct, 0)
-            preview._healthText.Text = tostring(math.floor(preview._previewHealth))
-        end
-
-        -- Armor
-        if preview._armorBarBG and (preview._armorBarBG.Visible or preview._armorESP.Visible) then
-            local pct = math.clamp(preview._previewArmor / preview._previewMaxArmor, 0, 1)
-            local color = getArmorColor(preview._previewArmor)
-            preview._armorBarFill.Size = UDim2.new(1, 0, pct, 0)
-            preview._armorBarFill.BackgroundColor3 = color
-            preview._armorText.Text = tostring(math.floor(preview._previewArmor))
-            preview._armorText.TextColor3 = color
-            preview._armorESP.Text = "Armor: " .. tostring(math.floor(preview._previewArmor))
-            preview._armorESP.TextColor3 = color
-        end
-
-        -- Distance
-        if preview._distESP and preview._distESP.Visible then
-            preview._distESP.Text = "[" .. tostring(preview._previewDistance) .. "m]"
-        end
-
-        -- Tool
-        if preview._toolESP and preview._toolESP.Visible then
-            preview._toolESP.Text = "[" .. preview._previewTool .. "]"
-        end
-
-        -- Name
-        if preview._nameESP and preview._nameESP.Visible then
-            preview._nameESP.Text = preview._previewName
-        end
     end
 
     -- Update all positions
@@ -2037,7 +2121,6 @@ function ESPPreview.Create(library, screenGui)
             end
         end
 
-        -- Health bar
         if preview._healthBarBG and preview._elementPositions["Health"] then
             local zone = preview._elementPositions["Health"]
             local x = 0.5
@@ -2055,7 +2138,6 @@ function ESPPreview.Create(library, screenGui)
             preview._healthBarBG.AnchorPoint = Vector2.new(anchorX, 0.5)
         end
 
-        -- Armor bar
         if preview._armorBarBG and preview._elementPositions["ArmorBar"] then
             local zone = preview._elementPositions["ArmorBar"]
             local x = 0.5
@@ -2072,6 +2154,63 @@ function ESPPreview.Create(library, screenGui)
             preview._armorBarBG.Position = UDim2.new(x, 0, 0.5, 0)
             preview._armorBarBG.AnchorPoint = Vector2.new(anchorX, 0.5)
         end
+    end
+
+    -- Update preview values (non-live mode)
+    local function updatePreviewValues()
+        if preview._liveMode then return end
+
+        if preview._healthBarBG and preview._healthBarBG.Visible then
+            local pct = math.clamp(preview._previewHealth / preview._previewMaxHealth, 0, 1)
+            preview._healthBarFill.Size = UDim2.new(1, 0, pct, 0)
+            preview._healthBarFill.BackgroundColor3 = Color3.new(1 - pct, pct, 0)
+            preview._healthText.Text = tostring(math.floor(preview._previewHealth))
+        end
+
+        if preview._armorBarBG and (preview._armorBarBG.Visible or preview._armorESP.Visible) then
+            local pct = math.clamp(preview._previewArmor / preview._previewMaxArmor, 0, 1)
+            local color = getArmorColor(preview._previewArmor)
+            preview._armorBarFill.Size = UDim2.new(1, 0, pct, 0)
+            preview._armorBarFill.BackgroundColor3 = color
+            preview._armorText.Text = tostring(math.floor(preview._previewArmor))
+            preview._armorText.TextColor3 = color
+            preview._armorESP.Text = "Armor: " .. tostring(math.floor(preview._previewArmor))
+            preview._armorESP.TextColor3 = color
+        end
+
+        if preview._distESP and preview._distESP.Visible then
+            preview._distESP.Text = "[" .. tostring(preview._previewDistance) .. "m]"
+        end
+
+        if preview._toolESP and preview._toolESP.Visible then
+            preview._toolESP.Text = "[" .. preview._previewTool .. "]"
+        end
+
+        if preview._nameESP and preview._nameESP.Visible then
+            preview._nameESP.Text = preview._previewName
+        end
+    end
+
+    -- Switch mode function (NOW DEFINED AFTER THE FUNCTIONS IT CALLS)
+    local function switchMode(newMode)
+        preview._currentMode = newMode
+        ModeButton.Text = "  " .. newMode .. " ▼"
+        modeDropdownOpen = false
+        ModeDropdown.Visible = false
+
+        if newMode == "Character" then
+            CharBox.Visible = true
+            ImageContainer.Visible = false
+            preview._liveMode = true
+        else
+            CharBox.Visible = false
+            ImageContainer.Visible = true
+            preview._liveMode = false
+        end
+
+        recalculateCharacter()
+        updateAllPositions()
+        updatePreviewValues()
     end
 
     -- Snap draggable for text elements
@@ -2169,205 +2308,58 @@ function ESPPreview.Create(library, screenGui)
         end)
     end
 
-    -- Name ESP
-    local NameESP = Instance.new('TextButton', PreviewArea)
-    NameESP.Name = "NameESP"
-    NameESP.AnchorPoint = Vector2.new(0.5, 1)
-    NameESP.Position = UDim2.new(0.5, 0, 0.15, 0)
-    NameESP.Size = UDim2.new(0, 100, 0, 16)
-    NameESP.BackgroundTransparency = 1
-    NameESP.Text = Players.LocalPlayer.DisplayName
-    NameESP.TextColor3 = Color3.fromRGB(255, 255, 255)
-    NameESP.FontFace = Library.UIFont
-    NameESP.TextSize = 13
-    NameESP.Visible = false
-    NameESP.AutoButtonColor = false
-    NameESP.AutomaticSize = Enum.AutomaticSize.X
-    preview._nameESP = NameESP
-    preview._elementPositions["Name"] = "Top"
+    -- Apply draggable to elements
     makeSnapDraggable(NameESP, "Name")
-
-    -- Health bar
-    local HealthBarBG = Instance.new('TextButton', PreviewArea)
-    HealthBarBG.Name = "HealthBarBG"
-    HealthBarBG.AnchorPoint = Vector2.new(1, 0.5)
-    HealthBarBG.Position = UDim2.new(0.15, 0, 0.5, 0)
-    HealthBarBG.Size = UDim2.new(0, 4, 0, 150)
-    HealthBarBG.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
-    HealthBarBG.BorderColor3 = Color3.new(0, 0, 0)
-    HealthBarBG.Visible = false
-    HealthBarBG.Text = ""
-    HealthBarBG.AutoButtonColor = false
-
-    local HealthBarFill = Instance.new('Frame', HealthBarBG)
-    HealthBarFill.AnchorPoint = Vector2.new(0, 1)
-    HealthBarFill.Position = UDim2.new(0, 0, 1, 0)
-    HealthBarFill.Size = UDim2.new(1, 0, 1, 0)
-    HealthBarFill.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-    HealthBarFill.BorderSizePixel = 0
-
-    local HealthText = Instance.new('TextLabel', HealthBarBG)
-    HealthText.AnchorPoint = Vector2.new(0.5, 0)
-    HealthText.Position = UDim2.new(0.5, 0, 1, 2)
-    HealthText.Size = UDim2.new(0, 30, 0, 10)
-    HealthText.BackgroundTransparency = 1
-    HealthText.Text = "100"
-    HealthText.TextColor3 = Color3.fromRGB(255, 255, 255)
-    HealthText.FontFace = Library.UIFont
-    HealthText.TextSize = 9
-    HealthText.Visible = false
-
-    preview._healthBarBG = HealthBarBG
-    preview._healthBarFill = HealthBarFill
-    preview._healthText = HealthText
-    preview._elementPositions["Health"] = "Left"
-    makeSnapDraggableBar(HealthBarBG, "Health")
-
-    -- Distance ESP
-    local DistESP = Instance.new('TextButton', PreviewArea)
-    DistESP.Name = "DistESP"
-    DistESP.AnchorPoint = Vector2.new(0.5, 0)
-    DistESP.Position = UDim2.new(0.5, 0, 0.85, 0)
-    DistESP.Size = UDim2.new(0, 60, 0, 14)
-    DistESP.BackgroundTransparency = 1
-    DistESP.Text = "[120m]"
-    DistESP.TextColor3 = Color3.fromRGB(200, 200, 200)
-    DistESP.FontFace = Library.UIFont
-    DistESP.TextSize = 11
-    DistESP.Visible = false
-    DistESP.AutoButtonColor = false
-    DistESP.AutomaticSize = Enum.AutomaticSize.X
-    preview._distESP = DistESP
-    preview._distanceESP = DistESP
-    preview._elementPositions["Distance"] = "Bottom"
     makeSnapDraggable(DistESP, "Distance")
-
-    -- Tool ESP
-    local ToolESP = Instance.new('TextButton', PreviewArea)
-    ToolESP.Name = "ToolESP"
-    ToolESP.AnchorPoint = Vector2.new(0.5, 0)
-    ToolESP.Position = UDim2.new(0.5, 0, 0.88, 0)
-    ToolESP.Size = UDim2.new(0, 60, 0, 14)
-    ToolESP.BackgroundTransparency = 1
-    ToolESP.Text = "[AK-47]"
-    ToolESP.TextColor3 = Color3.fromRGB(180, 180, 180)
-    ToolESP.FontFace = Library.UIFont
-    ToolESP.TextSize = 10
-    ToolESP.Visible = false
-    ToolESP.AutoButtonColor = false
-    ToolESP.AutomaticSize = Enum.AutomaticSize.X
-    preview._toolESP = ToolESP
-    preview._elementPositions["Tool"] = "Bottom"
     makeSnapDraggable(ToolESP, "Tool")
-
-    -- Armor ESP
-    local ArmorESP = Instance.new('TextButton', PreviewArea)
-    ArmorESP.Name = "ArmorESP"
-    ArmorESP.AnchorPoint = Vector2.new(0.5, 0)
-    ArmorESP.Position = UDim2.new(0.5, 0, 0.91, 0)
-    ArmorESP.Size = UDim2.new(0, 80, 0, 14)
-    ArmorESP.BackgroundTransparency = 1
-    ArmorESP.Text = "Armor: 100"
-    ArmorESP.TextColor3 = Color3.fromRGB(0, 150, 255)
-    ArmorESP.FontFace = Library.UIFont
-    ArmorESP.TextSize = 11
-    ArmorESP.Visible = false
-    ArmorESP.AutoButtonColor = false
-    ArmorESP.AutomaticSize = Enum.AutomaticSize.X
-    preview._armorESP = ArmorESP
-    preview._elementPositions["Armor"] = "Bottom"
     makeSnapDraggable(ArmorESP, "Armor")
-
-    -- Armor bar
-    local ArmorBarBG = Instance.new('TextButton', PreviewArea)
-    ArmorBarBG.Name = "ArmorBarBG"
-    ArmorBarBG.AnchorPoint = Vector2.new(0, 0.5)
-    ArmorBarBG.Position = UDim2.new(0.85, 0, 0.5, 0)
-    ArmorBarBG.Size = UDim2.new(0, 4, 0, 150)
-    ArmorBarBG.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
-    ArmorBarBG.BorderColor3 = Color3.new(0, 0, 0)
-    ArmorBarBG.Visible = false
-    ArmorBarBG.Text = ""
-    ArmorBarBG.AutoButtonColor = false
-
-    local ArmorBarFill = Instance.new('Frame', ArmorBarBG)
-    ArmorBarFill.AnchorPoint = Vector2.new(0, 1)
-    ArmorBarFill.Position = UDim2.new(0, 0, 1, 0)
-    ArmorBarFill.Size = UDim2.new(1, 0, 1, 0)
-    ArmorBarFill.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-    ArmorBarFill.BorderSizePixel = 0
-
-    local ArmorText = Instance.new('TextLabel', ArmorBarBG)
-    ArmorText.AnchorPoint = Vector2.new(0.5, 0)
-    ArmorText.Position = UDim2.new(0.5, 0, 1, 2)
-    ArmorText.Size = UDim2.new(0, 30, 0, 10)
-    ArmorText.BackgroundTransparency = 1
-    ArmorText.Text = "100"
-    ArmorText.TextColor3 = Color3.fromRGB(0, 150, 255)
-    ArmorText.FontFace = Library.UIFont
-    ArmorText.TextSize = 9
-    ArmorText.Visible = false
-
-    preview._armorBarBG = ArmorBarBG
-    preview._armorBarFill = ArmorBarFill
-    preview._armorText = ArmorText
-    preview._elementPositions["ArmorBar"] = "Right"
+    makeSnapDraggableBar(HealthBarBG, "Health")
     makeSnapDraggableBar(ArmorBarBG, "ArmorBar")
 
-    -- Skeleton
-    local skeletonLines = {}
-    local lineData = {
-        {name = "neck", x1 = 0.5, y1 = 0.10, x2 = 0.5, y2 = 0.20},
-        {name = "spine", x1 = 0.5, y1 = 0.20, x2 = 0.5, y2 = 0.55},
-        {name = "lshoulder", x1 = 0.5, y1 = 0.20, x2 = 0.25, y2 = 0.22},
-        {name = "rshoulder", x1 = 0.5, y1 = 0.20, x2 = 0.75, y2 = 0.22},
-        {name = "larm", x1 = 0.25, y1 = 0.22, x2 = 0.22, y2 = 0.52},
-        {name = "rarm", x1 = 0.75, y1 = 0.22, x2 = 0.78, y2 = 0.52},
-        {name = "lhip", x1 = 0.5, y1 = 0.55, x2 = 0.38, y2 = 0.58},
-        {name = "rhip", x1 = 0.5, y1 = 0.55, x2 = 0.62, y2 = 0.58},
-        {name = "lleg", x1 = 0.38, y1 = 0.58, x2 = 0.36, y2 = 0.92},
-        {name = "rleg", x1 = 0.62, y1 = 0.58, x2 = 0.64, y2 = 0.92},
-    }
+    -- Mode dropdown button
+    ModeButton.MouseButton1Click:Connect(function()
+        modeDropdownOpen = not modeDropdownOpen
+        ModeDropdown.Visible = modeDropdownOpen
+    end)
 
-    for _, ld in ipairs(lineData) do
-        local line = Instance.new('Frame', PreviewArea)
-        line.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        line.BorderSizePixel = 0
-        line.Visible = false
-        local cx, cy = (ld.x1 + ld.x2) / 2, (ld.y1 + ld.y2) / 2
-        local dx, dy = ld.x2 - ld.x1, ld.y2 - ld.y1
-        local len = math.sqrt(dx * dx + dy * dy)
-        line.AnchorPoint = Vector2.new(0.5, 0.5)
-        line.Position = UDim2.new(cx, 0, cy, 0)
-        line.Size = UDim2.new(len, 0, 0, 2)
-        line.Rotation = -math.deg(math.atan2(dx, dy))
-        skeletonLines[ld.name] = line
-    end
-    preview._skeletonLines = skeletonLines
-
-    -- Armor color function
-    local function getArmorColor(armorValue)
-        local pct = math.clamp(armorValue / 100, 0, 1)
-        if pct >= 0.75 then
-            return Color3.fromRGB(0, 120, 255)
-        elseif pct >= 0.5 then
-            return Color3.fromRGB(0, 200, 150)
-        elseif pct >= 0.25 then
-            return Color3.fromRGB(255, 200, 0)
-        elseif pct > 0 then
-            return Color3.fromRGB(255, 130, 0)
-        else
-            return Color3.fromRGB(255, 60, 60)
+    Library:Connection(UserInputService.InputBegan, function(input)
+        if modeDropdownOpen and input.UserInputType == Enum.UserInputType.MouseButton1 then
+            task.defer(function()
+                if not Library:IsMouseOverFrame(ModeDropdown) and not Library:IsMouseOverFrame(ModeButton) then
+                    modeDropdownOpen = false
+                    ModeDropdown.Visible = false
+                end
+            end)
         end
+    end)
+
+    -- Create mode options
+    for i, mode in ipairs(PREVIEW_MODES) do
+        local ModeOption = Instance.new('TextButton', ModeDropdown)
+        ModeOption.Size = UDim2.new(1, 0, 0, 20)
+        ModeOption.BackgroundTransparency = 1
+        ModeOption.Text = "  " .. mode
+        ModeOption.TextColor3 = Color3.new(0.6, 0.6, 0.6)
+        ModeOption.FontFace = Library.UIFont
+        ModeOption.TextSize = 11
+        ModeOption.TextXAlignment = Enum.TextXAlignment.Left
+        ModeOption.ZIndex = 201
+        ModeOption.LayoutOrder = i
+
+        ModeOption.MouseButton1Click:Connect(function()
+            switchMode(mode)
+        end)
+
+        ModeOption.MouseEnter:Connect(function()
+            ModeOption.TextColor3 = Color3.fromRGB(255, 255, 255)
+        end)
+
+        ModeOption.MouseLeave:Connect(function()
+            ModeOption.TextColor3 = Color3.new(0.6, 0.6, 0.6)
+        end)
     end
 
-    -- Make getArmorColor accessible
-    _G.getArmorColor = getArmorColor
-
-    preview._currentArmor = 100
-    preview._maxArmor = 100
-
-    -- Live tracking functions (only for Character mode)
+    -- Live tracking functions
     local function getHumanoid()
         local char = Players.LocalPlayer.Character
         if char then return char:FindFirstChildOfClass("Humanoid") end
@@ -2561,7 +2553,6 @@ function ESPPreview.Create(library, screenGui)
     function preview:SetDistanceESP(enabled, text, color)
         self._distESP.Visible = enabled
         if text then 
-            -- Extract number from text like "[120m]"
             local num = tonumber(text:match("%d+"))
             if num then self._previewDistance = num end
             self._distESP.Text = text 
@@ -2710,6 +2701,8 @@ end
 
 
 -- ESP PREVIEW DONE 
+
+
 
 
 -- WRAPPER
