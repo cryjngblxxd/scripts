@@ -2016,23 +2016,22 @@ function ESPPreview.Create(library, screenGui)
             preview._charW = charW
             preview._charH = charH
         else
-            -- Anime Girl mode - 9:16 aspect ratio, fill 90% of available space
-            local targetFill = 0.90
-            local availableHeight = (areaSize.Y - espSpace * 2) * targetFill
-            local availableWidth = areaSize.X * targetFill
-
-            -- 9:16 aspect ratio (width:height)
-            local aspectRatio = 9 / 16
-
-            -- Calculate size maintaining aspect ratio
-            local imgHeight = availableHeight
-            local imgWidth = imgHeight * aspectRatio
-
-            -- If width exceeds available, scale down
-            if imgWidth > availableWidth then
-                imgWidth = availableWidth
-                imgHeight = imgWidth / aspectRatio
+            -- Anime Girl mode - MAXIMUM SIZE
+            local imgHeight = areaSize.Y * 0.92  -- 92% of total height
+            local imgWidth = imgHeight * (9 / 16)  -- 9:16 aspect ratio
+            
+            -- Clamp width if too wide
+            if imgWidth > areaSize.X * 0.85 then
+                imgWidth = areaSize.X * 0.85
+                imgHeight = imgWidth / (9 / 16)
             end
+
+            ImageContainer.Size = UDim2.new(0, imgWidth, 0, imgHeight)
+            PreviewImage.Size = UDim2.new(1, 0, 1, 0)
+
+            preview._charW = imgWidth
+            preview._charH = imgHeight
+        end
 
             ImageContainer.Size = UDim2.new(0, imgWidth, 0, imgHeight)
             PreviewImage.Size = UDim2.new(1, 0, 1, 0)
