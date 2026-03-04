@@ -1577,9 +1577,7 @@ local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 
--- Snap zones: Top, Bottom, Left, Right
 local SNAP_ZONES = {"Top", "Bottom", "Left", "Right"}
-local SNAP_THRESHOLD = 40
 
 function ESPPreview.Create(library, screenGui)
     local preview = { Enabled = true, _connections = {}, _elementPositions = {} }
@@ -1643,31 +1641,16 @@ function ESPPreview.Create(library, screenGui)
     PreviewArea.ClipsDescendants = true
     preview._previewArea = PreviewArea
 
-    -- Character will be sized dynamically to fill 90% of panel
-    -- These are PROPORTIONS relative to character height
-    local HEAD_WIDTH_RATIO = 0.22    -- Head width relative to char height (slimmer)
-    local HEAD_HEIGHT_RATIO = 0.15   -- Head height relative to char height
-    local TORSO_WIDTH_RATIO = 0.28   -- Torso width relative to char height
-    local TORSO_HEIGHT_RATIO = 0.30  -- Torso height relative to char height
-    local ARM_WIDTH_RATIO = 0.10     -- Arm width relative to char height
-    local ARM_HEIGHT_RATIO = 0.30    -- Arm height relative to char height
-    local LEG_WIDTH_RATIO = 0.12     -- Leg width relative to char height
-    local LEG_HEIGHT_RATIO = 0.32    -- Leg height relative to char height
-    local GAP_RATIO = 0.015          -- Gap between parts
-
-    local boxPad = 12
+    -- Fixed character proportions (R6 style, proper head size)
+    local boxPad = 8
     preview._boxPad = boxPad
 
-    -- Container for character that will scale
-    local CharContainer = Instance.new('Frame', PreviewArea)
-    CharContainer.Name = "CharContainer"
-    CharContainer.AnchorPoint = Vector2.new(0.5, 0.5)
-    CharContainer.Position = UDim2.new(0.5, 0, 0.5, 0)
-    CharContainer.BackgroundTransparency = 1
-    CharContainer.BorderSizePixel = 0
-    preview._charContainer = CharContainer
+    -- Store sizes
+    preview._charW = 0
+    preview._charH = 0
 
-    local CharBox = Instance.new('Frame', CharContainer)
+    -- Character container - centered in preview area
+    local CharBox = Instance.new('Frame', PreviewArea)
     CharBox.Name = "CharBox"
     CharBox.AnchorPoint = Vector2.new(0.5, 0.5)
     CharBox.Position = UDim2.new(0.5, 0, 0.5, 0)
@@ -1675,12 +1658,12 @@ function ESPPreview.Create(library, screenGui)
     CharBox.BorderSizePixel = 0
     preview._charBox = CharBox
 
-    -- Character parts (will be sized dynamically)
+    -- Character parts
     local Head = Instance.new('Frame', CharBox)
     Head.Name = "Head"
     Head.BackgroundColor3 = Color3.new(0.35, 0.35, 0.35)
     Head.BorderSizePixel = 0
-    Instance.new('UICorner', Head).CornerRadius = UDim.new(0, 4)
+    Instance.new('UICorner', Head).CornerRadius = UDim.new(0, 3)
 
     local Torso = Instance.new('Frame', CharBox)
     Torso.Name = "Torso"
@@ -1708,88 +1691,78 @@ function ESPPreview.Create(library, screenGui)
     RLeg.BorderSizePixel = 0
 
     preview._charParts = {Head, Torso, LArm, RArm, LLeg, RLeg}
-    preview._head = Head
-    preview._torso = Torso
-    preview._larm = LArm
-    preview._rarm = RArm
-    preview._lleg = LLeg
-    preview._rleg = RLeg
 
-    -- Store current calculated sizes
-    preview._charW = 0
-    preview._charH = 0
-
-    -- Function to recalculate character sizes based on panel size
+    -- Function to recalculate character sizes
     local function recalculateCharacter()
         local areaSize = PreviewArea.AbsoluteSize
-        if areaSize.X < 10 or areaSize.Y < 10 then return end
+        if areaSize.X < 50 or areaSize.Y < 50 then return end
 
-        -- Target 85% of the smaller dimension to leave room for ESP elements
-        local targetFill = 0.70
-        local availableHeight = areaSize.Y * targetFill
-        local availableWidth = areaSize.X * targetFill
+        -- Use 75% of available space for character (leave room for ESP elements)
+        local targetFillY = 0.65
+        local targetFillX = 0.50
 
-        -- Calculate character dimensions based on R6 proportions
-        -- Total height = head + gap + torso + gap + legs
-        local totalHeightRatio = HEAD_HEIGHT_RATIO + GAP_RATIO + TORSO_HEIGHT_RATIO + GAP_RATIO + LEG_HEIGHT_RATIO
-        -- Total width = arm + gap + torso + gap + arm
-        local totalWidthRatio = ARM_WIDTH_RATIO + GAP_RATIO + TORSO_WIDTH_RATIO + GAP_RATIO + ARM_WIDTH_RATIO
+        local availableHeight = areaSize.Y * targetFillY
+        local availableWidth = areaSize.X * targetFillX
 
-        -- Scale to fit
-        local scaleByHeight = availableHeight
-        local scaleByWidth = availableWidth / (totalWidthRatio / totalHeightRatio)
-        local charH = math.min(scaleByHeight, scaleByWidth)
-        local charW = charH * (totalWidthRatio / totalHeightRatio)
+        -- R6 proportions (in studs): Head=1x1, Torso=2x2, Arms=1x2, Legs=1x2
+        -- Total height: 1 (head) + 2 (torso) + 2 (legs) = 5 studs
+        -- Total width: 1 (arm) + 2 (torso) + 1 (arm) = 4 studs
 
-        -- Calculate individual part sizes
-        local headW = charH * HEAD_WIDTH_RATIO
-        local headH = charH * HEAD_HEIGHT_RATIO
-        local torsoW = charH * TORSO_WIDTH_RATIO
-        local torsoH = charH * TORSO_HEIGHT_RATIO
-        local armW = charH * ARM_WIDTH_RATIO
-        local armH = charH * ARM_HEIGHT_RATIO
-        local legW = charH * LEG_WIDTH_RATIO
-        local legH = charH * LEG_HEIGHT_RATIO
-        local gap = charH * GAP_RATIO
+        local totalHeightStuds = 5
+        local totalWidthStuds = 4
+        local gap = 2
 
-        -- Update container size
-        CharContainer.Size = UDim2.new(0, charW + boxPad * 2, 0, charH + boxPad * 2)
+        -- Calculate scale based on available space
+        local scaleY = availableHeight / (totalHeightStuds * 20 + gap * 2)
+        local scaleX = availableWidth / (totalWidthStuds * 20 + gap * 2)
+        local scale = math.min(scaleY, scaleX)
+
+        -- Part sizes in pixels
+        local headW = 20 * scale  -- 1 stud width (not too wide)
+        local headH = 20 * scale  -- 1 stud height
+        local torsoW = 40 * scale -- 2 studs
+        local torsoH = 40 * scale -- 2 studs
+        local armW = 20 * scale   -- 1 stud
+        local armH = 40 * scale   -- 2 studs
+        local legW = 20 * scale   -- 1 stud
+        local legH = 40 * scale   -- 2 studs
+
+        -- Total character dimensions
+        local charW = torsoW + (armW + gap) * 2
+        local charH = headH + gap + torsoH + gap + legH
+
+        -- Update CharBox size
         CharBox.Size = UDim2.new(0, charW, 0, charH)
 
-        -- Position parts
-        -- Head - centered at top
+        -- Position head (centered at top)
         Head.Size = UDim2.new(0, headW, 0, headH)
-        Head.Position = UDim2.new(0.5, -headW / 2, 0, 0)
+        Head.Position = UDim2.new(0.5, -headW/2, 0, 0)
 
-        -- Torso - centered below head
+        -- Position torso (centered below head)
         Torso.Size = UDim2.new(0, torsoW, 0, torsoH)
-        Torso.Position = UDim2.new(0.5, -torsoW / 2, 0, headH + gap)
+        Torso.Position = UDim2.new(0.5, -torsoW/2, 0, headH + gap)
 
-        -- Left Arm - left of torso
+        -- Position left arm (left of torso)
         LArm.Size = UDim2.new(0, armW, 0, armH)
-        LArm.Position = UDim2.new(0.5, -torsoW / 2 - gap - armW, 0, headH + gap)
+        LArm.Position = UDim2.new(0.5, -torsoW/2 - gap - armW, 0, headH + gap)
 
-        -- Right Arm - right of torso
+        -- Position right arm (right of torso)
         RArm.Size = UDim2.new(0, armW, 0, armH)
-        RArm.Position = UDim2.new(0.5, torsoW / 2 + gap, 0, headH + gap)
+        RArm.Position = UDim2.new(0.5, torsoW/2 + gap, 0, headH + gap)
 
-        -- Left Leg - under left side of torso
+        -- Position left leg (under left side of torso)
         LLeg.Size = UDim2.new(0, legW, 0, legH)
-        LLeg.Position = UDim2.new(0.5, -torsoW / 2, 0, headH + gap + torsoH + gap)
+        LLeg.Position = UDim2.new(0.5, -torsoW/2, 0, headH + gap + torsoH + gap)
 
-        -- Right Leg - under right side of torso
+        -- Position right leg (under right side of torso)
         RLeg.Size = UDim2.new(0, legW, 0, legH)
-        RLeg.Position = UDim2.new(0.5, torsoW / 2 - legW, 0, headH + gap + torsoH + gap)
+        RLeg.Position = UDim2.new(0.5, torsoW/2 - legW, 0, headH + gap + torsoH + gap)
 
-        -- Store for other calculations
+        -- Store for ESP positioning
         preview._charW = charW
         preview._charH = charH
-        preview._headH = headH
-        preview._torsoH = torsoH
-        preview._legH = legH
-        preview._gap = gap
 
-        -- Update box ESP size
+        -- Update Box ESP
         if preview._boxESP then
             preview._boxESP.Size = UDim2.new(0, charW + boxPad * 2, 0, charH + boxPad * 2)
         end
@@ -1807,29 +1780,48 @@ function ESPPreview.Create(library, screenGui)
         return charW, charH
     end
 
-    -- Snap position calculation
+    -- Box ESP (centered with character)
+    local BoxESP = Instance.new('Frame', PreviewArea)
+    BoxESP.Name = "BoxESP"
+    BoxESP.AnchorPoint = Vector2.new(0.5, 0.5)
+    BoxESP.Position = UDim2.new(0.5, 0, 0.5, 0)
+    BoxESP.Size = UDim2.new(0, 100, 0, 150)
+    BoxESP.BackgroundTransparency = 1
+    BoxESP.Visible = false
+
+    local BoxStroke = Instance.new('UIStroke', BoxESP)
+    BoxStroke.Color = Color3.fromRGB(255, 255, 255)
+    BoxStroke.Thickness = 1
+
+    preview._boxESP = BoxESP
+    preview._boxStroke = BoxStroke
+
+    -- Helper functions for snap positioning
     local function getSnapZone(element)
         local areaPos = PreviewArea.AbsolutePosition
         local areaSize = PreviewArea.AbsoluteSize
         local elemPos = element.AbsolutePosition
         local elemSize = element.AbsoluteSize
+
         local centerX = elemPos.X + elemSize.X / 2
         local centerY = elemPos.Y + elemSize.Y / 2
+        local areaCenterX = areaPos.X + areaSize.X / 2
+        local areaCenterY = areaPos.Y + areaSize.Y / 2
 
-        local charCenter = CharContainer.AbsolutePosition + CharContainer.AbsoluteSize / 2
         local charH = preview._charH
         local charW = preview._charW
 
-        local distTop = centerY - (charCenter.Y - charH / 2 - boxPad)
-        local distBot = (charCenter.Y + charH / 2 + boxPad) - centerY
-        local distLeft = centerX - (charCenter.X - charW / 2 - boxPad)
-        local distRight = (charCenter.X + charW / 2 + boxPad) - centerX
+        -- Calculate distances to each zone
+        local distTop = math.abs(centerY - (areaCenterY - charH/2 - boxPad - 20))
+        local distBot = math.abs(centerY - (areaCenterY + charH/2 + boxPad + 20))
+        local distLeft = math.abs(centerX - (areaCenterX - charW/2 - boxPad - 30))
+        local distRight = math.abs(centerX - (areaCenterX + charW/2 + boxPad + 30))
 
         local zones = {
-            {name = "Top", dist = math.abs(distTop)},
-            {name = "Bottom", dist = math.abs(distBot)},
-            {name = "Left", dist = math.abs(distLeft)},
-            {name = "Right", dist = math.abs(distRight)},
+            {name = "Top", dist = distTop},
+            {name = "Bottom", dist = distBot},
+            {name = "Left", dist = distLeft},
+            {name = "Right", dist = distRight},
         }
         table.sort(zones, function(a, b) return a.dist < b.dist end)
         return zones[1].name
@@ -1838,7 +1830,7 @@ function ESPPreview.Create(library, screenGui)
     local function getStackIndex(elementName, zone)
         local index = 0
         local order = {"Name", "Distance", "Armor", "Tool"}
-        for i, name in ipairs(order) do
+        for _, name in ipairs(order) do
             if name == elementName then break end
             if preview._elementPositions[name] == zone then
                 index = index + 1
@@ -1847,90 +1839,83 @@ function ESPPreview.Create(library, screenGui)
         return index
     end
 
-    local function getSnapPosition(zone, stackIndex)
-        stackIndex = stackIndex or 0
-        local spacing = 16
+    local function updateAllPositions()
         local charH = preview._charH
         local charW = preview._charW
         local areaSize = PreviewArea.AbsoluteSize
 
-        if areaSize.X < 10 or areaSize.Y < 10 then
-            return UDim2.new(0.5, 0, 0.5, 0), Vector2.new(0.5, 0.5)
-        end
+        if charH == 0 or charW == 0 or areaSize.X < 50 then return end
 
-        local x, y = 0.5, 0.5
-        local anchorX, anchorY = 0.5, 0.5
+        local spacing = 16
 
-        if zone == "Top" then
-            y = 0.5 - (charH / 2 + boxPad + 8 + stackIndex * spacing) / areaSize.Y
-            anchorY = 1
-        elseif zone == "Bottom" then
-            y = 0.5 + (charH / 2 + boxPad + 8 + stackIndex * spacing) / areaSize.Y
-            anchorY = 0
-        elseif zone == "Left" then
-            x = 0.5 - (charW / 2 + boxPad + 10) / areaSize.X
-            y = 0.5 - (charH / 2) / areaSize.Y + stackIndex * spacing / areaSize.Y
-            anchorX = 1
-            anchorY = 0
-        elseif zone == "Right" then
-            x = 0.5 + (charW / 2 + boxPad + 10) / areaSize.X
-            y = 0.5 - (charH / 2) / areaSize.Y + stackIndex * spacing / areaSize.Y
-            anchorX = 0
-            anchorY = 0
-        end
-
-        return UDim2.new(x, 0, y, 0), Vector2.new(anchorX, anchorY)
-    end
-
-    local function getBarSnapPosition(zone)
-        local charW = preview._charW
-        local areaSize = PreviewArea.AbsoluteSize
-
-        if areaSize.X < 10 then
-            return UDim2.new(0.5, 0, 0.5, 0), Vector2.new(0.5, 0.5)
-        end
-
-        local x, y = 0.5, 0.5
-        local anchorX, anchorY = 0.5, 0.5
-
-        if zone == "Left" then
-            x = 0.5 - (charW / 2 + boxPad + 8) / areaSize.X
-            anchorX = 1
-        elseif zone == "Right" then
-            x = 0.5 + (charW / 2 + boxPad + 8) / areaSize.X
-            anchorX = 0
-        end
-
-        return UDim2.new(x, 0, y, 0), Vector2.new(anchorX, anchorY)
-    end
-
-    local function updateAllPositions()
         for name, zone in pairs(preview._elementPositions) do
             local element = preview["_" .. name:lower() .. "ESP"]
             if element and element.Visible then
                 local stackIndex = getStackIndex(name, zone)
-                local pos, anchor = getSnapPosition(zone, stackIndex)
-                element.Position = pos
-                element.AnchorPoint = anchor
+                local x, y = 0.5, 0.5
+                local anchorX, anchorY = 0.5, 0.5
+
+                if zone == "Top" then
+                    y = 0.5 - (charH/2 + boxPad + 8 + stackIndex * spacing) / areaSize.Y
+                    anchorY = 1
+                elseif zone == "Bottom" then
+                    y = 0.5 + (charH/2 + boxPad + 8 + stackIndex * spacing) / areaSize.Y
+                    anchorY = 0
+                elseif zone == "Left" then
+                    x = 0.5 - (charW/2 + boxPad + 15) / areaSize.X
+                    y = 0.5 - (charH/2 - stackIndex * spacing) / areaSize.Y
+                    anchorX = 1
+                    anchorY = 0
+                elseif zone == "Right" then
+                    x = 0.5 + (charW/2 + boxPad + 15) / areaSize.X
+                    y = 0.5 - (charH/2 - stackIndex * spacing) / areaSize.Y
+                    anchorX = 0
+                    anchorY = 0
+                end
+
+                element.Position = UDim2.new(x, 0, y, 0)
+                element.AnchorPoint = Vector2.new(anchorX, anchorY)
             end
         end
 
+        -- Health bar
         if preview._elementPositions["Health"] then
             local zone = preview._elementPositions["Health"]
-            local pos, anchor = getBarSnapPosition(zone)
-            preview._healthBarBG.Position = pos
-            preview._healthBarBG.AnchorPoint = anchor
+            local x = 0.5
+            local anchorX = 0.5
+
+            if zone == "Left" then
+                x = 0.5 - (charW/2 + boxPad + 8) / areaSize.X
+                anchorX = 1
+            elseif zone == "Right" then
+                x = 0.5 + (charW/2 + boxPad + 8) / areaSize.X
+                anchorX = 0
+            end
+
+            preview._healthBarBG.Position = UDim2.new(x, 0, 0.5, 0)
+            preview._healthBarBG.AnchorPoint = Vector2.new(anchorX, 0.5)
         end
 
+        -- Armor bar
         if preview._elementPositions["ArmorBar"] then
             local zone = preview._elementPositions["ArmorBar"]
-            local pos, anchor = getBarSnapPosition(zone)
-            preview._armorBarBG.Position = pos
-            preview._armorBarBG.AnchorPoint = anchor
+            local x = 0.5
+            local anchorX = 0.5
+
+            if zone == "Left" then
+                x = 0.5 - (charW/2 + boxPad + 8) / areaSize.X
+                anchorX = 1
+            elseif zone == "Right" then
+                x = 0.5 + (charW/2 + boxPad + 8) / areaSize.X
+                anchorX = 0
+            end
+
+            preview._armorBarBG.Position = UDim2.new(x, 0, 0.5, 0)
+            preview._armorBarBG.AnchorPoint = Vector2.new(anchorX, 0.5)
         end
     end
 
-    -- Snap draggable helper for text elements
+    -- Snap draggable for text elements
     local function makeSnapDraggable(element, elementName)
         local dragging = false
         local dragOffset = Vector2.new(0, 0)
@@ -1948,13 +1933,11 @@ function ESPPreview.Create(library, screenGui)
                 if dragging then
                     local zone = getSnapZone(element)
                     preview._elementPositions[elementName] = zone
-
                     pcall(function()
                         if library and library.flags then
                             library.flags["RaidESP_" .. elementName .. "Position"] = zone
                         end
                     end)
-
                     updateAllPositions()
                 end
                 dragging = false
@@ -1977,7 +1960,7 @@ function ESPPreview.Create(library, screenGui)
         end)
     end
 
-    -- Snap draggable for bar elements (Left/Right only)
+    -- Snap draggable for bar elements
     local function makeSnapDraggableBar(element, elementName)
         local dragging = false
         local dragOffsetX = 0
@@ -1999,13 +1982,11 @@ function ESPPreview.Create(library, screenGui)
 
                     local zone = elemCenterX < areaCenterX and "Left" or "Right"
                     preview._elementPositions[elementName] = zone
-
                     pcall(function()
                         if library and library.flags then
                             library.flags["RaidESP_" .. elementName .. "Position"] = zone
                         end
                     end)
-
                     updateAllPositions()
                 end
                 dragging = false
@@ -2017,7 +1998,6 @@ function ESPPreview.Create(library, screenGui)
                 local areaPos = PreviewArea.AbsolutePosition
                 local areaSize = PreviewArea.AbsoluteSize
                 local newX = input.Position.X - dragOffsetX - areaPos.X
-
                 local clampX = math.clamp(newX, 0, areaSize.X - element.AbsoluteSize.X)
 
                 element.Position = UDim2.new(0, clampX, 0.5, 0)
@@ -2026,24 +2006,12 @@ function ESPPreview.Create(library, screenGui)
         end)
     end
 
-    -- Box ESP
-    local BoxESP = Instance.new('Frame', PreviewArea)
-    BoxESP.AnchorPoint = Vector2.new(0.5, 0.5)
-    BoxESP.Position = UDim2.new(0.5, 0, 0.5, 0)
-    BoxESP.Size = UDim2.new(0, 100, 0, 200)
-    BoxESP.BackgroundTransparency = 1
-    BoxESP.Visible = false
-    local BoxStroke = Instance.new('UIStroke', BoxESP)
-    BoxStroke.Color = Color3.fromRGB(255, 255, 255)
-    BoxStroke.Thickness = 1
-    preview._boxESP = BoxESP
-    preview._boxStroke = BoxStroke
-
     -- Name ESP
     local NameESP = Instance.new('TextButton', PreviewArea)
+    NameESP.Name = "NameESP"
     NameESP.AnchorPoint = Vector2.new(0.5, 1)
-    NameESP.Position = UDim2.new(0.5, 0, 0.3, 0)
-    NameESP.Size = UDim2.new(0, 150, 0, 16)
+    NameESP.Position = UDim2.new(0.5, 0, 0.2, 0)
+    NameESP.Size = UDim2.new(0, 100, 0, 16)
     NameESP.BackgroundTransparency = 1
     NameESP.Text = Players.LocalPlayer.DisplayName
     NameESP.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -2058,9 +2026,10 @@ function ESPPreview.Create(library, screenGui)
 
     -- Health bar
     local HealthBarBG = Instance.new('TextButton', PreviewArea)
+    HealthBarBG.Name = "HealthBarBG"
     HealthBarBG.AnchorPoint = Vector2.new(1, 0.5)
-    HealthBarBG.Position = UDim2.new(0.3, 0, 0.5, 0)
-    HealthBarBG.Size = UDim2.new(0, 4, 0, 200)
+    HealthBarBG.Position = UDim2.new(0.2, 0, 0.5, 0)
+    HealthBarBG.Size = UDim2.new(0, 4, 0, 150)
     HealthBarBG.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
     HealthBarBG.BorderColor3 = Color3.new(0, 0, 0)
     HealthBarBG.Visible = false
@@ -2082,7 +2051,7 @@ function ESPPreview.Create(library, screenGui)
     HealthText.Text = "100"
     HealthText.TextColor3 = Color3.fromRGB(255, 255, 255)
     HealthText.FontFace = Library.UIFont
-    HealthText.TextSize = 10
+    HealthText.TextSize = 9
     HealthText.Visible = false
 
     preview._healthBarBG = HealthBarBG
@@ -2093,14 +2062,15 @@ function ESPPreview.Create(library, screenGui)
 
     -- Distance ESP
     local DistESP = Instance.new('TextButton', PreviewArea)
+    DistESP.Name = "DistESP"
     DistESP.AnchorPoint = Vector2.new(0.5, 0)
-    DistESP.Position = UDim2.new(0.5, 0, 0.7, 0)
-    DistESP.Size = UDim2.new(0, 80, 0, 14)
+    DistESP.Position = UDim2.new(0.5, 0, 0.8, 0)
+    DistESP.Size = UDim2.new(0, 60, 0, 14)
     DistESP.BackgroundTransparency = 1
     DistESP.Text = "[120m]"
     DistESP.TextColor3 = Color3.fromRGB(200, 200, 200)
     DistESP.FontFace = Library.UIFont
-    DistESP.TextSize = 12
+    DistESP.TextSize = 11
     DistESP.Visible = false
     DistESP.AutoButtonColor = false
     DistESP.AutomaticSize = Enum.AutomaticSize.X
@@ -2110,14 +2080,15 @@ function ESPPreview.Create(library, screenGui)
 
     -- Tool ESP
     local ToolESP = Instance.new('TextButton', PreviewArea)
+    ToolESP.Name = "ToolESP"
     ToolESP.AnchorPoint = Vector2.new(0.5, 0)
-    ToolESP.Position = UDim2.new(0.5, 0, 0.75, 0)
-    ToolESP.Size = UDim2.new(0, 80, 0, 14)
+    ToolESP.Position = UDim2.new(0.5, 0, 0.85, 0)
+    ToolESP.Size = UDim2.new(0, 60, 0, 14)
     ToolESP.BackgroundTransparency = 1
     ToolESP.Text = "[AK-47]"
     ToolESP.TextColor3 = Color3.fromRGB(180, 180, 180)
     ToolESP.FontFace = Library.UIFont
-    ToolESP.TextSize = 11
+    ToolESP.TextSize = 10
     ToolESP.Visible = false
     ToolESP.AutoButtonColor = false
     ToolESP.AutomaticSize = Enum.AutomaticSize.X
@@ -2125,16 +2096,17 @@ function ESPPreview.Create(library, screenGui)
     preview._elementPositions["Tool"] = "Bottom"
     makeSnapDraggable(ToolESP, "Tool")
 
-    -- Armor ESP (numerical)
+    -- Armor ESP
     local ArmorESP = Instance.new('TextButton', PreviewArea)
+    ArmorESP.Name = "ArmorESP"
     ArmorESP.AnchorPoint = Vector2.new(0.5, 0)
-    ArmorESP.Position = UDim2.new(0.5, 0, 0.8, 0)
-    ArmorESP.Size = UDim2.new(0, 120, 0, 14)
+    ArmorESP.Position = UDim2.new(0.5, 0, 0.9, 0)
+    ArmorESP.Size = UDim2.new(0, 80, 0, 14)
     ArmorESP.BackgroundTransparency = 1
     ArmorESP.Text = "Armor: 100"
     ArmorESP.TextColor3 = Color3.fromRGB(0, 150, 255)
     ArmorESP.FontFace = Library.UIFont
-    ArmorESP.TextSize = 12
+    ArmorESP.TextSize = 11
     ArmorESP.Visible = false
     ArmorESP.AutoButtonColor = false
     ArmorESP.AutomaticSize = Enum.AutomaticSize.X
@@ -2144,9 +2116,10 @@ function ESPPreview.Create(library, screenGui)
 
     -- Armor bar
     local ArmorBarBG = Instance.new('TextButton', PreviewArea)
+    ArmorBarBG.Name = "ArmorBarBG"
     ArmorBarBG.AnchorPoint = Vector2.new(0, 0.5)
-    ArmorBarBG.Position = UDim2.new(0.7, 0, 0.5, 0)
-    ArmorBarBG.Size = UDim2.new(0, 4, 0, 200)
+    ArmorBarBG.Position = UDim2.new(0.8, 0, 0.5, 0)
+    ArmorBarBG.Size = UDim2.new(0, 4, 0, 150)
     ArmorBarBG.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
     ArmorBarBG.BorderColor3 = Color3.new(0, 0, 0)
     ArmorBarBG.Visible = false
@@ -2168,7 +2141,7 @@ function ESPPreview.Create(library, screenGui)
     ArmorText.Text = "100"
     ArmorText.TextColor3 = Color3.fromRGB(0, 150, 255)
     ArmorText.FontFace = Library.UIFont
-    ArmorText.TextSize = 10
+    ArmorText.TextSize = 9
     ArmorText.Visible = false
 
     preview._armorBarBG = ArmorBarBG
@@ -2177,19 +2150,19 @@ function ESPPreview.Create(library, screenGui)
     preview._elementPositions["ArmorBar"] = "Right"
     makeSnapDraggableBar(ArmorBarBG, "ArmorBar")
 
-    -- Skeleton lines
+    -- Skeleton
     local skeletonLines = {}
     local lineData = {
-        {name = "neck", x1 = 0.5, y1 = 0.08, x2 = 0.5, y2 = 0.17},
-        {name = "spine", x1 = 0.5, y1 = 0.17, x2 = 0.5, y2 = 0.50},
-        {name = "lshoulder", x1 = 0.5, y1 = 0.17, x2 = 0.25, y2 = 0.19},
-        {name = "rshoulder", x1 = 0.5, y1 = 0.17, x2 = 0.75, y2 = 0.19},
-        {name = "larm", x1 = 0.25, y1 = 0.19, x2 = 0.22, y2 = 0.48},
-        {name = "rarm", x1 = 0.75, y1 = 0.19, x2 = 0.78, y2 = 0.48},
-        {name = "lhip", x1 = 0.5, y1 = 0.50, x2 = 0.38, y2 = 0.52},
-        {name = "rhip", x1 = 0.5, y1 = 0.50, x2 = 0.62, y2 = 0.52},
-        {name = "lleg", x1 = 0.38, y1 = 0.52, x2 = 0.36, y2 = 0.92},
-        {name = "rleg", x1 = 0.62, y1 = 0.52, x2 = 0.64, y2 = 0.92},
+        {name = "neck", x1 = 0.5, y1 = 0.10, x2 = 0.5, y2 = 0.20},
+        {name = "spine", x1 = 0.5, y1 = 0.20, x2 = 0.5, y2 = 0.55},
+        {name = "lshoulder", x1 = 0.5, y1 = 0.20, x2 = 0.25, y2 = 0.22},
+        {name = "rshoulder", x1 = 0.5, y1 = 0.20, x2 = 0.75, y2 = 0.22},
+        {name = "larm", x1 = 0.25, y1 = 0.22, x2 = 0.22, y2 = 0.52},
+        {name = "rarm", x1 = 0.75, y1 = 0.22, x2 = 0.78, y2 = 0.52},
+        {name = "lhip", x1 = 0.5, y1 = 0.55, x2 = 0.38, y2 = 0.58},
+        {name = "rhip", x1 = 0.5, y1 = 0.55, x2 = 0.62, y2 = 0.58},
+        {name = "lleg", x1 = 0.38, y1 = 0.58, x2 = 0.36, y2 = 0.92},
+        {name = "rleg", x1 = 0.62, y1 = 0.58, x2 = 0.64, y2 = 0.92},
     }
 
     for _, ld in ipairs(lineData) do
@@ -2210,9 +2183,7 @@ function ESPPreview.Create(library, screenGui)
 
     -- Armor color function
     local function getArmorColor(armorValue)
-        local maxArmor = 100
-        local pct = math.clamp(armorValue / maxArmor, 0, 1)
-
+        local pct = math.clamp(armorValue / 100, 0, 1)
         if pct >= 0.75 then
             return Color3.fromRGB(0, 120, 255)
         elseif pct >= 0.5 then
@@ -2253,7 +2224,6 @@ function ESPPreview.Create(library, screenGui)
         if not char then return preview._currentArmor end
 
         local hum = char:FindFirstChildOfClass("Humanoid")
-
         if hum and hum:GetAttribute("Armor") then
             return hum:GetAttribute("Armor")
         end
@@ -2267,14 +2237,6 @@ function ESPPreview.Create(library, screenGui)
         local leaderstats = player:FindFirstChild("leaderstats")
         if leaderstats then
             local armor = leaderstats:FindFirstChild("Armor")
-            if armor and (armor:IsA("NumberValue") or armor:IsA("IntValue")) then
-                return armor.Value
-            end
-        end
-
-        local data = player:FindFirstChild("Data") or player:FindFirstChild("PlayerData")
-        if data then
-            local armor = data:FindFirstChild("Armor")
             if armor and (armor:IsA("NumberValue") or armor:IsA("IntValue")) then
                 return armor.Value
             end
@@ -2324,11 +2286,7 @@ function ESPPreview.Create(library, screenGui)
         local char = Players.LocalPlayer.Character
         if char then
             local tool = char:FindFirstChildOfClass("Tool")
-            if tool then
-                ToolESP.Text = "[" .. tool.Name .. "]"
-            else
-                ToolESP.Text = "[None]"
-            end
+            ToolESP.Text = tool and ("[" .. tool.Name .. "]") or "[None]"
         end
     end
 
@@ -2347,11 +2305,14 @@ function ESPPreview.Create(library, screenGui)
         end
     end
 
-    Library:Connection(Players.LocalPlayer.CharacterAdded, function(char)
+    Library:Connection(Players.LocalPlayer.CharacterAdded, function()
         task.wait(0.1)
         connectTool()
     end)
     task.defer(connectTool)
+
+    -- Track last size for change detection
+    local lastAreaSize = Vector2.new(0, 0)
 
     -- Panel position update
     local function updatePosition()
@@ -2362,15 +2323,19 @@ function ESPPreview.Create(library, screenGui)
             Panel.Position = UDim2.new(0, mp.X + ms.X + 5, 0, mp.Y)
             Panel.Visible = Library.Open
 
-            -- Recalculate character size when panel size changes
-            recalculateCharacter()
-            updateAllPositions()
+            -- Only recalculate if size changed
+            local currentSize = PreviewArea.AbsoluteSize
+            if math.abs(currentSize.X - lastAreaSize.X) > 1 or math.abs(currentSize.Y - lastAreaSize.Y) > 1 then
+                lastAreaSize = currentSize
+                recalculateCharacter()
+                updateAllPositions()
+            end
         else
             Panel.Visible = false
         end
     end
 
-    -- Main update loop
+    -- Main loop
     Library:Connection(RunService.Heartbeat, function()
         updatePosition()
         if HealthBarBG.Visible then updateHealth() end
@@ -2382,29 +2347,19 @@ function ESPPreview.Create(library, screenGui)
     local function syncFromFlags()
         pcall(function()
             if library and library.flags then
-                if library.flags["RaidESP_NamePosition"] then
-                    preview._elementPositions["Name"] = library.flags["RaidESP_NamePosition"]
-                end
-                if library.flags["RaidESP_DistancePosition"] then
-                    preview._elementPositions["Distance"] = library.flags["RaidESP_DistancePosition"]
-                end
-                if library.flags["RaidESP_ArmorPosition"] then
-                    preview._elementPositions["Armor"] = library.flags["RaidESP_ArmorPosition"]
-                end
-                if library.flags["RaidESP_ToolPosition"] then
-                    preview._elementPositions["Tool"] = library.flags["RaidESP_ToolPosition"]
-                end
-                if library.flags["RaidESP_HealthPosition"] then
-                    preview._elementPositions["Health"] = library.flags["RaidESP_HealthPosition"]
+                for _, name in ipairs({"Name", "Distance", "Armor", "Tool", "Health"}) do
+                    local flagName = "RaidESP_" .. name .. "Position"
+                    if library.flags[flagName] then
+                        preview._elementPositions[name] = library.flags[flagName]
+                    end
                 end
                 updateAllPositions()
             end
         end)
     end
-
     task.defer(syncFromFlags)
 
-    -- API Functions
+    -- API
     function preview:SetBoxESP(enabled, color)
         self._boxESP.Visible = enabled
         if color then self._boxStroke.Color = color end
@@ -2446,15 +2401,8 @@ function ESPPreview.Create(library, screenGui)
         self._armorESP.Visible = enabled
         self._armorBarBG.Visible = enabled
         self._armorText.Visible = enabled
-
-        if maxArmor then
-            self._maxArmor = maxArmor
-        end
-
-        if armorValue ~= nil then
-            self._currentArmor = armorValue
-        end
-
+        if maxArmor then self._maxArmor = maxArmor end
+        if armorValue ~= nil then self._currentArmor = armorValue end
         if enabled then
             updateArmor()
             updateAllPositions()
@@ -2497,15 +2445,18 @@ function ESPPreview.Create(library, screenGui)
     function preview:Show() Panel.Visible = true end
     function preview:Hide() Panel.Visible = false end
 
-    -- Initial calculation
+    -- Initial setup
     task.defer(function()
-        task.wait(0.1)
+        task.wait(0.15)
         recalculateCharacter()
         updateAllPositions()
     end)
 
     return preview
 end
+
+-- ESP PREVIEW DONE HERE
+
 
 
 
