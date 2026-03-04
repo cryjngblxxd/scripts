@@ -1580,6 +1580,7 @@ local RunService = game:GetService("RunService")
 local SNAP_ZONES = {"Top", "Bottom", "Left", "Right"}
 local PREVIEW_MODES = {"Character", "Avenir Anime Girl"}
 local ANIME_GIRL_IMAGE = "rbxassetid://138507241500989"
+local ANIME_GIRL_NAME = "discord.gg/avenir"
 
 function ESPPreview.Create(library, screenGui)
     local preview = { 
@@ -1767,7 +1768,7 @@ function ESPPreview.Create(library, screenGui)
     preview._boxESP = BoxESP
     preview._boxStroke = BoxStroke
 
-    -- Armor color function (defined early so it can be used)
+    -- Armor color function
     local function getArmorColor(armorValue)
         local pct = math.clamp(armorValue / 100, 0, 1)
         if pct >= 0.75 then
@@ -1956,20 +1957,21 @@ function ESPPreview.Create(library, screenGui)
     preview._currentArmor = 100
     preview._maxArmor = 100
 
-    -- DEFINE ALL FUNCTIONS FIRST
+    -- DEFINE ALL FUNCTIONS
 
     -- Recalculate character/image size
     local function recalculateCharacter()
         local areaSize = PreviewArea.AbsoluteSize
         if areaSize.X < 50 or areaSize.Y < 50 then return end
 
-        local targetFill = 0.85
-        local espSpace = 40
-        
-        local availableHeight = (areaSize.Y - espSpace * 2) * targetFill
-        local availableWidth = areaSize.X * 0.6
+        local espSpace = 35
 
         if preview._currentMode == "Character" then
+            -- Character mode - 85% fill
+            local targetFill = 0.85
+            local availableHeight = (areaSize.Y - espSpace * 2) * targetFill
+            local availableWidth = areaSize.X * 0.6
+
             local totalHeightStuds = 5
             local totalWidthStuds = 4
             local gap = 2
@@ -2014,12 +2016,22 @@ function ESPPreview.Create(library, screenGui)
             preview._charW = charW
             preview._charH = charH
         else
+            -- Anime Girl mode - 9:16 aspect ratio, fill 90% of available space
+            local targetFill = 0.90
+            local availableHeight = (areaSize.Y - espSpace * 2) * targetFill
+            local availableWidth = areaSize.X * targetFill
+
+            -- 9:16 aspect ratio (width:height)
+            local aspectRatio = 9 / 16
+
+            -- Calculate size maintaining aspect ratio
             local imgHeight = availableHeight
-            local imgWidth = imgHeight * 0.6
-            
+            local imgWidth = imgHeight * aspectRatio
+
+            -- If width exceeds available, scale down
             if imgWidth > availableWidth then
                 imgWidth = availableWidth
-                imgHeight = imgWidth / 0.6
+                imgHeight = imgWidth / aspectRatio
             end
 
             ImageContainer.Size = UDim2.new(0, imgWidth, 0, imgHeight)
@@ -2187,11 +2199,31 @@ function ESPPreview.Create(library, screenGui)
         end
 
         if preview._nameESP and preview._nameESP.Visible then
-            preview._nameESP.Text = preview._previewName
+            -- Use discord link for anime girl mode, display name for character mode
+            if preview._currentMode == "Avenir Anime Girl" then
+                preview._nameESP.Text = ANIME_GIRL_NAME
+            else
+                preview._nameESP.Text = preview._previewName
+            end
         end
     end
 
-    -- Switch mode function (NOW DEFINED AFTER THE FUNCTIONS IT CALLS)
+    -- Update name based on mode
+    local function updateNameForMode()
+        if preview._nameESP and preview._nameESP.Visible then
+            if preview._currentMode == "Avenir Anime Girl" then
+                preview._nameESP.Text = ANIME_GIRL_NAME
+            else
+                if preview._liveMode then
+                    preview._nameESP.Text = Players.LocalPlayer.DisplayName
+                else
+                    preview._nameESP.Text = preview._previewName
+                end
+            end
+        end
+    end
+
+    -- Switch mode function
     local function switchMode(newMode)
         preview._currentMode = newMode
         ModeButton.Text = "  " .. newMode .. " ▼"
@@ -2211,6 +2243,7 @@ function ESPPreview.Create(library, screenGui)
         recalculateCharacter()
         updateAllPositions()
         updatePreviewValues()
+        updateNameForMode()
     end
 
     -- Snap draggable for text elements
@@ -2526,14 +2559,20 @@ function ESPPreview.Create(library, screenGui)
     function preview:SetNameESP(enabled, color, text)
         self._nameESP.Visible = enabled
         if color then self._nameESP.TextColor3 = color end
+        
         if text then 
             self._previewName = text
-            self._nameESP.Text = text 
+        end
+        
+        -- Always use correct name based on mode
+        if self._currentMode == "Avenir Anime Girl" then
+            self._nameESP.Text = ANIME_GIRL_NAME
         elseif self._liveMode then
             self._nameESP.Text = Players.LocalPlayer.DisplayName
         else
             self._nameESP.Text = self._previewName
         end
+        
         if enabled then updateAllPositions() end
     end
 
@@ -2671,7 +2710,7 @@ function ESPPreview.Create(library, screenGui)
 
     function preview:SetPreviewName(name)
         self._previewName = name
-        if not self._liveMode then 
+        if not self._liveMode and self._currentMode == "Character" then 
             self._nameESP.Text = name 
         end
     end
