@@ -65,7 +65,7 @@ do
     Library.Pages.__index = Library.Pages
     Library.Sections.__index = Library.Sections
 
-    -- UTILITY
+
 
     function Library:FireFlagCallbacks(flag, value)
         local cbs = self._flagCallbacks[flag]
@@ -163,7 +163,7 @@ do
         end
     end
 
-    -- CONFIG SYSTEM
+
 
     function Library:InitFolders()
         pcall(function()
@@ -269,7 +269,7 @@ function Library:LoadConfig(configJson)
             local s = Flags[flag]
             if s and type(s) == "function" then pcall(s, Color3.fromHex(value.hex)) end
         elseif type(value) == "table" then
-            -- Multi dropdown (array)
+        
             local s = Flags[flag]
             if s then
                 if type(s) == "table" and s.Set then pcall(function() s:Set(value) end)
@@ -313,7 +313,7 @@ end
         return list
     end
 
-    -- COLOR PICKER
+
 
     function Library:NewPicker(default, alpha, parent, count, flag, callback)
         local Icon = Instance.new('TextButton', parent)
@@ -411,7 +411,7 @@ end
         return cpt
     end
 
-    -- KEYBIND HANDLER
+
 
     local function SetupKeybindHandler()
         Library:Connection(UIS.InputBegan, function(input, gp)
@@ -481,7 +481,7 @@ end
         end)
     end
 
-    -- UI ELEMENTS
+    
 
     do
         local Pages = Library.Pages
@@ -618,7 +618,7 @@ end
             version.TextXAlignment = Enum.TextXAlignment.Left
             version.RichText = true
 
-            -- Dragging
+     
             Library:Connection(Top.InputBegan, function(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                     Base.Dragging[1] = true
@@ -867,7 +867,7 @@ end
             return setmetatable(Page, Library.Pages)
         end
 
-        -- TOGGLE
+    
         function Sections:Toggle(Options)
             local Props = Options or {}
             local Toggle = {
@@ -952,7 +952,7 @@ end
             return Toggle
         end
 
-        -- SLIDER
+
         function Sections:Slider(Options)
             local Props = Options or {}
             local Slider = {
@@ -1045,7 +1045,7 @@ end
             return Slider
         end
 
-        -- DROPDOWN
+  
         function Sections:List(Options)
             local Props = Options or {}
             local DD = {
@@ -1244,7 +1244,6 @@ end
             return DD
         end
 
-        -- TEXTBOX
         function Sections:Textbox(Options)
             local Props = Options or {}
             local TB = {
@@ -1330,7 +1329,6 @@ end
             return TB
         end
 
-        -- BUTTON
         function Sections:Button(Options)
             local Props = Options or {}
             local parent = Props.Side == "Right" and self.Elements.Right or self.Elements.Left
@@ -1356,7 +1354,7 @@ end
             return {Holder = H}
         end
 
-        -- COLORPICKER
+ 
         function Sections:Colorpicker(Options)
             local Props = Options or {}
             local CP = {
@@ -1388,7 +1386,7 @@ end
             return CP
         end
 
-        -- LABEL
+
         function Sections:Label(Options)
             local Props = Options or {}
             local parent = Props.Side == "Right" and self.Elements.Right or self.Elements.Left
@@ -1408,7 +1406,7 @@ end
             return lbl
         end
 
-        -- DIVIDER
+       
         function Sections:Divider(Options)
             local parent = (Options and Options.Side == "Right") and self.Elements.Right or self.Elements.Left
             local D = Instance.new('Frame', parent)
@@ -1417,7 +1415,7 @@ end
             D.BorderSizePixel = 0
         end
 
-        -- KEYBIND
+  
         function Sections:Keybind(Options)
             local Props = Options or {}
             local KB = {
@@ -1582,6 +1580,10 @@ local PREVIEW_MODES = {"Character", "Avenir Anime Girl"}
 local ANIME_GIRL_IMAGE = "rbxassetid://138507241500989"
 local ANIME_GIRL_NAME = "discord.gg/avenir"
 
+
+local IMAGE_WIDTH = 900
+local IMAGE_HEIGHT = 1600
+
 function ESPPreview.Create(library, screenGui)
     local preview = { 
         Enabled = true, 
@@ -1596,6 +1598,11 @@ function ESPPreview.Create(library, screenGui)
         _previewTool = "AK-47",
         _previewName = Players.LocalPlayer.DisplayName,
         _liveMode = true,
+        -- Track the actual rendered image bounds within the container
+        _renderedImageW = 0,
+        _renderedImageH = 0,
+        _renderedImageOffsetX = 0,
+        _renderedImageOffsetY = 0,
     }
     local panelWidth = 350
 
@@ -1649,7 +1656,6 @@ function ESPPreview.Create(library, screenGui)
     TitleText.TextXAlignment = Enum.TextXAlignment.Left
     table.insert(Library.ThemeObjects, TitleText)
 
-    -- Mode Selector Dropdown
     local ModeButton = Instance.new('TextButton', TitleBar)
     ModeButton.Size = UDim2.new(0, 130, 0, 18)
     ModeButton.Position = UDim2.new(1, -135, 0, 2)
@@ -1689,7 +1695,7 @@ function ESPPreview.Create(library, screenGui)
     preview._charW = 0
     preview._charH = 0
 
-    -- CHARACTER MODEL CONTAINER
+   
     local CharBox = Instance.new('Frame', PreviewArea)
     CharBox.Name = "CharBox"
     CharBox.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -1699,7 +1705,6 @@ function ESPPreview.Create(library, screenGui)
     CharBox.Visible = true
     preview._charBox = CharBox
 
-    -- Character parts
     local Head = Instance.new('Frame', CharBox)
     Head.Name = "Head"
     Head.BackgroundColor3 = Color3.new(0.35, 0.35, 0.35)
@@ -1733,19 +1738,19 @@ function ESPPreview.Create(library, screenGui)
 
     preview._charParts = {Head, Torso, LArm, RArm, LLeg, RLeg}
 
-    -- ANIME GIRL IMAGE CONTAINER - FILLS THE PREVIEW AREA
+    
     local ImageContainer = Instance.new('Frame', PreviewArea)
     ImageContainer.Name = "ImageContainer"
     ImageContainer.AnchorPoint = Vector2.new(0.5, 0.5)
     ImageContainer.Position = UDim2.new(0.5, 0, 0.5, 0)
-    -- Container fills most of the preview area, ScaleType.Fit handles the rest
-    ImageContainer.Size = UDim2.new(1, -20, 1, -20)
+    ImageContainer.Size = UDim2.new(1, 0, 1, 0)
     ImageContainer.BackgroundTransparency = 1
     ImageContainer.BorderSizePixel = 0
     ImageContainer.Visible = false
+    ImageContainer.ClipsDescendants = false
     preview._imageContainer = ImageContainer
 
-    -- The actual preview image - ScaleType.Fit does the heavy lifting
+    
     local PreviewImage = Instance.new('ImageLabel', ImageContainer)
     PreviewImage.Name = "PreviewImage"
     PreviewImage.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -1753,7 +1758,7 @@ function ESPPreview.Create(library, screenGui)
     PreviewImage.Size = UDim2.new(1, 0, 1, 0)
     PreviewImage.BackgroundTransparency = 1
     PreviewImage.Image = ANIME_GIRL_IMAGE
-    PreviewImage.ScaleType = Enum.ScaleType.Fit  -- This auto-scales maintaining aspect ratio
+    PreviewImage.ScaleType = Enum.ScaleType.Stretch -- We manually calculate size so Stretch is fine
     preview._previewImage = PreviewImage
 
     -- Box ESP
@@ -1772,7 +1777,6 @@ function ESPPreview.Create(library, screenGui)
     preview._boxESP = BoxESP
     preview._boxStroke = BoxStroke
 
-    -- Armor color function
     local function getArmorColor(armorValue)
         local pct = math.clamp(armorValue / 100, 0, 1)
         if pct >= 0.75 then
@@ -1961,9 +1965,38 @@ function ESPPreview.Create(library, screenGui)
     preview._currentArmor = 100
     preview._maxArmor = 100
 
-    -- DEFINE ALL FUNCTIONS
+    -- ============================================
+    -- CORE CALCULATION: Compute rendered image bounds
+    -- This is the key function that makes everything fit
+    -- ============================================
+    local function calculateRenderedImageBounds(containerW, containerH)
+        local imageAspect = IMAGE_WIDTH / IMAGE_HEIGHT
+        local containerAspect = containerW / containerH
 
-    -- Recalculate character/image size
+        local renderedW, renderedH, offsetX, offsetY
+
+        if containerAspect > imageAspect then
+            -- Container is wider than image aspect ratio
+            -- Image height fills container, width is smaller (pillarboxed)
+            renderedH = containerH
+            renderedW = renderedH * imageAspect
+            offsetX = (containerW - renderedW) / 2
+            offsetY = 0
+        else
+            -- Container is taller than image aspect ratio
+            -- Image width fills container, height is smaller (letterboxed)
+            renderedW = containerW
+            renderedH = renderedW / imageAspect
+            offsetX = 0
+            offsetY = (containerH - renderedH) / 2
+        end
+
+        return renderedW, renderedH, offsetX, offsetY
+    end
+
+    -- ============================================
+    -- RECALCULATE CHARACTER / IMAGE
+    -- ============================================
     local function recalculateCharacter()
         local areaSize = PreviewArea.AbsoluteSize
         if areaSize.X < 50 or areaSize.Y < 50 then return end
@@ -2020,44 +2053,49 @@ function ESPPreview.Create(library, screenGui)
             preview._charW = charW
             preview._charH = charH
         else
-            -- Anime Girl mode - Container fills available space, ScaleType.Fit handles aspect ratio
-            -- Leave small margins for ESP elements
-            local margin = 10
-            local containerWidth = areaSize.X - (margin * 2)
-            local containerHeight = areaSize.Y - (margin * 2)
             
-            -- Update container size to fill the preview area
-            ImageContainer.Size = UDim2.new(1, -margin * 2, 1, -margin * 2)
-            PreviewImage.Size = UDim2.new(1, 0, 1, 0)
+            local espMarginX = 30  -- space on left/right for health bar, armor bar
+            local espMarginY = 30  -- space on top/bottom for name, distance labels
             
-            -- For ESP positioning, estimate the actual rendered image size
-            -- Image is 9:16 aspect ratio, ScaleType.Fit will letterbox if needed
-            local imageAspect = 9 / 16
-            local containerAspect = containerWidth / containerHeight
+            -- Available space for the image itself
+            local availableW = areaSize.X - (espMarginX * 2)
+            local availableH = areaSize.Y - (espMarginY * 2)
             
-            local renderedWidth, renderedHeight
-            if containerAspect > imageAspect then
-                -- Container is wider than image, height is limiting factor
-                renderedHeight = containerHeight
-                renderedWidth = renderedHeight * imageAspect
-            else
-                -- Container is taller than image, width is limiting factor
-                renderedWidth = containerWidth
-                renderedHeight = renderedWidth / imageAspect
-            end
+            -- Calculate exact rendered size maintaining aspect ratio
+            local renderedW, renderedH, offsetX, offsetY = calculateRenderedImageBounds(availableW, availableH)
             
-            preview._charW = renderedWidth
-            preview._charH = renderedHeight
+            -- Store for ESP positioning
+            preview._renderedImageW = renderedW
+            preview._renderedImageH = renderedH
+            preview._renderedImageOffsetX = offsetX
+            preview._renderedImageOffsetY = offsetY
+            
+            -- Size the container to available space
+            ImageContainer.Size = UDim2.new(0, availableW, 0, availableH)
+            ImageContainer.Position = UDim2.new(0.5, 0, 0.5, 0)
+            ImageContainer.AnchorPoint = Vector2.new(0.5, 0.5)
+            
+   
+            PreviewImage.Size = UDim2.new(0, renderedW, 0, renderedH)
+            PreviewImage.Position = UDim2.new(0.5, 0, 0.5, 0)
+            PreviewImage.AnchorPoint = Vector2.new(0.5, 0.5)
+            
+            -- charW and charH drive all ESP element positioning
+            preview._charW = renderedW
+            preview._charH = renderedH
         end
 
+        -- Update Box ESP to wrap tightly around the character/image
         if preview._boxESP then
             preview._boxESP.Size = UDim2.new(0, preview._charW + boxPad * 2, 0, preview._charH + boxPad * 2)
         end
 
+        -- Update health bar height to match
         if preview._healthBarBG then
             preview._healthBarBG.Size = UDim2.new(0, 4, 0, preview._charH + boxPad * 2)
         end
 
+        -- Update armor bar height to match
         if preview._armorBarBG then
             preview._armorBarBG.Size = UDim2.new(0, 4, 0, preview._charH + boxPad * 2)
         end
@@ -2098,7 +2136,7 @@ function ESPPreview.Create(library, screenGui)
         return elements
     end
 
-    -- Update all positions
+    -- Update all ESP element positions relative to the character/image
     local function updateAllPositions()
         local charH = preview._charH
         local charW = preview._charW
@@ -2142,6 +2180,7 @@ function ESPPreview.Create(library, screenGui)
             end
         end
 
+        -- Position health bar
         if preview._healthBarBG and preview._elementPositions["Health"] then
             local zone = preview._elementPositions["Health"]
             local x = 0.5
@@ -2159,6 +2198,7 @@ function ESPPreview.Create(library, screenGui)
             preview._healthBarBG.AnchorPoint = Vector2.new(anchorX, 0.5)
         end
 
+        -- Position armor bar
         if preview._armorBarBG and preview._elementPositions["ArmorBar"] then
             local zone = preview._elementPositions["ArmorBar"]
             local x = 0.5
@@ -2216,7 +2256,6 @@ function ESPPreview.Create(library, screenGui)
         end
     end
 
-    -- Update name based on mode
     local function updateNameForMode()
         if preview._nameESP and preview._nameESP.Visible then
             if preview._currentMode == "Avenir Anime Girl" then
@@ -2231,7 +2270,7 @@ function ESPPreview.Create(library, screenGui)
         end
     end
 
-    -- Switch mode function
+    -- Switch mode
     local function switchMode(newMode)
         preview._currentMode = newMode
         ModeButton.Text = "  " .. newMode .. " ▼"
@@ -2301,7 +2340,6 @@ function ESPPreview.Create(library, screenGui)
         end)
     end
 
-    -- Snap draggable for bar elements
     local function makeSnapDraggableBar(element, elementName)
         local dragging = false
         local dragOffsetX = 0
@@ -2349,7 +2387,6 @@ function ESPPreview.Create(library, screenGui)
         end)
     end
 
-    -- Apply draggable to elements
     makeSnapDraggable(NameESP, "Name")
     makeSnapDraggable(DistESP, "Distance")
     makeSnapDraggable(ToolESP, "Tool")
@@ -2357,7 +2394,6 @@ function ESPPreview.Create(library, screenGui)
     makeSnapDraggableBar(HealthBarBG, "Health")
     makeSnapDraggableBar(ArmorBarBG, "ArmorBar")
 
-    -- Mode dropdown button
     ModeButton.MouseButton1Click:Connect(function()
         modeDropdownOpen = not modeDropdownOpen
         ModeDropdown.Visible = modeDropdownOpen
@@ -2374,7 +2410,6 @@ function ESPPreview.Create(library, screenGui)
         end
     end)
 
-    -- Create mode options
     for i, mode in ipairs(PREVIEW_MODES) do
         local ModeOption = Instance.new('TextButton', ModeDropdown)
         ModeOption.Size = UDim2.new(1, 0, 0, 20)
@@ -2400,7 +2435,7 @@ function ESPPreview.Create(library, screenGui)
         end)
     end
 
-    -- Live tracking functions
+    -- Live tracking
     local function getHumanoid()
         local char = Players.LocalPlayer.Character
         if char then return char:FindFirstChildOfClass("Humanoid") end
@@ -2729,10 +2764,19 @@ function ESPPreview.Create(library, screenGui)
         end
     end
 
+    -- Allow changing the image aspect ratio if needed
+    function preview:SetImageDimensions(width, height)
+        IMAGE_WIDTH = width
+        IMAGE_HEIGHT = height
+        if self._currentMode == "Avenir Anime Girl" then
+            recalculateCharacter()
+            updateAllPositions()
+        end
+    end
+
     function preview:Show() Panel.Visible = true end
     function preview:Hide() Panel.Visible = false end
 
-    -- Initialize
     task.defer(function()
         task.wait(0.15)
         recalculateCharacter()
@@ -2742,6 +2786,7 @@ function ESPPreview.Create(library, screenGui)
 
     return preview
 end
+
 
 
 
