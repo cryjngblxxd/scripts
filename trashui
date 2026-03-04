@@ -1733,23 +1733,27 @@ function ESPPreview.Create(library, screenGui)
 
     preview._charParts = {Head, Torso, LArm, RArm, LLeg, RLeg}
 
-    -- ANIME GIRL IMAGE CONTAINER
+    -- ANIME GIRL IMAGE CONTAINER - FILLS THE PREVIEW AREA
     local ImageContainer = Instance.new('Frame', PreviewArea)
     ImageContainer.Name = "ImageContainer"
     ImageContainer.AnchorPoint = Vector2.new(0.5, 0.5)
     ImageContainer.Position = UDim2.new(0.5, 0, 0.5, 0)
+    -- Container fills most of the preview area, ScaleType.Fit handles the rest
+    ImageContainer.Size = UDim2.new(1, -20, 1, -20)
     ImageContainer.BackgroundTransparency = 1
     ImageContainer.BorderSizePixel = 0
     ImageContainer.Visible = false
     preview._imageContainer = ImageContainer
 
+    -- The actual preview image - ScaleType.Fit does the heavy lifting
     local PreviewImage = Instance.new('ImageLabel', ImageContainer)
     PreviewImage.Name = "PreviewImage"
     PreviewImage.AnchorPoint = Vector2.new(0.5, 0.5)
     PreviewImage.Position = UDim2.new(0.5, 0, 0.5, 0)
+    PreviewImage.Size = UDim2.new(1, 0, 1, 0)
     PreviewImage.BackgroundTransparency = 1
     PreviewImage.Image = ANIME_GIRL_IMAGE
-    PreviewImage.ScaleType = Enum.ScaleType.Fit
+    PreviewImage.ScaleType = Enum.ScaleType.Fit  -- This auto-scales maintaining aspect ratio
     preview._previewImage = PreviewImage
 
     -- Box ESP
@@ -2016,28 +2020,34 @@ function ESPPreview.Create(library, screenGui)
             preview._charW = charW
             preview._charH = charH
         else
-            -- Anime Girl mode - MAXIMUM SIZE
-            local imgHeight = areaSize.Y * 0.92  -- 92% of total height
-            local imgWidth = imgHeight * (9 / 16)  -- 9:16 aspect ratio
+            -- Anime Girl mode - Container fills available space, ScaleType.Fit handles aspect ratio
+            -- Leave small margins for ESP elements
+            local margin = 10
+            local containerWidth = areaSize.X - (margin * 2)
+            local containerHeight = areaSize.Y - (margin * 2)
             
-            -- Clamp width if too wide
-            if imgWidth > areaSize.X * 0.85 then
-                imgWidth = areaSize.X * 0.85
-                imgHeight = imgWidth / (9 / 16)
+            -- Update container size to fill the preview area
+            ImageContainer.Size = UDim2.new(1, -margin * 2, 1, -margin * 2)
+            PreviewImage.Size = UDim2.new(1, 0, 1, 0)
+            
+            -- For ESP positioning, estimate the actual rendered image size
+            -- Image is 9:16 aspect ratio, ScaleType.Fit will letterbox if needed
+            local imageAspect = 9 / 16
+            local containerAspect = containerWidth / containerHeight
+            
+            local renderedWidth, renderedHeight
+            if containerAspect > imageAspect then
+                -- Container is wider than image, height is limiting factor
+                renderedHeight = containerHeight
+                renderedWidth = renderedHeight * imageAspect
+            else
+                -- Container is taller than image, width is limiting factor
+                renderedWidth = containerWidth
+                renderedHeight = renderedWidth / imageAspect
             end
-
-            ImageContainer.Size = UDim2.new(0, imgWidth, 0, imgHeight)
-            PreviewImage.Size = UDim2.new(1, 0, 1, 0)
-
-            preview._charW = imgWidth
-            preview._charH = imgHeight
-        end
-
-            ImageContainer.Size = UDim2.new(0, imgWidth, 0, imgHeight)
-            PreviewImage.Size = UDim2.new(1, 0, 1, 0)
-
-            preview._charW = imgWidth
-            preview._charH = imgHeight
+            
+            preview._charW = renderedWidth
+            preview._charH = renderedHeight
         end
 
         if preview._boxESP then
@@ -2198,7 +2208,6 @@ function ESPPreview.Create(library, screenGui)
         end
 
         if preview._nameESP and preview._nameESP.Visible then
-            -- Use discord link for anime girl mode, display name for character mode
             if preview._currentMode == "Avenir Anime Girl" then
                 preview._nameESP.Text = ANIME_GIRL_NAME
             else
@@ -2563,7 +2572,6 @@ function ESPPreview.Create(library, screenGui)
             self._previewName = text
         end
         
-        -- Always use correct name based on mode
         if self._currentMode == "Avenir Anime Girl" then
             self._nameESP.Text = ANIME_GIRL_NAME
         elseif self._liveMode then
