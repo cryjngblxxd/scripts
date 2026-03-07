@@ -966,403 +966,472 @@ function Library:CreateWindow(config)
 			end
 
 			function Section:List(cfg3)
-				cfg3 = cfg3 or {}
-				local options = cfg3.Options or {}
-				local state = cfg3.State or options[1] or ""
-				local multi = cfg3.Multi or false
-				local flag = cfg3.Flag or cfg3.Name
-				local cb = cfg3.Callback or function() end
-				if multi and type(state) == "string" then state = {[state] = true} end
-				Library.Flags[flag] = state
+            cfg3 = cfg3 or {}
+            local options = cfg3.Options or {}
+            local state = cfg3.State or options[1] or ""
+            local multi = cfg3.Multi or false
+            local flag = cfg3.Flag or cfg3.Name
+            local cb = cfg3.Callback or function() end
+            if multi and type(state) == "string" then state = {[state] = true} end
+            Library.Flags[flag] = state
 
-				local lOpen = false
+            local lOpen = false
 
-				local W = Instance.new("Frame", SContent)
-				W.Size = UDim2.new(1, 0, 0, 22)
-				W.BackgroundTransparency = 1
-				W.ClipsDescendants = true
-				W.ZIndex = 20
+            local W = Instance.new("Frame", SContent)
+            W.Size = UDim2.new(1, 0, 0, 22)
+            W.BackgroundTransparency = 1
+            W.ClipsDescendants = false  -- ✅ CHANGED
+            W.ZIndex = 20
 
-				local Lbl = Instance.new("TextLabel", W)
-				Lbl.Size = UDim2.new(0.45, 0, 0, 22)
-				Lbl.Position = UDim2.new(0, 2, 0, 0)
-				Lbl.BackgroundTransparency = 1
-				Lbl.Text = cfg3.Name or "List"
-				Lbl.TextColor3 = Color3.fromRGB(180, 180, 180)
-				Lbl.TextSize = 13
-				Lbl.Font = Enum.Font.Gotham
-				Lbl.TextXAlignment = Enum.TextXAlignment.Left
-				Lbl.ZIndex = 21
+            local Lbl = Instance.new("TextLabel", W)
+            Lbl.Size = UDim2.new(0.45, 0, 0, 22)
+            Lbl.Position = UDim2.new(0, 2, 0, 0)
+            Lbl.BackgroundTransparency = 1
+            Lbl.Text = cfg3.Name or "List"
+            Lbl.TextColor3 = Color3.fromRGB(180, 180, 180)
+            Lbl.TextSize = 13
+            Lbl.Font = Enum.Font.Gotham
+            Lbl.TextXAlignment = Enum.TextXAlignment.Left
+            Lbl.ZIndex = 21
 
-				local SelFrame = Instance.new("Frame", W)
-				SelFrame.Size = UDim2.new(0.53, -4, 0, 16)
-				SelFrame.Position = UDim2.new(0.47, 0, 0, 3)
-				SelFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
-				SelFrame.BorderSizePixel = 0
-				SelFrame.ZIndex = 21
+            local SelFrame = Instance.new("Frame", W)
+            SelFrame.Size = UDim2.new(0.53, -4, 0, 16)
+            SelFrame.Position = UDim2.new(0.47, 0, 0, 3)
+            SelFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
+            SelFrame.BorderSizePixel = 0
+            SelFrame.ZIndex = 21
 
-				local SelBrd = Instance.new("Frame", SelFrame)
-				SelBrd.Size = UDim2.new(1, 2, 1, 2)
-				SelBrd.Position = UDim2.new(0, -1, 0, -1)
-				SelBrd.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-				SelBrd.BorderSizePixel = 0
-				SelBrd.ZIndex = 20
+            local SelBrd = Instance.new("Frame", SelFrame)
+            SelBrd.Size = UDim2.new(1, 2, 1, 2)
+            SelBrd.Position = UDim2.new(0, -1, 0, -1)
+            SelBrd.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+            SelBrd.BorderSizePixel = 0
+            SelBrd.ZIndex = 20
 
-				local SelInner = Instance.new("Frame", SelFrame)
-				SelInner.Size = UDim2.new(1, -2, 1, -2)
-				SelInner.Position = UDim2.new(0, 1, 0, 1)
-				SelInner.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
-				SelInner.BorderSizePixel = 0
-				SelInner.ZIndex = 22
+            local SelInner = Instance.new("Frame", SelFrame)
+            SelInner.Size = UDim2.new(1, -2, 1, -2)
+            SelInner.Position = UDim2.new(0, 1, 0, 1)
+            SelInner.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+            SelInner.BorderSizePixel = 0
+            SelInner.ZIndex = 22
 
-				local function getDsp()
-					if multi then
-						local s = {}
-						for _, o in ipairs(options) do if state[o] then table.insert(s, o) end end
-						return #s > 0 and table.concat(s, ", ") or "None"
-					else return tostring(state) end
-				end
+            local function getDsp()
+                if multi then
+                    local s = {}
+                    for _, o in ipairs(options) do if state[o] then table.insert(s, o) end end
+                    return #s > 0 and table.concat(s, ", ") or "None"
+                else return tostring(state) end
+            end
 
-				local SelLbl = Instance.new("TextLabel", SelInner)
-				SelLbl.Size = UDim2.new(1, -16, 1, 0)
-				SelLbl.Position = UDim2.new(0, 4, 0, 0)
-				SelLbl.BackgroundTransparency = 1
-				SelLbl.Text = getDsp()
-				SelLbl.TextColor3 = accentColor
-				SelLbl.TextSize = 11
-				SelLbl.Font = Enum.Font.Gotham
-				SelLbl.TextTruncate = Enum.TextTruncate.AtEnd
-				SelLbl.ZIndex = 23
-				regAccent(SelLbl, "TextColor3")
+            local SelLbl = Instance.new("TextLabel", SelInner)
+            SelLbl.Size = UDim2.new(1, -16, 1, 0)
+            SelLbl.Position = UDim2.new(0, 4, 0, 0)
+            SelLbl.BackgroundTransparency = 1
+            SelLbl.Text = getDsp()
+            SelLbl.TextColor3 = accentColor
+            SelLbl.TextSize = 11
+            SelLbl.Font = Enum.Font.Gotham
+            SelLbl.TextTruncate = Enum.TextTruncate.AtEnd
+            SelLbl.ZIndex = 23
+            regAccent(SelLbl, "TextColor3")
 
-				local Arrow = Instance.new("TextLabel", SelInner)
-				Arrow.Size = UDim2.new(0, 10, 1, 0)
-				Arrow.Position = UDim2.new(1, -12, 0, 0)
-				Arrow.BackgroundTransparency = 1
-				Arrow.Text = "v"
-				Arrow.TextColor3 = Color3.fromRGB(100, 100, 100)
-				Arrow.TextSize = 10
-				Arrow.Font = Enum.Font.GothamBold
-				Arrow.ZIndex = 23
+            local Arrow = Instance.new("TextLabel", SelInner)
+            Arrow.Size = UDim2.new(0, 10, 1, 0)
+            Arrow.Position = UDim2.new(1, -12, 0, 0)
+            Arrow.BackgroundTransparency = 1
+            Arrow.Text = "v"
+            Arrow.TextColor3 = Color3.fromRGB(100, 100, 100)
+            Arrow.TextSize = 10
+            Arrow.Font = Enum.Font.GothamBold
+            Arrow.ZIndex = 23
 
-				local Drop = Instance.new("Frame", W)
-				Drop.Size = UDim2.new(0.53, -4, 0, 0)
-				Drop.Position = UDim2.new(0.47, 0, 0, 24)
-				Drop.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-				Drop.BorderSizePixel = 0
-				Drop.ClipsDescendants = true
-				Drop.ZIndex = 100
+            -- ✅ DROPDOWN PARENTED TO SCREENGUI
+            local Drop = Instance.new("Frame")
+            Drop.Name = "ListDropdown"
+            Drop.Size = UDim2.new(0, 100, 0, 0)
+            Drop.Position = UDim2.new(0, 0, 0, 0)
+            Drop.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+            Drop.BorderSizePixel = 0
+            Drop.ClipsDescendants = false
+            Drop.Visible = false
+            Drop.ZIndex = 200
+            Drop.Parent = Library._screenGui  -- ✅ PARENT TO SCREENGUI
 
-				local DropBrd = Instance.new("Frame", Drop)
-				DropBrd.Size = UDim2.new(1, 2, 1, 2)
-				DropBrd.Position = UDim2.new(0, -1, 0, -1)
-				DropBrd.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-				DropBrd.BorderSizePixel = 0
-				DropBrd.ZIndex = 100
+            local DropBrd = Instance.new("Frame", Drop)
+            DropBrd.Size = UDim2.new(1, 2, 1, 2)
+            DropBrd.Position = UDim2.new(0, -1, 0, -1)
+            DropBrd.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+            DropBrd.BorderSizePixel = 0
+            DropBrd.ZIndex = 199
 
-				local dropLayout = Instance.new("UIListLayout", Drop)
-				dropLayout.Padding = UDim.new(0, 1)
-				dropLayout.SortOrder = Enum.SortOrder.LayoutOrder
+            local DropInner = Instance.new("Frame", Drop)
+            DropInner.Size = UDim2.new(1, 0, 1, 0)
+            DropInner.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+            DropInner.BorderSizePixel = 0
+            DropInner.ClipsDescendants = true
+            DropInner.ZIndex = 200
 
-				local oBtns = {}
+            local dropLayout = Instance.new("UIListLayout", DropInner)
+            dropLayout.Padding = UDim.new(0, 1)
+            dropLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
-				local function refresh()
-					for _, o in ipairs(oBtns) do if o.btn and o.btn.Parent then o.btn:Destroy() end end
-					oBtns = {}
-					for idx, opt in ipairs(options) do
-						local B = Instance.new("TextButton", Drop)
-						B.Size = UDim2.new(1, 0, 0, 18)
-						B.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-						B.BorderSizePixel = 0
-						B.Text = "  " .. opt
-						B.TextXAlignment = Enum.TextXAlignment.Left
-						B.TextSize = 11
-						B.Font = Enum.Font.Gotham
-						B.ZIndex = 25
-						B.AutoButtonColor = false
-						B.LayoutOrder = idx
+            local oBtns = {}
 
-						local function uc()
-							if multi then
-								B.TextColor3 = (state[opt] == true) and accentColor or Color3.fromRGB(180, 180, 180)
-							else
-								B.TextColor3 = (state == opt) and accentColor or Color3.fromRGB(180, 180, 180)
-							end
-						end
-						uc()
+            local function refresh()
+                for _, o in ipairs(oBtns) do if o.btn and o.btn.Parent then o.btn:Destroy() end end
+                oBtns = {}
+                for idx, opt in ipairs(options) do
+                    local B = Instance.new("TextButton", DropInner)
+                    B.Size = UDim2.new(1, 0, 0, 18)
+                    B.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+                    B.BorderSizePixel = 0
+                    B.Text = "  " .. opt
+                    B.TextXAlignment = Enum.TextXAlignment.Left
+                    B.TextSize = 11
+                    B.Font = Enum.Font.Gotham
+                    B.ZIndex = 201
+                    B.AutoButtonColor = false
+                    B.LayoutOrder = idx
 
-						B.MouseEnter:Connect(function() B.BackgroundColor3 = Color3.fromRGB(22, 22, 22) end)
-						B.MouseLeave:Connect(function() B.BackgroundColor3 = Color3.fromRGB(15, 15, 15) end)
+                    local function uc()
+                        if multi then
+                            B.TextColor3 = (state[opt] == true) and accentColor or Color3.fromRGB(180, 180, 180)
+                        else
+                            B.TextColor3 = (state == opt) and accentColor or Color3.fromRGB(180, 180, 180)
+                        end
+                    end
+                    uc()
 
-						B.MouseButton1Click:Connect(function()
-							if multi then
-								state[opt] = not state[opt] or nil
-								if not state[opt] then state[opt] = nil end
-								Library.Flags[flag] = state
-								SelLbl.Text = getDsp()
-								for _, o2 in ipairs(oBtns) do o2.uc() end
-								cb(state)
-							else
-								state = opt
-								Library.Flags[flag] = state
-								SelLbl.Text = getDsp()
-								for _, o2 in ipairs(oBtns) do o2.uc() end
-								lOpen = false
-								tween(W, {Size = UDim2.new(1, 0, 0, 22)}, 0.15)
-								tween(Drop, {Size = UDim2.new(0.53, -4, 0, 0)}, 0.15)
-								Arrow.Text = "v"
-								cb(state)
-							end
-						end)
-						table.insert(oBtns, {btn = B, uc = uc})
-					end
-				end
-				refresh()
+                    B.MouseEnter:Connect(function() B.BackgroundColor3 = Color3.fromRGB(22, 22, 22) end)
+                    B.MouseLeave:Connect(function() B.BackgroundColor3 = Color3.fromRGB(15, 15, 15) end)
 
-				local SelBtn = Instance.new("TextButton", SelFrame)
-				SelBtn.Size = UDim2.new(1, 0, 1, 0)
-				SelBtn.BackgroundTransparency = 1
-				SelBtn.Text = ""
-				SelBtn.ZIndex = 24
+                    B.MouseButton1Click:Connect(function()
+                        if multi then
+                            state[opt] = not state[opt]
+                            if not state[opt] then state[opt] = nil end
+                            Library.Flags[flag] = state
+                            SelLbl.Text = getDsp()
+                            for _, o2 in ipairs(oBtns) do o2.uc() end
+                            cb(state)
+                        else
+                            state = opt
+                            Library.Flags[flag] = state
+                            SelLbl.Text = getDsp()
+                            for _, o2 in ipairs(oBtns) do o2.uc() end
+                            lOpen = false
+                            Drop.Visible = false
+                            Arrow.Text = "v"
+                            cb(state)
+                        end
+                    end)
+                    table.insert(oBtns, {btn = B, uc = uc})
+                end
+            end
+            refresh()
 
-				SelBtn.MouseButton1Click:Connect(function()
-					lOpen = not lOpen
-					local tH = #options * 19 + 2
-					if lOpen then
-						tween(W, {Size = UDim2.new(1, 0, 0, 22 + tH + 6)}, 0.15)
-						tween(Drop, {Size = UDim2.new(0.53, -4, 0, tH)}, 0.15)
-						Arrow.Text = "^"
-					else
-						tween(W, {Size = UDim2.new(1, 0, 0, 22)}, 0.15)
-						tween(Drop, {Size = UDim2.new(0.53, -4, 0, 0)}, 0.15)
-						Arrow.Text = "v"
-					end
-				end)
+            local SelBtn = Instance.new("TextButton", SelFrame)
+            SelBtn.Size = UDim2.new(1, 0, 1, 0)
+            SelBtn.BackgroundTransparency = 1
+            SelBtn.Text = ""
+            SelBtn.ZIndex = 24
 
-				local obj = {}
-				function obj:Set(v)
-					state = v
-					Library.Flags[flag] = v
-					SelLbl.Text = getDsp()
-					for _, o in ipairs(oBtns) do o.uc() end
-				end
-				function obj:Refresh(n)
-					options = n
-					if lOpen then
-						lOpen = false
-						W.Size = UDim2.new(1, 0, 0, 22)
-						Drop.Size = UDim2.new(0.53, -4, 0, 0)
-						Arrow.Text = "v"
-					end
-					refresh()
-					SelLbl.Text = getDsp()
-				end
-				function obj:Get() return state end
-				table.insert(Library._elements, {flag = flag, obj = obj})
-				return obj
-			end
+            SelBtn.MouseButton1Click:Connect(function()
+                lOpen = not lOpen
+                if lOpen then
+                    -- ✅ POSITION AT ABSOLUTE POSITION
+                    local absPos = SelFrame.AbsolutePosition
+                    local absSize = SelFrame.AbsoluteSize
+                    local tH = #options * 19 + 2
+                    
+                    Drop.Position = UDim2.fromOffset(absPos.X, absPos.Y + absSize.Y + 2)
+                    Drop.Size = UDim2.fromOffset(absSize.X, tH)
+                    Drop.Visible = true
+                    Arrow.Text = "^"
+                else
+                    Drop.Visible = false
+                    Arrow.Text = "v"
+                end
+            end)
+
+            -- ✅ CLOSE DROPDOWN WHEN CLICKING OUTSIDE
+            local closeConnection
+            closeConnection = UserInputService.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 and lOpen then
+                    local mousePos = UserInputService:GetMouseLocation()
+                    local dropPos = Drop.AbsolutePosition
+                    local dropSize = Drop.AbsoluteSize
+                    local selPos = SelFrame.AbsolutePosition
+                    local selSize = SelFrame.AbsoluteSize
+                    
+                    local inDrop = mousePos.X >= dropPos.X and mousePos.X <= dropPos.X + dropSize.X and
+                                mousePos.Y >= dropPos.Y and mousePos.Y <= dropPos.Y + dropSize.Y
+                    local inSel = mousePos.X >= selPos.X and mousePos.X <= selPos.X + selSize.X and
+                                mousePos.Y >= selPos.Y and mousePos.Y <= selPos.Y + selSize.Y
+                    
+                    if not inDrop and not inSel then
+                        lOpen = false
+                        Drop.Visible = false
+                        Arrow.Text = "v"
+                    end
+                end
+            end)
+
+            local obj = {}
+            function obj:Set(v)
+                state = v
+                Library.Flags[flag] = v
+                SelLbl.Text = getDsp()
+                for _, o in ipairs(oBtns) do o.uc() end
+            end
+            function obj:Refresh(n)
+                options = n
+                lOpen = false
+                Drop.Visible = false
+                Arrow.Text = "v"
+                refresh()
+                SelLbl.Text = getDsp()
+            end
+            function obj:Get() return state end
+            table.insert(Library._elements, {flag = flag, obj = obj})
+            return obj
+        end
 
 			function Section:Keybind(cfg3)
-				cfg3 = cfg3 or {}
-				local state = cfg3.State or Enum.KeyCode.Unknown
-				local mode = cfg3.Mode or "Toggle"
-				local flag = cfg3.Flag or cfg3.Name
-				local cb = cfg3.Callback or function() end
-				Library.Flags[flag] = state
+            cfg3 = cfg3 or {}
+            local state = cfg3.State or Enum.KeyCode.Unknown
+            local mode = cfg3.Mode or "Toggle"
+            local flag = cfg3.Flag or cfg3.Name
+            local cb = cfg3.Callback or function() end
+            Library.Flags[flag] = state
 
-				local kbEntry = {name = cfg3.Name or "Keybind", mode = mode, active = false, key = state}
-				table.insert(Library._keybindEntries, kbEntry)
+            local kbEntry = {name = cfg3.Name or "Keybind", mode = mode, active = false, key = state}
+            table.insert(Library._keybindEntries, kbEntry)
 
-				local mOpen = false
+            local mOpen = false
 
-				local W = Instance.new("Frame", SContent)
-				W.Size = UDim2.new(1, 0, 0, 22)
-				W.BackgroundTransparency = 1
-				W.ClipsDescendants = true
-				W.ZIndex = 20
+            local W = Instance.new("Frame", SContent)
+            W.Size = UDim2.new(1, 0, 0, 22)
+            W.BackgroundTransparency = 1
+            W.ClipsDescendants = false  --  CHANGED
+            W.ZIndex = 20
 
-				local Lbl = Instance.new("TextLabel", W)
-				Lbl.Size = UDim2.new(1, -70, 0, 22)
-				Lbl.Position = UDim2.new(0, 2, 0, 0)
-				Lbl.BackgroundTransparency = 1
-				Lbl.Text = cfg3.Name or "Keybind"
-				Lbl.TextColor3 = Color3.fromRGB(180, 180, 180)
-				Lbl.TextSize = 13
-				Lbl.Font = Enum.Font.Gotham
-				Lbl.TextXAlignment = Enum.TextXAlignment.Left
-				Lbl.ZIndex = 21
+            local Lbl = Instance.new("TextLabel", W)
+            Lbl.Size = UDim2.new(1, -70, 0, 22)
+            Lbl.Position = UDim2.new(0, 2, 0, 0)
+            Lbl.BackgroundTransparency = 1
+            Lbl.Text = cfg3.Name or "Keybind"
+            Lbl.TextColor3 = Color3.fromRGB(180, 180, 180)
+            Lbl.TextSize = 13
+            Lbl.Font = Enum.Font.Gotham
+            Lbl.TextXAlignment = Enum.TextXAlignment.Left
+            Lbl.ZIndex = 21
 
-				local KeyFrame = Instance.new("Frame", W)
-				KeyFrame.Size = UDim2.new(0, 55, 0, 16)
-				KeyFrame.Position = UDim2.new(1, -57, 0, 3)
-				KeyFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
-				KeyFrame.BorderSizePixel = 0
-				KeyFrame.ZIndex = 21
+            local KeyFrame = Instance.new("Frame", W)
+            KeyFrame.Size = UDim2.new(0, 55, 0, 16)
+            KeyFrame.Position = UDim2.new(1, -57, 0, 3)
+            KeyFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
+            KeyFrame.BorderSizePixel = 0
+            KeyFrame.ZIndex = 21
 
-				local KeyBrd = Instance.new("Frame", KeyFrame)
-				KeyBrd.Size = UDim2.new(1, 2, 1, 2)
-				KeyBrd.Position = UDim2.new(0, -1, 0, -1)
-				KeyBrd.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-				KeyBrd.BorderSizePixel = 0
-				KeyBrd.ZIndex = 20
+            local KeyBrd = Instance.new("Frame", KeyFrame)
+            KeyBrd.Size = UDim2.new(1, 2, 1, 2)
+            KeyBrd.Position = UDim2.new(0, -1, 0, -1)
+            KeyBrd.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+            KeyBrd.BorderSizePixel = 0
+            KeyBrd.ZIndex = 20
 
-				local KeyInner = Instance.new("Frame", KeyFrame)
-				KeyInner.Size = UDim2.new(1, -2, 1, -2)
-				KeyInner.Position = UDim2.new(0, 1, 0, 1)
-				KeyInner.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
-				KeyInner.BorderSizePixel = 0
-				KeyInner.ZIndex = 22
+            local KeyInner = Instance.new("Frame", KeyFrame)
+            KeyInner.Size = UDim2.new(1, -2, 1, -2)
+            KeyInner.Position = UDim2.new(0, 1, 0, 1)
+            KeyInner.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+            KeyInner.BorderSizePixel = 0
+            KeyInner.ZIndex = 22
 
-				local KeyLbl = Instance.new("TextLabel", KeyInner)
-				KeyLbl.Size = UDim2.new(1, 0, 1, 0)
-				KeyLbl.BackgroundTransparency = 1
-				KeyLbl.Text = gkn(state)
-				KeyLbl.TextColor3 = accentColor
-				KeyLbl.TextSize = 10
-				KeyLbl.Font = Enum.Font.Gotham
-				KeyLbl.ZIndex = 23
-				regAccent(KeyLbl, "TextColor3")
+            local KeyLbl = Instance.new("TextLabel", KeyInner)
+            KeyLbl.Size = UDim2.new(1, 0, 1, 0)
+            KeyLbl.BackgroundTransparency = 1
+            KeyLbl.Text = gkn(state)
+            KeyLbl.TextColor3 = accentColor
+            KeyLbl.TextSize = 10
+            KeyLbl.Font = Enum.Font.Gotham
+            KeyLbl.ZIndex = 23
+            regAccent(KeyLbl, "TextColor3")
 
-				local MDrop = Instance.new("Frame", W)
-				MDrop.Size = UDim2.new(0, 55, 0, 0)
-				MDrop.Position = UDim2.new(1, -57, 0, 24)
-				MDrop.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-				MDrop.BorderSizePixel = 0
-				MDrop.ClipsDescendants = true
-				MDrop.ZIndex = 26
+            -- ✅ MODE DROPDOWN PARENTED TO SCREENGUI
+            local MDrop = Instance.new("Frame")
+            MDrop.Name = "ModeDropdown"
+            MDrop.Size = UDim2.new(0, 55, 0, 0)
+            MDrop.Position = UDim2.new(0, 0, 0, 0)
+            MDrop.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+            MDrop.BorderSizePixel = 0
+            MDrop.ClipsDescendants = false
+            MDrop.Visible = false
+            MDrop.ZIndex = 200
+            MDrop.Parent = Library._screenGui  -- ✅ PARENT TO SCREENGUI
 
-				local MDropBrd = Instance.new("Frame", MDrop)
-				MDropBrd.Size = UDim2.new(1, 2, 1, 2)
-				MDropBrd.Position = UDim2.new(0, -1, 0, -1)
-				MDropBrd.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-				MDropBrd.BorderSizePixel = 0
-				MDropBrd.ZIndex = 25
+            local MDropBrd = Instance.new("Frame", MDrop)
+            MDropBrd.Size = UDim2.new(1, 2, 1, 2)
+            MDropBrd.Position = UDim2.new(0, -1, 0, -1)
+            MDropBrd.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+            MDropBrd.BorderSizePixel = 0
+            MDropBrd.ZIndex = 199
 
-				local mDropLayout = Instance.new("UIListLayout", MDrop)
-				mDropLayout.Padding = UDim.new(0, 1)
-				mDropLayout.SortOrder = Enum.SortOrder.LayoutOrder
+            local MDropInner = Instance.new("Frame", MDrop)
+            MDropInner.Size = UDim2.new(1, 0, 1, 0)
+            MDropInner.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+            MDropInner.BorderSizePixel = 0
+            MDropInner.ClipsDescendants = true
+            MDropInner.ZIndex = 200
 
-				local modes = {"Hold", "Toggle", "Always"}
-				local mBtns = {}
+            local mDropLayout = Instance.new("UIListLayout", MDropInner)
+            mDropLayout.Padding = UDim.new(0, 1)
+            mDropLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
-				for mIdx, m in ipairs(modes) do
-					local MB = Instance.new("TextButton", MDrop)
-					MB.Size = UDim2.new(1, 0, 0, 18)
-					MB.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-					MB.BorderSizePixel = 0
-					MB.Text = m
-					MB.TextSize = 10
-					MB.Font = Enum.Font.Gotham
-					MB.TextColor3 = (mode == m) and accentColor or Color3.fromRGB(180, 180, 180)
-					MB.ZIndex = 27
-					MB.AutoButtonColor = false
-					MB.LayoutOrder = mIdx
+            local modes = {"Hold", "Toggle", "Always"}
+            local mBtns = {}
 
-					MB.MouseEnter:Connect(function() MB.BackgroundColor3 = Color3.fromRGB(22, 22, 22) end)
-					MB.MouseLeave:Connect(function() MB.BackgroundColor3 = Color3.fromRGB(15, 15, 15) end)
+            for mIdx, m in ipairs(modes) do
+                local MB = Instance.new("TextButton", MDropInner)
+                MB.Size = UDim2.new(1, 0, 0, 18)
+                MB.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+                MB.BorderSizePixel = 0
+                MB.Text = m
+                MB.TextSize = 10
+                MB.Font = Enum.Font.Gotham
+                MB.TextColor3 = (mode == m) and accentColor or Color3.fromRGB(180, 180, 180)
+                MB.ZIndex = 201
+                MB.AutoButtonColor = false
+                MB.LayoutOrder = mIdx
 
-					MB.MouseButton1Click:Connect(function()
-						mode = m
-						kbEntry.mode = m
-						for _, mb in ipairs(mBtns) do
-							mb.btn.TextColor3 = (mode == mb.n) and accentColor or Color3.fromRGB(180, 180, 180)
-						end
-						mOpen = false
-						tween(W, {Size = UDim2.new(1, 0, 0, 22)}, 0.15)
-						tween(MDrop, {Size = UDim2.new(0, 55, 0, 0)}, 0.15)
-						refreshKeybindPanel()
-					end)
-					table.insert(mBtns, {btn = MB, n = m})
-				end
+                MB.MouseEnter:Connect(function() MB.BackgroundColor3 = Color3.fromRGB(22, 22, 22) end)
+                MB.MouseLeave:Connect(function() MB.BackgroundColor3 = Color3.fromRGB(15, 15, 15) end)
 
-				local listening = false
-				local toggled = false
+                MB.MouseButton1Click:Connect(function()
+                    mode = m
+                    kbEntry.mode = m
+                    for _, mb in ipairs(mBtns) do
+                        mb.btn.TextColor3 = (mode == mb.n) and accentColor or Color3.fromRGB(180, 180, 180)
+                    end
+                    mOpen = false
+                    MDrop.Visible = false
+                    refreshKeybindPanel()
+                end)
+                table.insert(mBtns, {btn = MB, n = m})
+            end
 
-				local KBtn = Instance.new("TextButton", KeyFrame)
-				KBtn.Size = UDim2.new(1, 0, 1, 0)
-				KBtn.BackgroundTransparency = 1
-				KBtn.Text = ""
-				KBtn.ZIndex = 24
+            local listening = false
+            local toggled = false
 
-				KBtn.MouseButton1Click:Connect(function()
-					listening = true
-					KeyLbl.Text = "..."
-					KeyLbl.TextColor3 = Color3.fromRGB(255, 200, 100)
-				end)
+            local KBtn = Instance.new("TextButton", KeyFrame)
+            KBtn.Size = UDim2.new(1, 0, 1, 0)
+            KBtn.BackgroundTransparency = 1
+            KBtn.Text = ""
+            KBtn.ZIndex = 24
 
-				KBtn.MouseButton2Click:Connect(function()
-					mOpen = not mOpen
-					local tH = #modes * 19 + 2
-					if mOpen then
-						tween(W, {Size = UDim2.new(1, 0, 0, 22 + tH + 4)}, 0.15)
-						tween(MDrop, {Size = UDim2.new(0, 55, 0, tH)}, 0.15)
-					else
-						tween(W, {Size = UDim2.new(1, 0, 0, 22)}, 0.15)
-						tween(MDrop, {Size = UDim2.new(0, 55, 0, 0)}, 0.15)
-					end
-				end)
+            KBtn.MouseButton1Click:Connect(function()
+                listening = true
+                KeyLbl.Text = "..."
+                KeyLbl.TextColor3 = Color3.fromRGB(255, 200, 100)
+            end)
 
-				UserInputService.InputBegan:Connect(function(i, gpe)
-					if listening then
-						state = i.UserInputType == Enum.UserInputType.Keyboard and i.KeyCode or i.UserInputType
-						Library.Flags[flag] = state
-						kbEntry.key = state
-						KeyLbl.Text = gkn(state)
-						KeyLbl.TextColor3 = accentColor
-						listening = false
-						refreshKeybindPanel()
-					elseif not gpe then
-						local ik = i.KeyCode ~= Enum.KeyCode.Unknown and i.KeyCode or i.UserInputType
-						if ik == state then
-							if mode == "Toggle" then
-								toggled = not toggled
-								kbEntry.active = toggled
-								refreshKeybindPanel()
-								cb(toggled)
-							elseif mode == "Hold" then
-								kbEntry.active = true
-								refreshKeybindPanel()
-								cb(true)
-							end
-						end
-					end
-				end)
+            KBtn.MouseButton2Click:Connect(function()
+                mOpen = not mOpen
+                if mOpen then
+                    -- ✅ POSITION AT ABSOLUTE POSITION
+                    local absPos = KeyFrame.AbsolutePosition
+                    local absSize = KeyFrame.AbsoluteSize
+                    local tH = #modes * 19 + 2
+                    
+                    MDrop.Position = UDim2.fromOffset(absPos.X, absPos.Y + absSize.Y + 2)
+                    MDrop.Size = UDim2.fromOffset(absSize.X, tH)
+                    MDrop.Visible = true
+                else
+                    MDrop.Visible = false
+                end
+            end)
 
-				UserInputService.InputEnded:Connect(function(i)
-					if mode == "Hold" and not listening then
-						local ik = i.KeyCode ~= Enum.KeyCode.Unknown and i.KeyCode or i.UserInputType
-						if ik == state then
-							kbEntry.active = false
-							refreshKeybindPanel()
-							cb(false)
-						end
-					end
-				end)
+            -- ✅ CLOSE MODE DROPDOWN WHEN CLICKING OUTSIDE
+            UserInputService.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 and mOpen then
+                    local mousePos = UserInputService:GetMouseLocation()
+                    local dropPos = MDrop.AbsolutePosition
+                    local dropSize = MDrop.AbsoluteSize
+                    local keyPos = KeyFrame.AbsolutePosition
+                    local keySize = KeyFrame.AbsoluteSize
+                    
+                    local inDrop = mousePos.X >= dropPos.X and mousePos.X <= dropPos.X + dropSize.X and
+                                mousePos.Y >= dropPos.Y and mousePos.Y <= dropPos.Y + dropSize.Y
+                    local inKey = mousePos.X >= keyPos.X and mousePos.X <= keyPos.X + keySize.X and
+                                mousePos.Y >= keyPos.Y and mousePos.Y <= keyPos.Y + keySize.Y
+                    
+                    if not inDrop and not inKey then
+                        mOpen = false
+                        MDrop.Visible = false
+                    end
+                end
+            end)
 
-				task.spawn(function()
-					local aa = false
-					while true do
-						task.wait(0.1)
-						if mode == "Always" and not aa then
-							aa = true
-							kbEntry.active = true
-							refreshKeybindPanel()
-							cb(true)
-						elseif mode ~= "Always" and aa then
-							aa = false
-							kbEntry.active = false
-							refreshKeybindPanel()
-							cb(false)
-						end
-					end
-				end)
+            UserInputService.InputBegan:Connect(function(i, gpe)
+                if listening then
+                    state = i.UserInputType == Enum.UserInputType.Keyboard and i.KeyCode or i.UserInputType
+                    Library.Flags[flag] = state
+                    kbEntry.key = state
+                    KeyLbl.Text = gkn(state)
+                    KeyLbl.TextColor3 = accentColor
+                    listening = false
+                    refreshKeybindPanel()
+                elseif not gpe then
+                    local ik = i.KeyCode ~= Enum.KeyCode.Unknown and i.KeyCode or i.UserInputType
+                    if ik == state then
+                        if mode == "Toggle" then
+                            toggled = not toggled
+                            kbEntry.active = toggled
+                            refreshKeybindPanel()
+                            cb(toggled)
+                        elseif mode == "Hold" then
+                            kbEntry.active = true
+                            refreshKeybindPanel()
+                            cb(true)
+                        end
+                    end
+                end
+            end)
 
-				local obj = {}
-				function obj:Set(k) state = k; Library.Flags[flag] = k; kbEntry.key = k; KeyLbl.Text = gkn(k); refreshKeybindPanel() end
-				function obj:Get() return state end
-				table.insert(Library._elements, {flag = flag, obj = obj})
-				return obj
-			end
+            UserInputService.InputEnded:Connect(function(i)
+                if mode == "Hold" and not listening then
+                    local ik = i.KeyCode ~= Enum.KeyCode.Unknown and i.KeyCode or i.UserInputType
+                    if ik == state then
+                        kbEntry.active = false
+                        refreshKeybindPanel()
+                        cb(false)
+                    end
+                end
+            end)
+
+            task.spawn(function()
+                local aa = false
+                while true do
+                    task.wait(0.1)
+                    if mode == "Always" and not aa then
+                        aa = true
+                        kbEntry.active = true
+                        refreshKeybindPanel()
+                        cb(true)
+                    elseif mode ~= "Always" and aa then
+                        aa = false
+                        kbEntry.active = false
+                        refreshKeybindPanel()
+                        cb(false)
+                    end
+                end
+            end)
+
+            local obj = {}
+            function obj:Set(k) state = k; Library.Flags[flag] = k; kbEntry.key = k; KeyLbl.Text = gkn(k); refreshKeybindPanel() end
+            function obj:Get() return state end
+            table.insert(Library._elements, {flag = flag, obj = obj})
+            return obj
+        end
 
 			function Section:Colorpicker(cfg3)
 				cfg3 = cfg3 or {}
