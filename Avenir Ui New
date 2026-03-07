@@ -3,6 +3,7 @@ local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local Stats = game:GetService("Stats")
+local HttpService = game:GetService("HttpService")
 
 local player = Players.LocalPlayer
 local mouse = player:GetMouse()
@@ -14,6 +15,8 @@ Library._watermark = nil
 Library._keybindPanel = nil
 Library._screenGui = nil
 Library._executionStart = tick()
+Library._project = "Default"
+Library._elements = {}
 
 local function tween(obj, props, dur)
 	TweenService:Create(obj, TweenInfo.new(dur or 0.2, Enum.EasingStyle.Quad), props):Play()
@@ -52,7 +55,16 @@ local function gkn(k)
 	local s = tostring(k)
 	if s:find("MouseButton1") then return "MB1" elseif s:find("MouseButton2") then return "MB2"
 	elseif s:find("MouseButton3") then return "MB3" end
-	return s:gsub("Enum.KeyCode.",""):gsub("Enum.UserInputType.","")
+	return s:gsub("Enum.KeyCode.", ""):gsub("Enum.UserInputType.", "")
+end
+
+local function ensureFolder()
+	pcall(function()
+		if not isfolder("AvenirCC") then makefolder("AvenirCC") end
+		if not isfolder("AvenirCC/" .. Library._project) then makefolder("AvenirCC/" .. Library._project) end
+		if not isfolder("AvenirCC/" .. Library._project .. "/configs") then makefolder("AvenirCC/" .. Library._project .. "/configs") end
+		if not isfolder("AvenirCC/" .. Library._project .. "/settings") then makefolder("AvenirCC/" .. Library._project .. "/settings") end
+	end)
 end
 
 local function refreshKeybindPanel()
@@ -73,7 +85,7 @@ local function refreshKeybindPanel()
 			row.Size = UDim2.new(1, 0, 0, 20)
 			row.Position = UDim2.new(0, 0, 0, idx * 24)
 			row.BackgroundTransparency = 1
-			row.ZIndex = 2
+			row.ZIndex = 102
 			row.Parent = kbContainer
 
 			local nl = Instance.new("TextLabel")
@@ -84,7 +96,7 @@ local function refreshKeybindPanel()
 			nl.TextSize = 13
 			nl.Font = Enum.Font.Gotham
 			nl.TextXAlignment = Enum.TextXAlignment.Left
-			nl.ZIndex = 2
+			nl.ZIndex = 102
 			nl.Parent = row
 
 			local ml = Instance.new("TextLabel")
@@ -96,7 +108,7 @@ local function refreshKeybindPanel()
 			ml.TextSize = 11
 			ml.Font = Enum.Font.Gotham
 			ml.TextXAlignment = Enum.TextXAlignment.Right
-			ml.ZIndex = 2
+			ml.ZIndex = 102
 			ml.Parent = row
 
 			idx = idx + 1
@@ -108,16 +120,141 @@ local function refreshKeybindPanel()
 	Library._keybindPanel.Size = UDim2.new(0, 200, 0, panelH)
 end
 
+function Library:SetProject(name)
+	Library._project = name or "Default"
+	ensureFolder()
+end
+
+function Library:SaveConfig(name)
+	if not name or name == "" then return end
+	ensureFolder()
+	local data = {}
+	for k, v in pairs(Library.Flags) do
+		if type(v) == "boolean" or type(v) == "number" or type(v) == "string" then
+			data[k] = {t = type(v), v = v}
+		elseif typeof(v) == "Color3" then
+			data[k] = {t = "Color3", v = {v.R, v.G, v.B}}
+		elseif typeof(v) == "EnumItem" then
+			data[k] = {t = "EnumItem", v = tostring(v)}
+		elseif type(v) == "table" then
+			data[k] = {t = "table", v = v}
+		end
+	end
+	pcall(function()
+		writefile("AvenirCC/" .. Library._project .. "/configs/" .. name .. ".json", HttpService:JSONEncode(data))
+	end)
+end
+
+function Library:LoadConfig(name)
+	if not name or name == "" then return end
+	ensureFolder()
+	local success, content = pcall(function()
+		return readfile("AvenirCC/" .. Library._project .. "/configs/" .. name .. ".json")
+	end)
+	if not success then return end
+	local ok, data = pcall(function()
+		return HttpService:JSONDecode(content)
+	end)
+	if not ok then return end
+	for k, info in pairs(data) do
+		if info.t == "boolean" then
+			Library.Flags[k] = info.v
+		elseif info.t == "number" then
+			Library.Flags[k] = info.v
+		elseif info.t == "string" then
+			Library.Flags[k] = info.v
+		elseif info.t == "Color3" then
+			Library.Flags[k] = Color3.new(info.v[1], info.v[2], info.v[3])
+		elseif info.t == "EnumItem" then
+			Library.Flags[k] = info.v
+		elseif info.t == "table" then
+			Library.Flags[k] = info.v
+		end
+	end
+	for _, el in pairs(Library._elements) do
+		if el.flag and el.obj and el.obj.Set then
+			local val = Library.Flags[el.flag]
+			if val ~= nil then
+				pcall(function() el.obj:Set(val) end)
+			end
+		end
+	end
+end
+
+function Library:DeleteConfig(name)
+	if not name or name == "" then return end
+	pcall(function()
+		delfile("AvenirCC/" .. Library._project .. "/configs/" .. name .. ".json")
+	end)
+end
+
+function Library:GetConfigs()
+	ensureFolder()
+	local configs = {}
+	pcall(function()
+		local files = listfiles("AvenirCC/" .. Library._project .. "/configs")
+		for _, f in ipairs(files) do
+			local n = f:match("([^/\\]+)%.json$")
+			if n then table.insert(configs, n) end
+		end
+	end)
+	return configs
+end
+
+function Library:SetAutoLoad(name)
+	ensureFolder()
+	pcall(function()
+		writefile("AvenirCC/" .. Library._project .. "/settings/autoload.txt", name or "")
+	end)
+end
+
+function Library:GetAutoLoad()
+	ensureFolder()
+	local name = ""
+	pcall(function()
+		name = readfile("AvenirCC/" .. Library._project .. "/settings/autoload.txt")
+	end)
+	return name
+end
+
+function Library:RemoveAutoLoad()
+	pcall(function()
+		delfile("AvenirCC/" .. Library._project .. "/settings/autoload.txt")
+	end)
+end
+
 function Library:CreateWindow(config)
 	config = config or {}
 	local Window = {}
 	Window.Tabs = {}
+	Window._accentElements = {}
+
+	local accentColor = Color3.fromRGB(100, 180, 255)
 
 	local ScreenGui = Instance.new("ScreenGui")
 	ScreenGui.Name = "Avenir"
 	ScreenGui.ResetOnSpawn = false
 	ScreenGui.Parent = player:WaitForChild("PlayerGui")
 	Library._screenGui = ScreenGui
+
+	local function setAccent(col)
+		accentColor = col
+		for _, info in ipairs(Window._accentElements) do
+			pcall(function()
+				if info.prop == "BackgroundColor3" then
+					info.obj.BackgroundColor3 = col
+				elseif info.prop == "TextColor3" then
+					info.obj.TextColor3 = col
+				elseif info.prop == "ScrollBarImageColor3" then
+					info.obj.ScrollBarImageColor3 = col
+				end
+			end)
+		end
+	end
+
+	local function regAccent(obj, prop)
+		table.insert(Window._accentElements, {obj = obj, prop = prop})
+	end
 
 	local WatermarkFrame = Instance.new("Frame")
 	WatermarkFrame.Name = "Watermark"
@@ -154,9 +291,10 @@ function Library:CreateWindow(config)
 	local WMAccentLine = Instance.new("Frame", WatermarkFrame)
 	WMAccentLine.Size = UDim2.new(1, -6, 0, 2)
 	WMAccentLine.Position = UDim2.new(0, 3, 0, 3)
-	WMAccentLine.BackgroundColor3 = Color3.fromRGB(100, 180, 255)
+	WMAccentLine.BackgroundColor3 = accentColor
 	WMAccentLine.BorderSizePixel = 0
 	WMAccentLine.ZIndex = 102
+	regAccent(WMAccentLine, "BackgroundColor3")
 
 	local WMInnerPanel = Instance.new("Frame", WatermarkFrame)
 	WMInnerPanel.Size = UDim2.new(1, -6, 1, -8)
@@ -188,7 +326,9 @@ function Library:CreateWindow(config)
 	RunService.RenderStepped:Connect(function()
 		local uptime = tick() - Library._executionStart
 		local ping = getPing()
-		WatermarkText.Text = string.format("Avenir | FPS: %d | Ping: %dms | %s", fpsValue, ping, formatTime(uptime))
+		if WatermarkText and WatermarkText.Parent then
+			WatermarkText.Text = string.format("Avenir | FPS: %d | Ping: %dms | %s", fpsValue, ping, formatTime(uptime))
+		end
 	end)
 
 	local KeybindsPanel = Instance.new("Frame")
@@ -227,9 +367,10 @@ function Library:CreateWindow(config)
 	local KBAccentLine = Instance.new("Frame", KeybindsPanel)
 	KBAccentLine.Size = UDim2.new(1, -6, 0, 2)
 	KBAccentLine.Position = UDim2.new(0, 3, 0, 3)
-	KBAccentLine.BackgroundColor3 = Color3.fromRGB(100, 180, 255)
+	KBAccentLine.BackgroundColor3 = accentColor
 	KBAccentLine.BorderSizePixel = 0
 	KBAccentLine.ZIndex = 102
+	regAccent(KBAccentLine, "BackgroundColor3")
 
 	local KBInnerPanel = Instance.new("Frame", KeybindsPanel)
 	KBInnerPanel.Name = "KBInnerPanel"
@@ -251,17 +392,18 @@ function Library:CreateWindow(config)
 	KBAvenirTitle.Position = UDim2.new(0, 8, 0, 8)
 	KBAvenirTitle.BackgroundTransparency = 1
 	KBAvenirTitle.Text = "Avenir"
-	KBAvenirTitle.TextColor3 = Color3.fromRGB(100, 180, 255)
+	KBAvenirTitle.TextColor3 = accentColor
 	KBAvenirTitle.TextSize = 14
 	KBAvenirTitle.Font = Enum.Font.GothamBold
 	KBAvenirTitle.TextXAlignment = Enum.TextXAlignment.Left
 	KBAvenirTitle.ZIndex = 102
+	regAccent(KBAvenirTitle, "TextColor3")
 
 	local KBTitle = Instance.new("TextLabel", KBInnerPanel)
 	KBTitle.Size = UDim2.new(1, -60, 0, 20)
-	KBTitle.Position = UDim2.new(0, 50, 0, 8)
+	KBTitle.Position = UDim2.new(0, 55, 0, 8)
 	KBTitle.BackgroundTransparency = 1
-	KBTitle.Text = "| KEYBINDS LIST"
+	KBTitle.Text = " | KEYBINDS LIST"
 	KBTitle.TextColor3 = Color3.fromRGB(180, 180, 180)
 	KBTitle.TextSize = 14
 	KBTitle.Font = Enum.Font.GothamBold
@@ -299,9 +441,10 @@ function Library:CreateWindow(config)
 	local AccentLine = Instance.new("Frame", MainPanel)
 	AccentLine.Size = UDim2.new(1, -4, 0, 2)
 	AccentLine.Position = UDim2.new(0, 2, 0, 2)
-	AccentLine.BackgroundColor3 = Color3.fromRGB(100, 180, 255)
+	AccentLine.BackgroundColor3 = accentColor
 	AccentLine.BorderSizePixel = 0
 	AccentLine.ZIndex = 2
+	regAccent(AccentLine, "BackgroundColor3")
 
 	local InnerPanel = Instance.new("Frame", MainPanel)
 	InnerPanel.Size = UDim2.new(1, -4, 1, -6)
@@ -348,33 +491,23 @@ function Library:CreateWindow(config)
 	TitleLabel.Position = UDim2.new(0, 8, 0, 4)
 	TitleLabel.BackgroundTransparency = 1
 	TitleLabel.Text = "Avenir"
-	TitleLabel.TextColor3 = Color3.fromRGB(100, 180, 255)
+	TitleLabel.TextColor3 = accentColor
 	TitleLabel.TextSize = 16
 	TitleLabel.Font = Enum.Font.GothamBold
 	TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 	TitleLabel.ZIndex = 3
+	regAccent(TitleLabel, "TextColor3")
 
 	local SubTitle = Instance.new("TextLabel", InnerPanel)
 	SubTitle.Size = UDim2.new(0, 200, 0, 20)
-	SubTitle.Position = UDim2.new(0, 60, 0, 4)
+	SubTitle.Position = UDim2.new(0, 65, 0, 4)
 	SubTitle.BackgroundTransparency = 1
-	SubTitle.Text = "| " .. (config.SubTitle or "CHEAT ENGINE")
+	SubTitle.Text = " | " .. (config.SubTitle or "CHEAT ENGINE")
 	SubTitle.TextColor3 = Color3.fromRGB(180, 180, 180)
 	SubTitle.TextSize = 14
 	SubTitle.Font = Enum.Font.GothamBold
 	SubTitle.TextXAlignment = Enum.TextXAlignment.Left
 	SubTitle.ZIndex = 3
-
-	local VersionLabel = Instance.new("TextLabel", InnerPanel)
-	VersionLabel.Size = UDim2.new(0, 72, 0, 16)
-	VersionLabel.Position = UDim2.new(1, -78, 0, 6)
-	VersionLabel.BackgroundTransparency = 1
-	VersionLabel.Text = "v1.0"
-	VersionLabel.TextColor3 = Color3.fromRGB(100, 180, 255)
-	VersionLabel.TextSize = 12
-	VersionLabel.Font = Enum.Font.Gotham
-	VersionLabel.TextXAlignment = Enum.TextXAlignment.Right
-	VersionLabel.ZIndex = 3
 
 	local TabBarBG = Instance.new("Frame", InnerPanel)
 	TabBarBG.Size = UDim2.new(1, -16, 0, 24)
@@ -416,6 +549,20 @@ function Library:CreateWindow(config)
 	ContentBorder.ZIndex = 1
 
 	local uiVisible = true
+
+	function Window:SetVisible(v)
+		uiVisible = v
+		MainPanel.Visible = v
+	end
+
+	function Window:Toggle()
+		uiVisible = not uiVisible
+		MainPanel.Visible = uiVisible
+	end
+
+	function Window:SetAccent(col)
+		setAccent(col)
+	end
 
 	function Window:Tab(cfg)
 		cfg = cfg or {}
@@ -472,7 +619,7 @@ function Library:CreateWindow(config)
 			if lH > LeftColumn.AbsoluteSize.Y then
 				LeftColumn.ScrollBarThickness = 2
 				LeftColumn.ScrollBarImageTransparency = 0
-				LeftColumn.ScrollBarImageColor3 = Color3.fromRGB(100, 180, 255)
+				LeftColumn.ScrollBarImageColor3 = accentColor
 			else
 				LeftColumn.ScrollBarThickness = 0
 				LeftColumn.ScrollBarImageTransparency = 1
@@ -480,7 +627,7 @@ function Library:CreateWindow(config)
 			if rH > RightColumn.AbsoluteSize.Y then
 				RightColumn.ScrollBarThickness = 2
 				RightColumn.ScrollBarImageTransparency = 0
-				RightColumn.ScrollBarImageColor3 = Color3.fromRGB(100, 180, 255)
+				RightColumn.ScrollBarImageColor3 = accentColor
 			else
 				RightColumn.ScrollBarThickness = 0
 				RightColumn.ScrollBarImageTransparency = 1
@@ -496,7 +643,7 @@ function Library:CreateWindow(config)
 				t.Button.TextColor3 = Color3.fromRGB(180, 180, 180)
 				t.Page.Visible = false
 			end
-			TabButton.BackgroundColor3 = Color3.fromRGB(100, 180, 255)
+			TabButton.BackgroundColor3 = accentColor
 			TabButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 			TabPage.Visible = true
 			task.defer(updateScroll)
@@ -542,9 +689,10 @@ function Library:CreateWindow(config)
 			local SAcc = Instance.new("Frame", AccClip)
 			SAcc.Size = UDim2.new(1, -4, 0, 2)
 			SAcc.Position = UDim2.new(0, 2, 0, 2)
-			SAcc.BackgroundColor3 = Color3.fromRGB(100, 180, 255)
+			SAcc.BackgroundColor3 = accentColor
 			SAcc.BorderSizePixel = 0
 			SAcc.ZIndex = 14
+			regAccent(SAcc, "BackgroundColor3")
 
 			local SInner = Instance.new("Frame", SectionFrame)
 			SInner.Size = UDim2.new(1, -4, 1, -6)
@@ -608,14 +756,14 @@ function Library:CreateWindow(config)
 				local Check = Instance.new("Frame", F)
 				Check.Size = UDim2.new(0, 12, 0, 12)
 				Check.Position = UDim2.new(0, 2, 0.5, -6)
-				Check.BackgroundColor3 = state and Color3.fromRGB(100, 180, 255) or Color3.fromRGB(18, 18, 18)
+				Check.BackgroundColor3 = state and accentColor or Color3.fromRGB(18, 18, 18)
 				Check.BorderSizePixel = 0
 				Check.ZIndex = 14
 
 				local CheckBrd = Instance.new("Frame", Check)
 				CheckBrd.Size = UDim2.new(1, 2, 1, 2)
 				CheckBrd.Position = UDim2.new(0, -1, 0, -1)
-				CheckBrd.BackgroundColor3 = state and Color3.fromRGB(100, 180, 255) or Color3.fromRGB(45, 45, 45)
+				CheckBrd.BackgroundColor3 = state and accentColor or Color3.fromRGB(45, 45, 45)
 				CheckBrd.BorderSizePixel = 0
 				CheckBrd.ZIndex = 13
 
@@ -631,8 +779,8 @@ function Library:CreateWindow(config)
 				Lbl.ZIndex = 14
 
 				local function upd()
-					tween(Check, {BackgroundColor3 = state and Color3.fromRGB(100, 180, 255) or Color3.fromRGB(18, 18, 18)}, 0.15)
-					tween(CheckBrd, {BackgroundColor3 = state and Color3.fromRGB(100, 180, 255) or Color3.fromRGB(45, 45, 45)}, 0.15)
+					tween(Check, {BackgroundColor3 = state and accentColor or Color3.fromRGB(18, 18, 18)}, 0.15)
+					tween(CheckBrd, {BackgroundColor3 = state and accentColor or Color3.fromRGB(45, 45, 45)}, 0.15)
 					tween(Lbl, {TextColor3 = state and Color3.fromRGB(220, 220, 220) or Color3.fromRGB(180, 180, 180)}, 0.15)
 				end
 
@@ -651,6 +799,7 @@ function Library:CreateWindow(config)
 				local obj = {}
 				function obj:Set(v) state = v; Library.Flags[flag] = v; upd(); cb(v) end
 				function obj:Get() return state end
+				table.insert(Library._elements, {flag = flag, obj = obj})
 				return obj
 			end
 
@@ -665,13 +814,13 @@ function Library:CreateWindow(config)
 				Library.Flags[flag] = state
 
 				local W = Instance.new("Frame", SContent)
-				W.Size = UDim2.new(1, 0, 0, 34)
+				W.Size = UDim2.new(1, 0, 0, 30)
 				W.BackgroundTransparency = 1
 				W.ClipsDescendants = true
 				W.ZIndex = 12
 
 				local Lbl = Instance.new("TextLabel", W)
-				Lbl.Size = UDim2.new(1, -60, 0, 16)
+				Lbl.Size = UDim2.new(1, -60, 0, 14)
 				Lbl.Position = UDim2.new(0, 2, 0, 0)
 				Lbl.BackgroundTransparency = 1
 				Lbl.Text = cfg3.Name or "Slider"
@@ -682,18 +831,19 @@ function Library:CreateWindow(config)
 				Lbl.ZIndex = 13
 
 				local Val = Instance.new("TextLabel", W)
-				Val.Size = UDim2.new(0, 55, 0, 16)
+				Val.Size = UDim2.new(0, 55, 0, 14)
 				Val.Position = UDim2.new(1, -57, 0, 0)
 				Val.BackgroundTransparency = 1
-				Val.TextColor3 = Color3.fromRGB(100, 180, 255)
+				Val.TextColor3 = accentColor
 				Val.TextSize = 13
 				Val.Font = Enum.Font.Gotham
 				Val.TextXAlignment = Enum.TextXAlignment.Right
 				Val.ZIndex = 13
+				regAccent(Val, "TextColor3")
 
 				local BarFrame = Instance.new("Frame", W)
-				BarFrame.Size = UDim2.new(1, -4, 0, 14)
-				BarFrame.Position = UDim2.new(0, 2, 0, 18)
+				BarFrame.Size = UDim2.new(1, -4, 0, 12)
+				BarFrame.Position = UDim2.new(0, 2, 0, 16)
 				BarFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
 				BarFrame.BorderSizePixel = 0
 				BarFrame.ZIndex = 13
@@ -707,13 +857,14 @@ function Library:CreateWindow(config)
 
 				local BarFill = Instance.new("Frame", BarFrame)
 				BarFill.Size = UDim2.new(math.clamp((state - min) / (max - min), 0, 1), 0, 1, 0)
-				BarFill.BackgroundColor3 = Color3.fromRGB(100, 180, 255)
+				BarFill.BackgroundColor3 = accentColor
 				BarFill.BorderSizePixel = 0
 				BarFill.ZIndex = 14
+				regAccent(BarFill, "BackgroundColor3")
 
 				local TypeFrame = Instance.new("Frame", W)
 				TypeFrame.Size = UDim2.new(1, -4, 0, 18)
-				TypeFrame.Position = UDim2.new(0, 2, 0, 36)
+				TypeFrame.Position = UDim2.new(0, 2, 0, 32)
 				TypeFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
 				TypeFrame.BorderSizePixel = 0
 				TypeFrame.ZIndex = 13
@@ -780,10 +931,10 @@ function Library:CreateWindow(config)
 				SClick.MouseButton2Click:Connect(function()
 					typeOpen = not typeOpen
 					if typeOpen then
-						tween(W, {Size = UDim2.new(1, 0, 0, 58)}, 0.15)
+						tween(W, {Size = UDim2.new(1, 0, 0, 54)}, 0.15)
 						task.defer(function() TypeBox:CaptureFocus() end)
 					else
-						tween(W, {Size = UDim2.new(1, 0, 0, 34)}, 0.15)
+						tween(W, {Size = UDim2.new(1, 0, 0, 30)}, 0.15)
 					end
 				end)
 
@@ -791,7 +942,7 @@ function Library:CreateWindow(config)
 					if enter then local n = tonumber(TypeBox.Text); if n then setV(n) end end
 					TypeBox.Text = ""
 					typeOpen = false
-					tween(W, {Size = UDim2.new(1, 0, 0, 34)}, 0.15)
+					tween(W, {Size = UDim2.new(1, 0, 0, 30)}, 0.15)
 				end)
 
 				UserInputService.InputEnded:Connect(function(i)
@@ -810,6 +961,7 @@ function Library:CreateWindow(config)
 				local obj = {}
 				function obj:Set(v) setV(v) end
 				function obj:Get() return state end
+				table.insert(Library._elements, {flag = flag, obj = obj})
 				return obj
 			end
 
@@ -823,11 +975,13 @@ function Library:CreateWindow(config)
 				if multi and type(state) == "string" then state = {[state] = true} end
 				Library.Flags[flag] = state
 
+				local lOpen = false
+
 				local W = Instance.new("Frame", SContent)
 				W.Size = UDim2.new(1, 0, 0, 22)
 				W.BackgroundTransparency = 1
 				W.ClipsDescendants = true
-				W.ZIndex = 12
+				W.ZIndex = 20
 
 				local Lbl = Instance.new("TextLabel", W)
 				Lbl.Size = UDim2.new(0.45, 0, 0, 22)
@@ -838,28 +992,28 @@ function Library:CreateWindow(config)
 				Lbl.TextSize = 13
 				Lbl.Font = Enum.Font.Gotham
 				Lbl.TextXAlignment = Enum.TextXAlignment.Left
-				Lbl.ZIndex = 13
+				Lbl.ZIndex = 21
 
 				local SelFrame = Instance.new("Frame", W)
 				SelFrame.Size = UDim2.new(0.53, -4, 0, 16)
 				SelFrame.Position = UDim2.new(0.47, 0, 0, 3)
 				SelFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
 				SelFrame.BorderSizePixel = 0
-				SelFrame.ZIndex = 13
+				SelFrame.ZIndex = 21
 
 				local SelBrd = Instance.new("Frame", SelFrame)
 				SelBrd.Size = UDim2.new(1, 2, 1, 2)
 				SelBrd.Position = UDim2.new(0, -1, 0, -1)
 				SelBrd.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 				SelBrd.BorderSizePixel = 0
-				SelBrd.ZIndex = 12
+				SelBrd.ZIndex = 20
 
 				local SelInner = Instance.new("Frame", SelFrame)
 				SelInner.Size = UDim2.new(1, -2, 1, -2)
 				SelInner.Position = UDim2.new(0, 1, 0, 1)
 				SelInner.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
 				SelInner.BorderSizePixel = 0
-				SelInner.ZIndex = 14
+				SelInner.ZIndex = 22
 
 				local function getDsp()
 					if multi then
@@ -874,11 +1028,12 @@ function Library:CreateWindow(config)
 				SelLbl.Position = UDim2.new(0, 4, 0, 0)
 				SelLbl.BackgroundTransparency = 1
 				SelLbl.Text = getDsp()
-				SelLbl.TextColor3 = Color3.fromRGB(100, 180, 255)
+				SelLbl.TextColor3 = accentColor
 				SelLbl.TextSize = 11
 				SelLbl.Font = Enum.Font.Gotham
 				SelLbl.TextTruncate = Enum.TextTruncate.AtEnd
-				SelLbl.ZIndex = 15
+				SelLbl.ZIndex = 23
+				regAccent(SelLbl, "TextColor3")
 
 				local Arrow = Instance.new("TextLabel", SelInner)
 				Arrow.Size = UDim2.new(0, 10, 1, 0)
@@ -888,7 +1043,7 @@ function Library:CreateWindow(config)
 				Arrow.TextColor3 = Color3.fromRGB(100, 100, 100)
 				Arrow.TextSize = 10
 				Arrow.Font = Enum.Font.GothamBold
-				Arrow.ZIndex = 15
+				Arrow.ZIndex = 23
 
 				local Drop = Instance.new("Frame", W)
 				Drop.Size = UDim2.new(0.53, -4, 0, 0)
@@ -896,25 +1051,25 @@ function Library:CreateWindow(config)
 				Drop.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 				Drop.BorderSizePixel = 0
 				Drop.ClipsDescendants = true
-				Drop.ZIndex = 15
+				Drop.ZIndex = 24
 
 				local DropBrd = Instance.new("Frame", Drop)
 				DropBrd.Size = UDim2.new(1, 2, 1, 2)
 				DropBrd.Position = UDim2.new(0, -1, 0, -1)
 				DropBrd.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 				DropBrd.BorderSizePixel = 0
-				DropBrd.ZIndex = 14
+				DropBrd.ZIndex = 23
 
 				local dropLayout = Instance.new("UIListLayout", Drop)
 				dropLayout.Padding = UDim.new(0, 1)
+				dropLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
-				local lOpen = false
 				local oBtns = {}
 
 				local function refresh()
-					for _, o in ipairs(oBtns) do if o.btn.Parent then o.btn:Destroy() end end
+					for _, o in ipairs(oBtns) do if o.btn and o.btn.Parent then o.btn:Destroy() end end
 					oBtns = {}
-					for _, opt in ipairs(options) do
+					for idx, opt in ipairs(options) do
 						local B = Instance.new("TextButton", Drop)
 						B.Size = UDim2.new(1, 0, 0, 18)
 						B.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
@@ -923,14 +1078,15 @@ function Library:CreateWindow(config)
 						B.TextXAlignment = Enum.TextXAlignment.Left
 						B.TextSize = 11
 						B.Font = Enum.Font.Gotham
-						B.ZIndex = 16
+						B.ZIndex = 25
 						B.AutoButtonColor = false
+						B.LayoutOrder = idx
 
 						local function uc()
 							if multi then
-								B.TextColor3 = state[opt] and Color3.fromRGB(100, 180, 255) or Color3.fromRGB(180, 180, 180)
+								B.TextColor3 = (state[opt] == true) and accentColor or Color3.fromRGB(180, 180, 180)
 							else
-								B.TextColor3 = (state == opt) and Color3.fromRGB(100, 180, 255) or Color3.fromRGB(180, 180, 180)
+								B.TextColor3 = (state == opt) and accentColor or Color3.fromRGB(180, 180, 180)
 							end
 						end
 						uc()
@@ -940,7 +1096,8 @@ function Library:CreateWindow(config)
 
 						B.MouseButton1Click:Connect(function()
 							if multi then
-								state[opt] = not state[opt]
+								state[opt] = not state[opt] or nil
+								if not state[opt] then state[opt] = nil end
 								Library.Flags[flag] = state
 								SelLbl.Text = getDsp()
 								for _, o2 in ipairs(oBtns) do o2.uc() end
@@ -966,7 +1123,7 @@ function Library:CreateWindow(config)
 				SelBtn.Size = UDim2.new(1, 0, 1, 0)
 				SelBtn.BackgroundTransparency = 1
 				SelBtn.Text = ""
-				SelBtn.ZIndex = 16
+				SelBtn.ZIndex = 24
 
 				SelBtn.MouseButton1Click:Connect(function()
 					lOpen = not lOpen
@@ -991,10 +1148,17 @@ function Library:CreateWindow(config)
 				end
 				function obj:Refresh(n)
 					options = n
+					if lOpen then
+						lOpen = false
+						W.Size = UDim2.new(1, 0, 0, 22)
+						Drop.Size = UDim2.new(0.53, -4, 0, 0)
+						Arrow.Text = "v"
+					end
 					refresh()
 					SelLbl.Text = getDsp()
 				end
 				function obj:Get() return state end
+				table.insert(Library._elements, {flag = flag, obj = obj})
 				return obj
 			end
 
@@ -1009,11 +1173,13 @@ function Library:CreateWindow(config)
 				local kbEntry = {name = cfg3.Name or "Keybind", mode = mode, active = false, key = state}
 				table.insert(Library._keybindEntries, kbEntry)
 
+				local mOpen = false
+
 				local W = Instance.new("Frame", SContent)
 				W.Size = UDim2.new(1, 0, 0, 22)
 				W.BackgroundTransparency = 1
 				W.ClipsDescendants = true
-				W.ZIndex = 12
+				W.ZIndex = 20
 
 				local Lbl = Instance.new("TextLabel", W)
 				Lbl.Size = UDim2.new(1, -70, 0, 22)
@@ -1024,37 +1190,38 @@ function Library:CreateWindow(config)
 				Lbl.TextSize = 13
 				Lbl.Font = Enum.Font.Gotham
 				Lbl.TextXAlignment = Enum.TextXAlignment.Left
-				Lbl.ZIndex = 13
+				Lbl.ZIndex = 21
 
 				local KeyFrame = Instance.new("Frame", W)
 				KeyFrame.Size = UDim2.new(0, 55, 0, 16)
 				KeyFrame.Position = UDim2.new(1, -57, 0, 3)
 				KeyFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
 				KeyFrame.BorderSizePixel = 0
-				KeyFrame.ZIndex = 13
+				KeyFrame.ZIndex = 21
 
 				local KeyBrd = Instance.new("Frame", KeyFrame)
 				KeyBrd.Size = UDim2.new(1, 2, 1, 2)
 				KeyBrd.Position = UDim2.new(0, -1, 0, -1)
 				KeyBrd.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 				KeyBrd.BorderSizePixel = 0
-				KeyBrd.ZIndex = 12
+				KeyBrd.ZIndex = 20
 
 				local KeyInner = Instance.new("Frame", KeyFrame)
 				KeyInner.Size = UDim2.new(1, -2, 1, -2)
 				KeyInner.Position = UDim2.new(0, 1, 0, 1)
 				KeyInner.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
 				KeyInner.BorderSizePixel = 0
-				KeyInner.ZIndex = 14
+				KeyInner.ZIndex = 22
 
 				local KeyLbl = Instance.new("TextLabel", KeyInner)
 				KeyLbl.Size = UDim2.new(1, 0, 1, 0)
 				KeyLbl.BackgroundTransparency = 1
 				KeyLbl.Text = gkn(state)
-				KeyLbl.TextColor3 = Color3.fromRGB(100, 180, 255)
+				KeyLbl.TextColor3 = accentColor
 				KeyLbl.TextSize = 10
 				KeyLbl.Font = Enum.Font.Gotham
-				KeyLbl.ZIndex = 15
+				KeyLbl.ZIndex = 23
+				regAccent(KeyLbl, "TextColor3")
 
 				local MDrop = Instance.new("Frame", W)
 				MDrop.Size = UDim2.new(0, 55, 0, 0)
@@ -1062,22 +1229,23 @@ function Library:CreateWindow(config)
 				MDrop.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 				MDrop.BorderSizePixel = 0
 				MDrop.ClipsDescendants = true
-				MDrop.ZIndex = 17
+				MDrop.ZIndex = 26
 
 				local MDropBrd = Instance.new("Frame", MDrop)
 				MDropBrd.Size = UDim2.new(1, 2, 1, 2)
 				MDropBrd.Position = UDim2.new(0, -1, 0, -1)
 				MDropBrd.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 				MDropBrd.BorderSizePixel = 0
-				MDropBrd.ZIndex = 16
+				MDropBrd.ZIndex = 25
 
-				Instance.new("UIListLayout", MDrop).Padding = UDim.new(0, 1)
+				local mDropLayout = Instance.new("UIListLayout", MDrop)
+				mDropLayout.Padding = UDim.new(0, 1)
+				mDropLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
 				local modes = {"Hold", "Toggle", "Always"}
-				local mOpen = false
 				local mBtns = {}
 
-				for _, m in ipairs(modes) do
+				for mIdx, m in ipairs(modes) do
 					local MB = Instance.new("TextButton", MDrop)
 					MB.Size = UDim2.new(1, 0, 0, 18)
 					MB.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
@@ -1085,9 +1253,10 @@ function Library:CreateWindow(config)
 					MB.Text = m
 					MB.TextSize = 10
 					MB.Font = Enum.Font.Gotham
-					MB.TextColor3 = (mode == m) and Color3.fromRGB(100, 180, 255) or Color3.fromRGB(180, 180, 180)
-					MB.ZIndex = 18
+					MB.TextColor3 = (mode == m) and accentColor or Color3.fromRGB(180, 180, 180)
+					MB.ZIndex = 27
 					MB.AutoButtonColor = false
+					MB.LayoutOrder = mIdx
 
 					MB.MouseEnter:Connect(function() MB.BackgroundColor3 = Color3.fromRGB(22, 22, 22) end)
 					MB.MouseLeave:Connect(function() MB.BackgroundColor3 = Color3.fromRGB(15, 15, 15) end)
@@ -1096,7 +1265,7 @@ function Library:CreateWindow(config)
 						mode = m
 						kbEntry.mode = m
 						for _, mb in ipairs(mBtns) do
-							mb.btn.TextColor3 = (mode == mb.n) and Color3.fromRGB(100, 180, 255) or Color3.fromRGB(180, 180, 180)
+							mb.btn.TextColor3 = (mode == mb.n) and accentColor or Color3.fromRGB(180, 180, 180)
 						end
 						mOpen = false
 						tween(W, {Size = UDim2.new(1, 0, 0, 22)}, 0.15)
@@ -1113,7 +1282,7 @@ function Library:CreateWindow(config)
 				KBtn.Size = UDim2.new(1, 0, 1, 0)
 				KBtn.BackgroundTransparency = 1
 				KBtn.Text = ""
-				KBtn.ZIndex = 16
+				KBtn.ZIndex = 24
 
 				KBtn.MouseButton1Click:Connect(function()
 					listening = true
@@ -1139,7 +1308,7 @@ function Library:CreateWindow(config)
 						Library.Flags[flag] = state
 						kbEntry.key = state
 						KeyLbl.Text = gkn(state)
-						KeyLbl.TextColor3 = Color3.fromRGB(100, 180, 255)
+						KeyLbl.TextColor3 = accentColor
 						listening = false
 						refreshKeybindPanel()
 					elseif not gpe then
@@ -1189,14 +1358,9 @@ function Library:CreateWindow(config)
 				end)
 
 				local obj = {}
-				function obj:Set(k)
-					state = k
-					Library.Flags[flag] = k
-					kbEntry.key = k
-					KeyLbl.Text = gkn(k)
-					refreshKeybindPanel()
-				end
+				function obj:Set(k) state = k; Library.Flags[flag] = k; kbEntry.key = k; KeyLbl.Text = gkn(k); refreshKeybindPanel() end
 				function obj:Get() return state end
+				table.insert(Library._elements, {flag = flag, obj = obj})
 				return obj
 			end
 
@@ -1415,6 +1579,7 @@ function Library:CreateWindow(config)
 				local obj = {}
 				function obj:Set(c) state = c; h, s, v = Color3.toHSV(c); uc() end
 				function obj:Get() return state end
+				table.insert(Library._elements, {flag = flag, obj = obj})
 				return obj
 			end
 
@@ -1485,6 +1650,7 @@ function Library:CreateWindow(config)
 				local obj = {}
 				function obj:Set(v2) state = v2; TB.Text = v2; Library.Flags[flag] = v2 end
 				function obj:Get() return state end
+				table.insert(Library._elements, {flag = flag, obj = obj})
 				return obj
 			end
 
@@ -1530,7 +1696,7 @@ function Library:CreateWindow(config)
 				Btn.MouseLeave:Connect(function() tween(BFrame, {BackgroundColor3 = Color3.fromRGB(15, 15, 15)}, 0.1) end)
 
 				Btn.MouseButton1Click:Connect(function()
-					tween(BFrame, {BackgroundColor3 = Color3.fromRGB(100, 180, 255)}, 0.06)
+					tween(BFrame, {BackgroundColor3 = accentColor}, 0.06)
 					tween(BLbl, {TextColor3 = Color3.fromRGB(255, 255, 255)}, 0.06)
 					task.delay(0.12, function()
 						tween(BFrame, {BackgroundColor3 = Color3.fromRGB(15, 15, 15)}, 0.15)
@@ -1582,110 +1748,97 @@ function Library:CreateWindow(config)
 		return Tab
 	end
 
-	function Window:SetVisible(v)
-		uiVisible = v
-		MainPanel.Visible = v
-	end
+	local settingsTab = Window:Tab({Name = "Settings"})
+	local uiSection = settingsTab:Section({Name = "UI Settings", Side = "Left"})
 
-	function Window:Toggle()
-		uiVisible = not uiVisible
-		MainPanel.Visible = uiVisible
-	end
+	uiSection:Keybind({Name = "Toggle UI", Flag = "ui_toggle_key", State = Enum.KeyCode.End, Mode = "Toggle", Callback = function()
+		Window:Toggle()
+	end})
 
-	function Library:SaveConfig(name)
-		if not name or name == "" then return end
-		local data = {}
-		for k, v in pairs(Library.Flags) do
-			if type(v) == "boolean" or type(v) == "number" or type(v) == "string" then
-				data[k] = {type = type(v), value = v}
-			elseif typeof(v) == "Color3" then
-				data[k] = {type = "Color3", value = {v.R, v.G, v.B}}
-			elseif typeof(v) == "EnumItem" then
-				data[k] = {type = "EnumItem", value = tostring(v)}
-			elseif type(v) == "table" then
-				data[k] = {type = "table", value = v}
-			end
+	uiSection:Toggle({Name = "Show Watermark", Flag = "ui_show_watermark", State = true, Callback = function(v)
+		WatermarkFrame.Visible = v
+	end})
+
+	uiSection:Toggle({Name = "Show Keybind List", Flag = "ui_show_keybinds", State = true, Callback = function(v)
+		KeybindsPanel.Visible = v
+	end})
+
+	uiSection:Colorpicker({Name = "Accent Color", Flag = "ui_accent", State = Color3.fromRGB(100, 180, 255), Callback = function(c)
+		setAccent(c)
+	end})
+
+	local configSection = settingsTab:Section({Name = "Configuration", Side = "Right"})
+
+	local configNameInput = configSection:Input({Name = "Config Name", Flag = "config_name", Placeholder = "my_config", Callback = function() end})
+
+	local cfgList = Library:GetConfigs()
+	if #cfgList == 0 then cfgList = {"None"} end
+
+	local configListDropdown = configSection:List({Name = "Configs", Flag = "config_list", Options = cfgList, State = cfgList[1] or "None", Callback = function() end})
+
+	configSection:Button({Name = "Save Config", Callback = function()
+		local n = Library.Flags["config_name"]
+		if n and n ~= "" then
+			Library:SaveConfig(n)
+			local newList = Library:GetConfigs()
+			if #newList == 0 then newList = {"None"} end
+			configListDropdown:Refresh(newList)
 		end
-		local success, encoded = pcall(function()
-			return game:GetService("HttpService"):JSONEncode(data)
-		end)
-		if success then
+	end})
+
+	configSection:Button({Name = "Load Config", Callback = function()
+		local n = Library.Flags["config_list"]
+		if n and n ~= "" and n ~= "None" then Library:LoadConfig(n) end
+	end})
+
+	configSection:Button({Name = "Delete Config", Callback = function()
+		local n = Library.Flags["config_list"]
+		if n and n ~= "" and n ~= "None" then
+			Library:DeleteConfig(n)
+			local newList = Library:GetConfigs()
+			if #newList == 0 then newList = {"None"} end
+			configListDropdown:Refresh(newList)
+			configListDropdown:Set(newList[1] or "None")
+		end
+	end})
+
+	configSection:Divider()
+
+	local autoLoadLabel = configSection:Label({Name = "Auto Load: " .. (Library:GetAutoLoad() ~= "" and Library:GetAutoLoad() or "None")})
+
+	configSection:Button({Name = "Set Auto Load Config", Callback = function()
+		local n = Library.Flags["config_list"]
+		if n and n ~= "" and n ~= "None" then
+			Library:SetAutoLoad(n)
+			autoLoadLabel:Set("Auto Load: " .. n)
+		end
+	end})
+
+	configSection:Button({Name = "Remove Auto Load", Callback = function()
+		Library:RemoveAutoLoad()
+		autoLoadLabel:Set("Auto Load: None")
+	end})
+
+	configSection:Divider()
+
+	configSection:Button({Name = "Reset All Settings", Callback = function()
+		for _, el in pairs(Library._elements) do
 			pcall(function()
-				writefile("Avenir/" .. name .. ".json", encoded)
+				if el.obj and el.obj.Set then
+					local flag = el.flag
+					if flag then
+						local v = Library.Flags[flag]
+						if type(v) == "boolean" then el.obj:Set(false)
+						elseif type(v) == "number" then el.obj:Set(0)
+						elseif type(v) == "string" then el.obj:Set("") end
+					end
+				end
 			end)
 		end
-	end
-
-	function Library:LoadConfig(name)
-		if not name or name == "" then return end
-		local success, content = pcall(function()
-			return readfile("Avenir/" .. name .. ".json")
-		end)
-		if not success then return end
-		local ok, data = pcall(function()
-			return game:GetService("HttpService"):JSONDecode(content)
-		end)
-		if not ok then return end
-		for k, info in pairs(data) do
-			if info.type == "boolean" then
-				Library.Flags[k] = info.value
-			elseif info.type == "number" then
-				Library.Flags[k] = info.value
-			elseif info.type == "string" then
-				Library.Flags[k] = info.value
-			elseif info.type == "Color3" then
-				Library.Flags[k] = Color3.new(info.value[1], info.value[2], info.value[3])
-			elseif info.type == "EnumItem" then
-				Library.Flags[k] = info.value
-			elseif info.type == "table" then
-				Library.Flags[k] = info.value
-			end
-		end
-	end
-
-	function Library:DeleteConfig(name)
-		if not name or name == "" then return end
-		pcall(function()
-			delfile("Avenir/" .. name .. ".json")
-		end)
-	end
-
-	function Library:GetConfigs()
-		local configs = {}
-		pcall(function()
-			if not isfolder("Avenir") then makefolder("Avenir") end
-			local files = listfiles("Avenir")
-			for _, f in ipairs(files) do
-				local n = f:match("Avenir/(.+)%.json$") or f:match("Avenir\\(.+)%.json$")
-				if n then table.insert(configs, n) end
-			end
-		end)
-		return configs
-	end
-
-	function Library:SetAutoLoad(name)
-		pcall(function()
-			if not isfolder("Avenir") then makefolder("Avenir") end
-			writefile("Avenir/_autoload.txt", name or "")
-		end)
-	end
-
-	function Library:GetAutoLoad()
-		local name = ""
-		pcall(function()
-			name = readfile("Avenir/_autoload.txt")
-		end)
-		return name
-	end
-
-	function Library:RemoveAutoLoad()
-		pcall(function()
-			delfile("Avenir/_autoload.txt")
-		end)
-	end
+	end})
 
 	pcall(function()
-		if not isfolder("Avenir") then makefolder("Avenir") end
+		ensureFolder()
 		local autoName = Library:GetAutoLoad()
 		if autoName and autoName ~= "" then
 			Library:LoadConfig(autoName)
