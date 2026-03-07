@@ -9,6 +9,28 @@ local GuiService = game:GetService("GuiService")
 local player = Players.LocalPlayer
 local mouse = player:GetMouse()
 
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local Stats = game:GetService("Stats")
+local HttpService = game:GetService("HttpService")
+
+local player = Players.LocalPlayer
+local mouse = player:GetMouse()
+
+local fpsValue = 60
+local frameCount = 0
+local lastFpsTime = tick()
+RunService.RenderStepped:Connect(function()
+    frameCount += 1
+    if tick() - lastFpsTime >= 1 then
+        fpsValue = frameCount
+        frameCount = 0
+        lastFpsTime = tick()
+    end
+end)
+
 local Library = {}
 Library.Unloaded = false
 Library._onUnload = {}
@@ -22,6 +44,9 @@ Library._keybindContainer = nil
 Library._accentColor = Color3.fromRGB(100, 180, 255)
 Library._accentElements = {}
 Library._project = "Default"
+
+
+
 
 getgenv().Toggles = getgenv().Toggles or {}
 getgenv().Options = getgenv().Options or {}
@@ -153,15 +178,18 @@ function OptionClass:GetState()
     return self._active or false
 end
 
-function Library:SetWatermarkVisibility(v)
-    if self._watermarkFrame then
-        self._watermarkFrame.Visible = v
-    end
+function Library:SetWatermark(text)
+    Library._watermarkFormat = text
 end
 
-function Library:SetWatermark(text)
-    if self._watermarkText then
-        self._watermarkText.Text = text
+function Library:GetWatermarkFormat()
+    return Library._watermarkFormat
+end
+
+function Library:SetWatermarkVisibility(v)
+    Library._watermarkVisible = v
+    if self._watermarkFrame then
+        self._watermarkFrame.Visible = v
     end
 end
 
@@ -244,6 +272,29 @@ function Library:CreateWindow(config)
     wmText.TextColor3 = Color3.fromRGB(255,255,255); wmText.TextSize = 12
     wmText.Font = Enum.Font.Gotham; wmText.TextXAlignment = Enum.TextXAlignment.Center; wmText.ZIndex = 102
     Library._watermarkText = wmText
+    Library._watermarkFormat = "Avenir | {fps} FPS | {ping}ms"
+    Library._watermarkVisible = false
+
+    local function updateWatermark()
+        if not Library._watermarkVisible then return end
+        local text = Library._watermarkFormat
+        text = text:gsub("{fps}", tostring(fpsValue))
+        local ping = 0
+        pcall(function() 
+            ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue()) 
+        end)
+        text = text:gsub("{ping}", tostring(ping))
+        wmText.Text = text
+        local textWidth = wmText.TextBounds.X + 20
+        WatermarkFrame.Size = UDim2.new(0, math.max(textWidth, 150), 0, 28)
+    end
+
+    task.spawn(function()
+        while not Library.Unloaded do
+            updateWatermark()
+            task.wait(0.5)
+        end
+    end)
 
     local KBPanel = Instance.new("Frame")
     KBPanel.Name = "KeybindFrame"
@@ -388,7 +439,7 @@ function Library:CreateWindow(config)
 
     local tabLayout = Instance.new("UIListLayout", tabHolder)
     tabLayout.FillDirection = Enum.FillDirection.Horizontal
-    tabLayout.Padding = UDim.new(0, config.TabPadding or 2)
+    tabLayout.Padding = UDim.new(0, 0)
 
     local contentArea = Instance.new("Frame", innerPanel)
     contentArea.Size = UDim2.new(1,-16,1,-66); contentArea.Position = UDim2.new(0,8,0,58)
@@ -400,13 +451,32 @@ function Library:CreateWindow(config)
     contentBrd.BackgroundColor3 = Color3.fromRGB(45,45,45); contentBrd.BorderSizePixel = 0; contentBrd.ZIndex = 1
 
     Library.ToggleKeybind = nil
+    Library._menuKey = Enum.KeyCode.End
+    Library._menuOpen = true
 
-    function Window:SetVisible(v)
-        MainPanel.Visible = v
+    UserInputService.InputBegan:Connect(function(input, gpe)
+        if gpe then return end
+        if input.KeyCode == Library._menuKey then
+            Library._menuOpen = not Library._menuOpen
+            MainPanel.Visible = Library._menuOpen
+        end
+    end)
+
+    function Library:SetMenuKey(key)
+        if type(key) == "string" then
+            local success, result = pcall(function()
+                return Enum.KeyCode[key]
+            end)
+            if success and result then
+                Library._menuKey = result
+            end
+        else
+            Library._menuKey = key
+        end
     end
 
-    function Window:Toggle()
-        MainPanel.Visible = not MainPanel.Visible
+    function Library:GetMenuKey()
+        return Library._menuKey
     end
 
     -- incase i forget 
@@ -416,11 +486,11 @@ function Library:CreateWindow(config)
         TabObj._name = name
 
         local tabBtn = Instance.new("TextButton", tabHolder)
-        tabBtn.Size = UDim2.new(0, 80, 1, 0)
-        tabBtn.BackgroundColor3 = Color3.fromRGB(18,18,18)
+        tabBtn.Size = UDim2.new(0, 70, 1, 0)
+        tabBtn.BackgroundColor3 = Color3.fromRGB(20,20,20)
         tabBtn.BorderSizePixel = 0
         tabBtn.Text = name
-        tabBtn.TextColor3 = Color3.fromRGB(180,180,180)
+        tabBtn.TextColor3 = Color3.fromRGB(140,140,140)
         tabBtn.TextSize = 11
         tabBtn.Font = Enum.Font.Gotham
         tabBtn.ZIndex = 4
@@ -468,12 +538,12 @@ function Library:CreateWindow(config)
 
         local function selectTab()
             for _, t in pairs(Window._tabButtons) do
-                t.btn.BackgroundColor3 = Color3.fromRGB(18,18,18)
-                t.btn.TextColor3 = Color3.fromRGB(180,180,180)
+                t.btn.BackgroundColor3 = Color3.fromRGB(20,20,20)
+                t.btn.TextColor3 = Color3.fromRGB(140,140,140)
                 t.page.Visible = false
             end
-            tabBtn.BackgroundColor3 = accentColor
-            tabBtn.TextColor3 = Color3.fromRGB(255,255,255)
+            tabBtn.BackgroundColor3 = Color3.fromRGB(30,30,30)
+            tabBtn.TextColor3 = accentColor
             tabPage.Visible = true
             task.defer(updateScroll)
         end
@@ -818,7 +888,7 @@ function Library:CreateWindow(config)
                         local optVal = v
                         local btn = Instance.new("TextButton")
                         btn.Size = UDim2.new(0,100,0,18)
-                        btn.BackgroundColor3 = Color3.fromRGB(15,15,15)
+                        btn.BackgroundColor3 = Color3.fromRGB(20,20,20)
                         btn.BorderSizePixel = 0
                         btn.Text = "  " .. v
                         btn.TextXAlignment = Enum.TextXAlignment.Left
@@ -829,14 +899,33 @@ function Library:CreateWindow(config)
                         btn.Visible = false
                         btn.Parent = Library._popupGui
 
+                        local btnBorder = Instance.new("Frame", btn)
+                        btnBorder.Size = UDim2.new(1,2,1,0)
+                        btnBorder.Position = UDim2.new(0,-1,0,0)
+                        btnBorder.BackgroundColor3 = Color3.fromRGB(45,45,45)
+                        btnBorder.BorderSizePixel = 0
+                        btnBorder.ZIndex = 9998
+
+                        local btnInner = Instance.new("Frame", btn)
+                        btnInner.Size = UDim2.new(1,0,1,0)
+                        btnInner.BackgroundColor3 = Color3.fromRGB(20,20,20)
+                        btnInner.BorderSizePixel = 0
+                        btnInner.ZIndex = 9998
+
                         if multi then
                             btn.TextColor3 = option.Value[v] and accentColor or Color3.fromRGB(180,180,180)
                         else
                             btn.TextColor3 = (option.Value == v) and accentColor or Color3.fromRGB(180,180,180)
                         end
 
-                        btn.MouseEnter:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(25,25,25) end)
-                        btn.MouseLeave:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(15,15,15) end)
+                        btn.MouseEnter:Connect(function() 
+                            btn.BackgroundColor3 = Color3.fromRGB(30,30,30)
+                            btnInner.BackgroundColor3 = Color3.fromRGB(30,30,30)
+                        end)
+                        btn.MouseLeave:Connect(function() 
+                            btn.BackgroundColor3 = Color3.fromRGB(20,20,20)
+                            btnInner.BackgroundColor3 = Color3.fromRGB(20,20,20)
+                        end)
 
                         btn.MouseButton1Click:Connect(function()
                             if multi then
@@ -1131,7 +1220,7 @@ function Library:CreateWindow(config)
                     local modeVal = m
                     local mBtn = Instance.new("TextButton")
                     mBtn.Size = UDim2.new(0,55,0,18)
-                    mBtn.BackgroundColor3 = Color3.fromRGB(15,15,15)
+                    mBtn.BackgroundColor3 = Color3.fromRGB(20,20,20)
                     mBtn.BorderSizePixel = 0
                     mBtn.Text = m
                     mBtn.TextSize = 10
@@ -1142,8 +1231,27 @@ function Library:CreateWindow(config)
                     mBtn.Visible = false
                     mBtn.Parent = Library._popupGui
 
-                    mBtn.MouseEnter:Connect(function() mBtn.BackgroundColor3 = Color3.fromRGB(25,25,25) end)
-                    mBtn.MouseLeave:Connect(function() mBtn.BackgroundColor3 = Color3.fromRGB(15,15,15) end)
+                    local mBtnBorder = Instance.new("Frame", mBtn)
+                    mBtnBorder.Size = UDim2.new(1,2,1,0)
+                    mBtnBorder.Position = UDim2.new(0,-1,0,0)
+                    mBtnBorder.BackgroundColor3 = Color3.fromRGB(45,45,45)
+                    mBtnBorder.BorderSizePixel = 0
+                    mBtnBorder.ZIndex = 9998
+
+                    local mBtnInner = Instance.new("Frame", mBtn)
+                    mBtnInner.Size = UDim2.new(1,0,1,0)
+                    mBtnInner.BackgroundColor3 = Color3.fromRGB(20,20,20)
+                    mBtnInner.BorderSizePixel = 0
+                    mBtnInner.ZIndex = 9998
+
+                    mBtn.MouseEnter:Connect(function() 
+                        mBtn.BackgroundColor3 = Color3.fromRGB(30,30,30)
+                        mBtnInner.BackgroundColor3 = Color3.fromRGB(30,30,30)
+                    end)
+                    mBtn.MouseLeave:Connect(function() 
+                        mBtn.BackgroundColor3 = Color3.fromRGB(20,20,20)
+                        mBtnInner.BackgroundColor3 = Color3.fromRGB(20,20,20)
+                    end)
 
                     mBtn.MouseButton1Click:Connect(function()
                         option.Mode = modeVal
@@ -1566,4 +1674,4 @@ function Library:CreateWindow(config)
     return Window
 end
 
-return library 
+return library
