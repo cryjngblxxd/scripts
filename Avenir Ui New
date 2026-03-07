@@ -68,34 +68,43 @@ local function refreshKeybindList()
     local idx = 0
     for _, opt in pairs(Options) do
         if opt._type == "KeyPicker" and not opt.NoUI and opt._active then
-            local row = Instance.new("Frame")
-            row.Size = UDim2.new(1, 0, 0, 20)
-            row.Position = UDim2.new(0, 0, 0, idx * 24)
-            row.BackgroundTransparency = 1
-            row.ZIndex = 102
-            row.Parent = Library._keybindContainer
-            local nl = Instance.new("TextLabel")
-            nl.Size = UDim2.new(1, -60, 1, 0)
-            nl.BackgroundTransparency = 1
-            nl.Text = opt.Text or opt._idx
-            nl.TextColor3 = Library._accentColor
-            nl.TextSize = 13
-            nl.Font = Enum.Font.Gotham
-            nl.TextXAlignment = Enum.TextXAlignment.Left
-            nl.ZIndex = 102
-            nl.Parent = row
-            local ml = Instance.new("TextLabel")
-            ml.Size = UDim2.new(0, 55, 1, 0)
-            ml.Position = UDim2.new(1, -55, 0, 0)
-            ml.BackgroundTransparency = 1
-            ml.Text = "[" .. opt.Mode .. "]"
-            ml.TextColor3 = Color3.fromRGB(180, 180, 180)
-            ml.TextSize = 11
-            ml.Font = Enum.Font.Gotham
-            ml.TextXAlignment = Enum.TextXAlignment.Right
-            ml.ZIndex = 102
-            ml.Parent = row
-            idx += 1
+            local showKeybind = true
+            if opt._parentToggleIdx then
+                local parentToggle = Toggles[opt._parentToggleIdx]
+                if parentToggle and not parentToggle.Value then
+                    showKeybind = false
+                end
+            end
+            if showKeybind then
+                local row = Instance.new("Frame")
+                row.Size = UDim2.new(1, 0, 0, 20)
+                row.Position = UDim2.new(0, 0, 0, idx * 24)
+                row.BackgroundTransparency = 1
+                row.ZIndex = 102
+                row.Parent = Library._keybindContainer
+                local nl = Instance.new("TextLabel")
+                nl.Size = UDim2.new(1, -60, 1, 0)
+                nl.BackgroundTransparency = 1
+                nl.Text = opt.Text or opt._idx
+                nl.TextColor3 = Library._accentColor
+                nl.TextSize = 13
+                nl.Font = Enum.Font.Gotham
+                nl.TextXAlignment = Enum.TextXAlignment.Left
+                nl.ZIndex = 102
+                nl.Parent = row
+                local ml = Instance.new("TextLabel")
+                ml.Size = UDim2.new(0, 55, 1, 0)
+                ml.Position = UDim2.new(1, -55, 0, 0)
+                ml.BackgroundTransparency = 1
+                ml.Text = "[" .. opt.Mode .. "]"
+                ml.TextColor3 = Color3.fromRGB(180, 180, 180)
+                ml.TextSize = 11
+                ml.Font = Enum.Font.Gotham
+                ml.TextXAlignment = Enum.TextXAlignment.Right
+                ml.ZIndex = 102
+                ml.Parent = row
+                idx += 1
+            end
         end
     end
     local totalH = math.max(idx * 24, 10)
@@ -187,7 +196,7 @@ function Library:CreateWindow(config)
 
     local PopupGui = Instance.new("ScreenGui")
     PopupGui.Name = "AvenirPopups"
-    PopupGui.IgnoreGuiInset = true
+    PopupGui.IgnoreGuiInset = false
     PopupGui.DisplayOrder = 100
     PopupGui.ResetOnSpawn = false
     PopupGui.Parent = player:WaitForChild("PlayerGui")
@@ -400,6 +409,8 @@ function Library:CreateWindow(config)
         MainPanel.Visible = not MainPanel.Visible
     end
 
+    -- incase i forget 
+
     function Window:AddTab(name)
         local TabObj = {}
         TabObj._name = name
@@ -542,6 +553,7 @@ function Library:CreateWindow(config)
                 toggle.Value = opts.Default or false
                 toggle.Callback = opts.Callback
                 toggle._type = "Toggle"
+                toggle._idx = idx
                 Toggles[idx] = toggle
 
                 local F = Instance.new("Frame", sContent)
@@ -568,6 +580,7 @@ function Library:CreateWindow(config)
                     tween(check, {BackgroundColor3 = toggle.Value and accentColor or Color3.fromRGB(18,18,18)}, 0.15)
                     tween(checkBrd, {BackgroundColor3 = toggle.Value and accentColor or Color3.fromRGB(45,45,45)}, 0.15)
                     tween(lbl, {TextColor3 = toggle.Value and Color3.fromRGB(220,220,220) or Color3.fromRGB(180,180,180)}, 0.15)
+                    refreshKeybindList()
                 end
                 toggle._update = upd
 
@@ -582,8 +595,15 @@ function Library:CreateWindow(config)
 
                 local labelObj = {}
                 labelObj._frame = F
-                function labelObj:AddKeyPicker(kIdx, kOpts) return Group:AddKeyPicker(kIdx, kOpts, F) end
-                function labelObj:AddColorPicker(cIdx, cOpts) return Group:AddColorPicker(cIdx, cOpts, F) end
+                labelObj._toggleIdx = idx
+                function labelObj:AddKeyPicker(kIdx, kOpts)
+                    kOpts = kOpts or {}
+                    kOpts._parentToggleIdx = idx
+                    return Group:AddKeyPicker(kIdx, kOpts, F)
+                end
+                function labelObj:AddColorPicker(cIdx, cOpts)
+                    return Group:AddColorPicker(cIdx, cOpts, F)
+                end
                 return labelObj
             end
 
@@ -1034,6 +1054,7 @@ function Library:CreateWindow(config)
                 option.Callback = opts.Callback
                 option.ChangedCallback = opts.ChangedCallback
                 option._active = false
+                option._parentToggleIdx = opts._parentToggleIdx
                 Options[idx] = option
 
                 if type(opts.Default) == "string" then
@@ -1054,6 +1075,7 @@ function Library:CreateWindow(config)
                 end
 
                 local keyFrame = Instance.new("Frame", container)
+                keyFrame.Name = "KeyPickerFrame"
                 keyFrame.Size = UDim2.new(0,55,0,12)
                 keyFrame.Position = UDim2.new(1,-57,0,5)
                 keyFrame.BackgroundColor3 = Color3.fromRGB(12,12,12)
@@ -1143,13 +1165,8 @@ function Library:CreateWindow(config)
                     keyLbl.TextColor3 = Color3.fromRGB(255, 200, 100)
                 end)
 
-                UserInputService.InputBegan:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton2 then
-                        local mp = Vector2.new(input.Position.X, input.Position.Y)
-                        if isMouseOver(keyFrame, mp) then
-                            if mOpen then closeMD() else openMD() end
-                        end
-                    end
+                kBtn.MouseButton2Click:Connect(function()
+                    if mOpen then closeMD() else openMD() end
                 end)
 
                 UserInputService.InputBegan:Connect(function(input)
@@ -1243,7 +1260,14 @@ function Library:CreateWindow(config)
                     refreshKeybindList()
                 end
 
-                return option
+                local kpReturn = setmetatable({}, {__index = option})
+                function kpReturn:AddColorPicker(cIdx, cOpts)
+                    return Group:AddColorPicker(cIdx, cOpts, container)
+                end
+                function kpReturn:AddKeyPicker(kIdx, kOpts)
+                    return Group:AddKeyPicker(kIdx, kOpts, container)
+                end
+                return kpReturn
             end
 
             function Group:AddColorPicker(idx, opts, parentFrame)
@@ -1262,9 +1286,24 @@ function Library:CreateWindow(config)
                     container.ZIndex = 12
                 end
 
+                local hasKeyPicker = false
+                if parentFrame then
+                    for _, child in pairs(parentFrame:GetChildren()) do
+                        if child.Name == "KeyPickerFrame" then
+                            hasKeyPicker = true
+                            break
+                        end
+                    end
+                end
+
                 local prevFrame = Instance.new("Frame", container)
+                prevFrame.Name = "ColorPickerFrame"
                 prevFrame.Size = UDim2.new(0,28,0,12)
-                prevFrame.Position = UDim2.new(1,-32,0,5)
+                if hasKeyPicker then
+                    prevFrame.Position = UDim2.new(1,-92,0,5)
+                else
+                    prevFrame.Position = UDim2.new(1,-32,0,5)
+                end
                 prevFrame.BackgroundColor3 = Color3.fromRGB(12,12,12)
                 prevFrame.BorderSizePixel = 0
                 prevFrame.ZIndex = 13
@@ -1436,7 +1475,14 @@ function Library:CreateWindow(config)
                     uc()
                 end
 
-                return option
+                local cpReturn = setmetatable({}, {__index = option})
+                function cpReturn:AddColorPicker(cIdx, cOpts)
+                    return Group:AddColorPicker(cIdx, cOpts, container)
+                end
+                function cpReturn:AddKeyPicker(kIdx, kOpts)
+                    return Group:AddKeyPicker(kIdx, kOpts, container)
+                end
+                return cpReturn
             end
 
             function Group:AddDependencyBox()
@@ -1515,9 +1561,9 @@ function Library:CreateWindow(config)
         end
 
         return TabObj
-    end
+    end    
 
     return Window
 end
 
-return Library
+return library 
