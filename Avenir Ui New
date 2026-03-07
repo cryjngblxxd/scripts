@@ -538,15 +538,15 @@ function Library:CreateWindow(config)
 	ContentArea.Position = UDim2.new(0, 8, 0, 58)
 	ContentArea.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 	ContentArea.BorderSizePixel = 0
-	ContentArea.ClipsDescendants = true
-	ContentArea.ZIndex = 2
+	ContentArea.ClipsDescendants = false
+	ContentArea.ZIndex = 50
 
 	local ContentBorder = Instance.new("Frame", ContentArea)
 	ContentBorder.Size = UDim2.new(1, 2, 1, 2)
 	ContentBorder.Position = UDim2.new(0, -1, 0, -1)
 	ContentBorder.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 	ContentBorder.BorderSizePixel = 0
-	ContentBorder.ZIndex = 1
+	ContentBorder.ZIndex = 50
 
 	local uiVisible = true
 
@@ -683,7 +683,7 @@ function Library:CreateWindow(config)
 			local AccClip = Instance.new("Frame", SectionFrame)
 			AccClip.Size = UDim2.new(1, 0, 0, 4)
 			AccClip.BackgroundTransparency = 1
-			AccClip.ClipsDescendants = true
+			AccClip.ClipsDescendants = false
 			AccClip.ZIndex = 13
 
 			local SAcc = Instance.new("Frame", AccClip)
@@ -816,7 +816,7 @@ function Library:CreateWindow(config)
 				local W = Instance.new("Frame", SContent)
 				W.Size = UDim2.new(1, 0, 0, 30)
 				W.BackgroundTransparency = 1
-				W.ClipsDescendants = true
+				W.ClipsDescendants = false
 				W.ZIndex = 12
 
 				local Lbl = Instance.new("TextLabel", W)
@@ -980,7 +980,7 @@ function Library:CreateWindow(config)
 				local W = Instance.new("Frame", SContent)
 				W.Size = UDim2.new(1, 0, 0, 22)
 				W.BackgroundTransparency = 1
-				W.ClipsDescendants = true
+				W.ClipsDescendants = false
 				W.ZIndex = 20
 
 				local Lbl = Instance.new("TextLabel", W)
@@ -1050,15 +1050,15 @@ function Library:CreateWindow(config)
 				Drop.Position = UDim2.new(0.47, 0, 0, 24)
 				Drop.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 				Drop.BorderSizePixel = 0
-				Drop.ClipsDescendants = true
-				Drop.ZIndex = 24
+				Drop.ClipsDescendants = false
+				Drop.ZIndex = 100
 
 				local DropBrd = Instance.new("Frame", Drop)
 				DropBrd.Size = UDim2.new(1, 2, 1, 2)
 				DropBrd.Position = UDim2.new(0, -1, 0, -1)
 				DropBrd.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 				DropBrd.BorderSizePixel = 0
-				DropBrd.ZIndex = 23
+				DropBrd.ZIndex = 99
 
 				local dropLayout = Instance.new("UIListLayout", Drop)
 				dropLayout.Padding = UDim.new(0, 1)
@@ -1178,7 +1178,7 @@ function Library:CreateWindow(config)
 				local W = Instance.new("Frame", SContent)
 				W.Size = UDim2.new(1, 0, 0, 22)
 				W.BackgroundTransparency = 1
-				W.ClipsDescendants = true
+				W.ClipsDescendants = false
 				W.ZIndex = 20
 
 				local Lbl = Instance.new("TextLabel", W)
@@ -1228,7 +1228,7 @@ function Library:CreateWindow(config)
 				MDrop.Position = UDim2.new(1, -57, 0, 24)
 				MDrop.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 				MDrop.BorderSizePixel = 0
-				MDrop.ClipsDescendants = true
+				MDrop.ClipsDescendants = false
 				MDrop.ZIndex = 26
 
 				local MDropBrd = Instance.new("Frame", MDrop)
@@ -1374,7 +1374,7 @@ function Library:CreateWindow(config)
 				local W = Instance.new("Frame", SContent)
 				W.Size = UDim2.new(1, 0, 0, 22)
 				W.BackgroundTransparency = 1
-				W.ClipsDescendants = true
+				W.ClipsDescendants = false
 				W.ZIndex = 12
 
 				local Lbl = Instance.new("TextLabel", W)
