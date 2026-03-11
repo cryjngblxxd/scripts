@@ -89,7 +89,7 @@ Library.TargetPlayer = nil
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "AvenirLibrary"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
 ScreenGui.Parent = CoreGui
 
 Library.ScreenGui = ScreenGui
@@ -163,7 +163,7 @@ function ConfigSystem:GetConfigs()
 	local s, files = pcall(function() return listfiles(folder) end)
 	if s and files then
 		for _, file in ipairs(files) do
-			local name = file:match("([^/\\]+)$")
+			local name = file:match("([^/\]+)$")
 			if name and name:sub(-5) == ".json" then
 				table.insert(configs, name:sub(1, -6))
 			end
@@ -272,13 +272,13 @@ function ConfigSystem:LoadConfig(configName)
 					Library.Flags[flag] = newColor
 					el.UI.Preview.BackgroundColor3 = newColor
 					if el.UI.HueFrame and el.UI.SatValFrame then
-						local nh, ns, nv = newColor:ToHSV()
-						el.State.hue = nh
-						el.State.sat = ns
-						el.State.val = nv
-						el.UI.HueCursor.Position = UDim2.new(nh, -2, 0, -3)
-						el.UI.SatValCursor.Position = UDim2.new(ns, -4, 1 - nv, -4)
-						el.UI.SatValFrame.BackgroundColor3 = Color3.fromHSV(nh, 1, 1)
+						local h, s2, v2 = newColor:ToHSV()
+						el.State.hue = h
+						el.State.sat = s2
+						el.State.val = v2
+						el.UI.HueCursor.Position = UDim2.new(h, 0, 0, -3)
+						el.UI.SatValCursor.Position = UDim2.new(s2, -4, 1 - v2, -4)
+						el.UI.SatValFrame.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
 					end
 					if el.Callback then pcall(el.Callback, newColor) end
 				end
@@ -404,7 +404,7 @@ makeDraggable(watermarkBorderAccent)
 
 local keybindBorderAccent = Instance.new("Frame")
 keybindBorderAccent.Name = "KeybindBorderAccent"
-keybindBorderAccent.Size = UDim2.new(0, 160, 0, 50)
+keybindBorderAccent.Size = UDim2.new(0, 160, 0, 200)
 keybindBorderAccent.Position = UDim2.new(1, -30, 0.5, 0)
 keybindBorderAccent.AnchorPoint = Vector2.new(1, 0.5)
 keybindBorderAccent.BackgroundColor3 = Colors.Accent
@@ -515,8 +515,6 @@ Library.KeybindListFrame = keybindBorderAccent
 Library.KeybindListContainer = keybindListContainer
 makeDraggable(keybindBorderAccent)
 
-local MAX_KEYBIND_ENTRIES_NO_SCROLL = 8
-
 function Library:UpdateKeybindList()
 	for _, child in ipairs(keybindListContainer:GetChildren()) do
 		if child:IsA("Frame") then child:Destroy() end
@@ -529,7 +527,6 @@ function Library:UpdateKeybindList()
 			local enabled = element.State.isEnabled
 			local name = element.DisplayName or flag
 			local key = element.State.currentKey
-			local mode = element.State.currentMode
 
 			local entryFrame = Instance.new("Frame")
 			entryFrame.Name = flag .. "Entry"
@@ -548,18 +545,11 @@ function Library:UpdateKeybindList()
 			entryLine.ZIndex = 20
 			entryLine.Parent = entryFrame
 
-			local displayText = name
-			if mode == "Always" then
-				displayText = name .. " [Always]"
-			elseif mode == "Hold" then
-				displayText = name .. " [Hold]"
-			end
-
 			local nameLabel = Instance.new("TextLabel")
 			nameLabel.Size = UDim2.new(1, -50, 1, 0)
 			nameLabel.Position = UDim2.new(0, 15, 0, 0)
 			nameLabel.BackgroundTransparency = 1
-			nameLabel.Text = displayText
+			nameLabel.Text = name
 			nameLabel.TextColor3 = enabled and Colors.Accent or Colors.Text
 			nameLabel.Font = Enum.Font.GothamBold
 			nameLabel.TextSize = 10
@@ -569,11 +559,11 @@ function Library:UpdateKeybindList()
 			nameLabel.Parent = entryFrame
 
 			local keyLabel = Instance.new("TextLabel")
-			keyLabel.Size = UDim2.new(0, 30, 1, 0)
-			keyLabel.Position = UDim2.new(1, -40, 0, 0)
+			keyLabel.Size = UDim2.new(0, 20, 1, 0)
+			keyLabel.Position = UDim2.new(1, -35, 0, 0)
 			keyLabel.BackgroundTransparency = 1
-			keyLabel.Text = "[" .. key .. "]"
-			keyLabel.TextColor3 = enabled and Colors.Accent or Colors.TextDim
+			keyLabel.Text = key
+			keyLabel.TextColor3 = enabled and Colors.Accent or Colors.Text
 			keyLabel.Font = Enum.Font.GothamBold
 			keyLabel.TextSize = 10
 			keyLabel.TextXAlignment = Enum.TextXAlignment.Right
@@ -586,19 +576,8 @@ function Library:UpdateKeybindList()
 	for _, child in ipairs(keybindListContainer:GetChildren()) do
 		if child:IsA("Frame") then entryCount = entryCount + 1 end
 	end
-
-	local contentHeight = entryCount * 20
-	local innerPadding = 30
-
-	if entryCount > MAX_KEYBIND_ENTRIES_NO_SCROLL then
-		local maxVisibleHeight = MAX_KEYBIND_ENTRIES_NO_SCROLL * 20
-		keybindBorderAccent.Size = UDim2.new(0, 160, 0, maxVisibleHeight + innerPadding)
-		kbInnerFrame.ScrollBarThickness = 3
-	else
-		local listHeight = math.max(contentHeight + innerPadding, 50)
-		keybindBorderAccent.Size = UDim2.new(0, 160, 0, listHeight)
-		kbInnerFrame.ScrollBarThickness = 0
-	end
+	local listHeight = math.max(entryCount * 20 + 30, 50)
+	keybindBorderAccent.Size = UDim2.new(0, 160, 0, listHeight)
 end
 
 local function getHealthColor(pct)
@@ -1238,18 +1217,15 @@ end)
 table.insert(Library.Connections, menuToggleConn)
 
 local kbMenuConn = UserInputService.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.MouseButton2 then
 		if ActiveKeybindMenu then
-			task.defer(function()
-				if not ActiveKeybindMenu then return end
-				local mp = UserInputService:GetMouseLocation()
-				local pos = ActiveKeybindMenu.AbsolutePosition
-				local sz = ActiveKeybindMenu.AbsoluteSize
-				if mp.X < pos.X or mp.X > pos.X + sz.X or mp.Y < pos.Y or mp.Y > pos.Y + sz.Y then
-					ActiveKeybindMenu.Visible = false
-					ActiveKeybindMenu = nil
-				end
-			end)
+			local mp = UserInputService:GetMouseLocation()
+			local pos = ActiveKeybindMenu.AbsolutePosition
+			local sz = ActiveKeybindMenu.AbsoluteSize
+			if mp.X < pos.X or mp.X > pos.X + sz.X or mp.Y < pos.Y or mp.Y > pos.Y + sz.Y then
+				ActiveKeybindMenu.Visible = false
+				ActiveKeybindMenu = nil
+			end
 		end
 	end
 end)
@@ -1457,7 +1433,7 @@ local function CreateToggle(parent, name, default, defaultKeybind, flag, callbac
 	flag = flag or name; callback = callback or function() end
 	local hasKeybind = defaultKeybind ~= nil
 
-	local tg = Instance.new("Frame"); tg.Name = name; tg.Size = UDim2.new(1,0,0,24); tg.BackgroundTransparency = 1; tg.ZIndex = 17; tg.ClipsDescendants = false; tg.Parent = parent
+	local tg = Instance.new("Frame"); tg.Name = name; tg.Size = UDim2.new(1,0,0,24); tg.BackgroundTransparency = 1; tg.ZIndex = 17; tg.Parent = parent
 	local co = Instance.new("Frame"); co.Size = UDim2.new(0,16,0,16); co.Position = UDim2.new(0,0,0.5,-8); co.BackgroundColor3 = Colors.InnerBorder1; co.BorderSizePixel = 0; co.ZIndex = 18; co.Parent = tg
 	local ci = Instance.new("Frame"); ci.Size = UDim2.new(1,-2,1,-2); ci.Position = UDim2.new(0,1,0,1); ci.BackgroundColor3 = Colors.InnerBorder2; ci.BorderSizePixel = 0; ci.ZIndex = 19; ci.Parent = co
 	local cf = Instance.new("Frame"); cf.Size = UDim2.new(1,-2,1,-2); cf.Position = UDim2.new(0,1,0,1); cf.BackgroundColor3 = default and Colors.Accent or Colors.Disabled; cf.BorderSizePixel = 0; cf.ZIndex = 20; cf.Parent = ci
@@ -1472,152 +1448,53 @@ local function CreateToggle(parent, name, default, defaultKeybind, flag, callbac
 	if hasKeybind then
 		local kb = Instance.new("TextButton"); kb.Size = UDim2.new(0,40,0,18); kb.Position = UDim2.new(1,-40,0.5,-9); kb.BackgroundColor3 = Colors.InnerBorder1; kb.BorderSizePixel = 0; kb.Text = ""; kb.AutoButtonColor = false; kb.ZIndex = 18; kb.Parent = tg
 		local ki = Instance.new("Frame"); ki.Size = UDim2.new(1,-2,1,-2); ki.Position = UDim2.new(0,1,0,1); ki.BackgroundColor3 = Colors.SurfaceLight; ki.BorderSizePixel = 0; ki.ZIndex = 19; ki.Parent = kb
-		kt = Instance.new("TextLabel"); kt.Size = UDim2.new(1,0,1,0); kt.BackgroundTransparency = 1; kt.Text = defaultKeybind; kt.TextColor3 = Colors.Accent; kt.TextSize = 10; kt.FontFace = GothamMedium; kt.ZIndex = 20; kt.Parent = ki
-
-		local modeMenuOuter = Instance.new("Frame")
-		modeMenuOuter.Name = "ModeMenu"
-		modeMenuOuter.Size = UDim2.new(0, 90, 0, 72)
-		modeMenuOuter.BackgroundColor3 = Colors.Border5
-		modeMenuOuter.BorderSizePixel = 0
-		modeMenuOuter.Visible = false
-		modeMenuOuter.ZIndex = 500
-		modeMenuOuter.Parent = ScreenGui
-		km = modeMenuOuter
-
-		local modeMenuBorder = Instance.new("Frame")
-		modeMenuBorder.Size = UDim2.new(1, -2, 1, -2)
-		modeMenuBorder.Position = UDim2.new(0, 1, 0, 1)
-		modeMenuBorder.BackgroundColor3 = Colors.InnerBorder2
-		modeMenuBorder.BorderSizePixel = 0
-		modeMenuBorder.ZIndex = 501
-		modeMenuBorder.Parent = modeMenuOuter
-
-		local modeMenuInner = Instance.new("Frame")
-		modeMenuInner.Size = UDim2.new(1, -2, 1, -2)
-		modeMenuInner.Position = UDim2.new(0, 1, 0, 1)
-		modeMenuInner.BackgroundColor3 = Colors.Background
-		modeMenuInner.BorderSizePixel = 0
-		modeMenuInner.ZIndex = 502
-		modeMenuInner.ClipsDescendants = true
-		modeMenuInner.Parent = modeMenuBorder
-
-		local modeLayout = Instance.new("UIListLayout")
-		modeLayout.Padding = UDim.new(0, 0)
-		modeLayout.Parent = modeMenuInner
+		kt = Instance.new("TextLabel"); kt.Size = UDim2.new(1,0,1,0); kt.BackgroundTransparency = 1; kt.Text = defaultKeybind or "..."; kt.TextColor3 = defaultKeybind and Colors.Accent or Colors.TextDim; kt.TextSize = 10; kt.FontFace = GothamMedium; kt.ZIndex = 20; kt.Parent = ki
+		km = Instance.new("Frame"); km.Size = UDim2.new(0,80,0,68); km.Position = UDim2.new(1,-80,1,2); km.BackgroundColor3 = Colors.InnerBorder1; km.BorderSizePixel = 0; km.Visible = false; km.ZIndex = 100; km.Parent = tg
+		local mi = Instance.new("Frame"); mi.Size = UDim2.new(1,-2,1,-2); mi.Position = UDim2.new(0,1,0,1); mi.BackgroundColor3 = Colors.Background; mi.BorderSizePixel = 0; mi.ZIndex = 101; mi.Parent = km
+		Instance.new("UIListLayout", mi).Padding = UDim.new(0, 0)
 
 		for idx, mode in ipairs({"Toggle", "Always", "Hold"}) do
-			local mb = Instance.new("TextButton")
-			mb.Name = mode
-			mb.Size = UDim2.new(1, 0, 0, 22)
-			mb.BackgroundColor3 = Colors.Background
-			mb.BorderSizePixel = 0
-			mb.Text = mode
-			mb.TextColor3 = idx == 1 and Colors.Accent or Colors.TextSub
-			mb.TextSize = 11
-			mb.FontFace = GothamRegular
-			mb.AutoButtonColor = false
-			mb.ZIndex = 503
-			mb.Parent = modeMenuInner
+			local mb = Instance.new("TextButton"); mb.Name = mode; mb.Size = UDim2.new(1,0,0,22); mb.BackgroundColor3 = Colors.Background; mb.BorderSizePixel = 0; mb.Text = mode; mb.TextColor3 = idx == 1 and Colors.Accent or Colors.TextSub; mb.TextSize = 11; mb.FontFace = GothamRegular; mb.AutoButtonColor = false; mb.ZIndex = 102; mb.Parent = mi
 			modeButtons[mode] = mb
-
-			mb.MouseEnter:Connect(function()
-				if state.currentMode ~= mode then
-					PlayTween(mb, {BackgroundColor3 = Colors.SurfaceLight}, 0.1)
-				end
-			end)
-			mb.MouseLeave:Connect(function()
-				PlayTween(mb, {BackgroundColor3 = Colors.Background}, 0.1)
-			end)
+			mb.MouseEnter:Connect(function() if state.currentMode ~= mode then PlayTween(mb, {BackgroundColor3=Colors.SurfaceLight}, 0.1) end end)
+			mb.MouseLeave:Connect(function() if state.currentMode ~= mode then PlayTween(mb, {BackgroundColor3=Colors.Background}, 0.1) end end)
 			mb.MouseButton1Down:Connect(function()
-				local old = state.currentMode
-				state.currentMode = mode
-				for m, b in pairs(modeButtons) do
-					b.TextColor3 = m == mode and Colors.Accent or Colors.TextSub
-					b.BackgroundColor3 = Colors.Background
-				end
-				modeMenuOuter.Visible = false
-				ActiveKeybindMenu = nil
-
-				if mode == "Always" then
-					state.isEnabled = true
-					Library.Flags[flag] = true
-					PlayTween(cf, {BackgroundColor3 = Colors.Accent}, 0.12)
-					callback(true)
-				elseif old == "Always" then
-					state.isEnabled = false
-					Library.Flags[flag] = false
-					PlayTween(cf, {BackgroundColor3 = Colors.Disabled}, 0.12)
-					callback(false)
-				elseif old == "Hold" then
-					state.isEnabled = false
-					Library.Flags[flag] = false
-					PlayTween(cf, {BackgroundColor3 = Colors.Disabled}, 0.12)
-					callback(false)
-				end
+				local old = state.currentMode; state.currentMode = mode
+				for m, b in pairs(modeButtons) do b.TextColor3 = m == mode and Colors.Accent or Colors.TextSub; b.BackgroundColor3 = Colors.Background end
+				km.Visible = false; ActiveKeybindMenu = nil
+				if mode == "Always" then state.isEnabled = true; Library.Flags[flag] = true; PlayTween(cf, {BackgroundColor3=Colors.Accent}, 0.12); callback(true)
+				elseif old == "Always" then state.isEnabled = false; Library.Flags[flag] = false; PlayTween(cf, {BackgroundColor3=Colors.Disabled}, 0.12); callback(false)
+				elseif old == "Hold" then state.isEnabled = false; Library.Flags[flag] = false; PlayTween(cf, {BackgroundColor3=Colors.Disabled}, 0.12); callback(false) end
 				Library:UpdateKeybindList()
 			end)
 		end
 
-		kb.MouseEnter:Connect(function() PlayTween(ki, {BackgroundColor3 = Colors.InnerBorder2}, 0.1) end)
-		kb.MouseLeave:Connect(function() PlayTween(ki, {BackgroundColor3 = Colors.SurfaceLight}, 0.1) end)
-
+		kb.MouseEnter:Connect(function() PlayTween(ki, {BackgroundColor3=Colors.InnerBorder2}, 0.1) end)
+		kb.MouseLeave:Connect(function() PlayTween(ki, {BackgroundColor3=Colors.SurfaceLight}, 0.1) end)
 		kb.MouseButton1Click:Connect(function()
-			if state.isBinding then return end
-			state.isBinding = true
-			kt.Text = "..."
-			kt.TextColor3 = Colors.AccentLight
-			local c
-			c = UserInputService.InputBegan:Connect(function(inp, gp)
+			if state.isBinding then return end; state.isBinding = true; kt.Text = "..."; kt.TextColor3 = Colors.AccentLight
+			local c; c = UserInputService.InputBegan:Connect(function(inp, gp)
 				if gp then return end
 				if inp.UserInputType == Enum.UserInputType.Keyboard then
-					state.currentKey = inp.KeyCode.Name
-					kt.Text = inp.KeyCode.Name
-					kt.TextColor3 = Colors.Accent
-					state.isBinding = false
-					c:Disconnect()
-					Library:UpdateKeybindList()
-				elseif inp.UserInputType == Enum.UserInputType.MouseButton2 then
-					kt.Text = state.currentKey or "..."
-					kt.TextColor3 = state.currentKey and Colors.Accent or Colors.TextDim
-					state.isBinding = false
-					c:Disconnect()
+					state.currentKey = inp.KeyCode.Name; kt.Text = inp.KeyCode.Name; kt.TextColor3 = Colors.Accent; state.isBinding = false; c:Disconnect(); Library:UpdateKeybindList()
+				elseif inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.MouseButton2 then
+					kt.Text = state.currentKey or "..."; kt.TextColor3 = state.currentKey and Colors.Accent or Colors.TextDim; state.isBinding = false; c:Disconnect()
 				end
 			end)
 		end)
-
 		kb.MouseButton2Click:Connect(function()
-			if state.isBinding then return end
-			if ActiveKeybindMenu and ActiveKeybindMenu ~= km then
-				ActiveKeybindMenu.Visible = false
-			end
-
-			if km.Visible then
-				km.Visible = false
-				ActiveKeybindMenu = nil
-			else
-				local absPos = kb.AbsolutePosition
-				local absSize = kb.AbsoluteSize
-				km.Position = UDim2.new(0, absPos.X + absSize.X - 90, 0, absPos.Y + absSize.Y + 2)
-				km.Visible = true
-				ActiveKeybindMenu = km
-			end
+			if ActiveKeybindMenu and ActiveKeybindMenu ~= km then ActiveKeybindMenu.Visible = false end
+			km.Visible = not km.Visible; ActiveKeybindMenu = km.Visible and km or nil
 		end)
 
 		local c1 = UserInputService.InputBegan:Connect(function(inp, gp)
 			if gp or state.isBinding then return end
 			if inp.UserInputType == Enum.UserInputType.Keyboard and state.currentKey and inp.KeyCode.Name == state.currentKey then
 				if state.currentMode == "Toggle" then
-					state.isEnabled = not state.isEnabled
-					Library.Flags[flag] = state.isEnabled
-					PlayTween(cf, {BackgroundColor3 = state.isEnabled and Colors.Accent or Colors.Disabled}, 0.12)
-					callback(state.isEnabled)
-					Library:UpdateKeybindList()
+					state.isEnabled = not state.isEnabled; Library.Flags[flag] = state.isEnabled
+					PlayTween(cf, {BackgroundColor3 = state.isEnabled and Colors.Accent or Colors.Disabled}, 0.12); callback(state.isEnabled); Library:UpdateKeybindList()
 				elseif state.currentMode == "Hold" then
-					state.isEnabled = true
-					Library.Flags[flag] = true
-					PlayTween(cf, {BackgroundColor3 = Colors.Accent}, 0.12)
-					callback(true)
-					Library:UpdateKeybindList()
+					state.isEnabled = true; Library.Flags[flag] = true; PlayTween(cf, {BackgroundColor3=Colors.Accent}, 0.12); callback(true); Library:UpdateKeybindList()
 				end
 			end
 		end)
@@ -1625,16 +1502,11 @@ local function CreateToggle(parent, name, default, defaultKeybind, flag, callbac
 			if state.isBinding then return end
 			if inp.UserInputType == Enum.UserInputType.Keyboard and state.currentKey and inp.KeyCode.Name == state.currentKey then
 				if state.currentMode == "Hold" then
-					state.isEnabled = false
-					Library.Flags[flag] = false
-					PlayTween(cf, {BackgroundColor3 = Colors.Disabled}, 0.12)
-					callback(false)
-					Library:UpdateKeybindList()
+					state.isEnabled = false; Library.Flags[flag] = false; PlayTween(cf, {BackgroundColor3=Colors.Disabled}, 0.12); callback(false); Library:UpdateKeybindList()
 				end
 			end
 		end)
-		table.insert(Library.Connections, c1)
-		table.insert(Library.Connections, c2)
+		table.insert(Library.Connections, c1); table.insert(Library.Connections, c2)
 	end
 
 	Library.Flags[flag] = state.isEnabled
@@ -1643,10 +1515,8 @@ local function CreateToggle(parent, name, default, defaultKeybind, flag, callbac
 	local btn = Instance.new("TextButton"); btn.Size = UDim2.new(0,26,1,0); btn.BackgroundTransparency = 1; btn.Text = ""; btn.ZIndex = 21; btn.Parent = tg
 	btn.MouseButton1Click:Connect(function()
 		if hasKeybind and state.currentMode == "Always" then return end
-		state.isEnabled = not state.isEnabled
-		Library.Flags[flag] = state.isEnabled
-		PlayTween(cf, {BackgroundColor3 = state.isEnabled and Colors.Accent or Colors.Disabled}, 0.12)
-		callback(state.isEnabled)
+		state.isEnabled = not state.isEnabled; Library.Flags[flag] = state.isEnabled
+		PlayTween(cf, {BackgroundColor3 = state.isEnabled and Colors.Accent or Colors.Disabled}, 0.12); callback(state.isEnabled)
 		if hasKeybind then Library:UpdateKeybindList() end
 	end)
 
@@ -1790,18 +1660,19 @@ local function CreateColorPicker(parent, name, default, flag, callback)
 
 	local popupOuter = Instance.new("Frame")
 	popupOuter.Size = UDim2.new(0, 180, 0, 200)
+	popupOuter.Position = UDim2.new(1, -180, 1, 4)
 	popupOuter.BackgroundColor3 = Colors.InnerBorder1
 	popupOuter.BorderSizePixel = 0
 	popupOuter.Visible = false
-	popupOuter.ZIndex = 400
-	popupOuter.Parent = ScreenGui
+	popupOuter.ZIndex = 300
+	popupOuter.Parent = cpFrame
 
 	local popupBorder = Instance.new("Frame")
 	popupBorder.Size = UDim2.new(1, -2, 1, -2)
 	popupBorder.Position = UDim2.new(0, 1, 0, 1)
 	popupBorder.BackgroundColor3 = Colors.InnerBorder2
 	popupBorder.BorderSizePixel = 0
-	popupBorder.ZIndex = 401
+	popupBorder.ZIndex = 301
 	popupBorder.Parent = popupOuter
 
 	local popupBg = Instance.new("Frame")
@@ -1809,7 +1680,7 @@ local function CreateColorPicker(parent, name, default, flag, callback)
 	popupBg.Position = UDim2.new(0, 1, 0, 1)
 	popupBg.BackgroundColor3 = Colors.Background
 	popupBg.BorderSizePixel = 0
-	popupBg.ZIndex = 402
+	popupBg.ZIndex = 302
 	popupBg.Parent = popupBorder
 
 	local h, s2, v2 = default:ToHSV()
@@ -1819,7 +1690,7 @@ local function CreateColorPicker(parent, name, default, flag, callback)
 	satValOuter.Position = UDim2.new(0, 7, 0, 7)
 	satValOuter.BackgroundColor3 = Colors.Border5
 	satValOuter.BorderSizePixel = 0
-	satValOuter.ZIndex = 403
+	satValOuter.ZIndex = 303
 	satValOuter.Parent = popupBg
 
 	local satValFrame = Instance.new("Frame")
@@ -1827,7 +1698,7 @@ local function CreateColorPicker(parent, name, default, flag, callback)
 	satValFrame.Position = UDim2.new(0, 1, 0, 1)
 	satValFrame.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
 	satValFrame.BorderSizePixel = 0
-	satValFrame.ZIndex = 404
+	satValFrame.ZIndex = 304
 	satValFrame.ClipsDescendants = true
 	satValFrame.Parent = satValOuter
 
@@ -1844,7 +1715,7 @@ local function CreateColorPicker(parent, name, default, flag, callback)
 	blackOverlay.Size = UDim2.new(1, 0, 1, 0)
 	blackOverlay.BackgroundColor3 = Color3.new(0, 0, 0)
 	blackOverlay.BorderSizePixel = 0
-	blackOverlay.ZIndex = 405
+	blackOverlay.ZIndex = 305
 	blackOverlay.Parent = satValFrame
 
 	local blackGrad = Instance.new("UIGradient")
@@ -1861,17 +1732,23 @@ local function CreateColorPicker(parent, name, default, flag, callback)
 	satValCursor.Position = UDim2.new(s2, -4, 1 - v2, -4)
 	satValCursor.BackgroundColor3 = Color3.new(1, 1, 1)
 	satValCursor.BorderSizePixel = 0
-	satValCursor.ZIndex = 407
+	satValCursor.ZIndex = 307
 	satValCursor.Parent = satValFrame
 
-	Instance.new("UICorner", satValCursor).CornerRadius = UDim.new(1, 0)
-	local cursorStroke = Instance.new("UIStroke"); cursorStroke.Color = Color3.new(0, 0, 0); cursorStroke.Thickness = 1; cursorStroke.Parent = satValCursor
+	local cursorCorner = Instance.new("UICorner")
+	cursorCorner.CornerRadius = UDim.new(1, 0)
+	cursorCorner.Parent = satValCursor
+
+	local cursorStroke = Instance.new("UIStroke")
+	cursorStroke.Color = Color3.new(0, 0, 0)
+	cursorStroke.Thickness = 1
+	cursorStroke.Parent = satValCursor
 
 	local satValBtn = Instance.new("TextButton")
 	satValBtn.Size = UDim2.new(1, 0, 1, 0)
 	satValBtn.BackgroundTransparency = 1
 	satValBtn.Text = ""
-	satValBtn.ZIndex = 408
+	satValBtn.ZIndex = 308
 	satValBtn.Parent = satValFrame
 
 	local hueOuter = Instance.new("Frame")
@@ -1879,7 +1756,7 @@ local function CreateColorPicker(parent, name, default, flag, callback)
 	hueOuter.Position = UDim2.new(0, 7, 0, 133)
 	hueOuter.BackgroundColor3 = Colors.Border5
 	hueOuter.BorderSizePixel = 0
-	hueOuter.ZIndex = 403
+	hueOuter.ZIndex = 303
 	hueOuter.Parent = popupBg
 
 	local hueFrame = Instance.new("Frame")
@@ -1887,7 +1764,7 @@ local function CreateColorPicker(parent, name, default, flag, callback)
 	hueFrame.Position = UDim2.new(0, 1, 0, 1)
 	hueFrame.BackgroundColor3 = Color3.new(1, 1, 1)
 	hueFrame.BorderSizePixel = 0
-	hueFrame.ZIndex = 404
+	hueFrame.ZIndex = 304
 	hueFrame.ClipsDescendants = true
 	hueFrame.Parent = hueOuter
 
@@ -1908,16 +1785,19 @@ local function CreateColorPicker(parent, name, default, flag, callback)
 	hueCursor.Position = UDim2.new(h, -2, 0, -3)
 	hueCursor.BackgroundColor3 = Color3.new(1, 1, 1)
 	hueCursor.BorderSizePixel = 0
-	hueCursor.ZIndex = 406
+	hueCursor.ZIndex = 306
 	hueCursor.Parent = hueFrame
 
-	local hueCursorStroke = Instance.new("UIStroke"); hueCursorStroke.Color = Color3.new(0, 0, 0); hueCursorStroke.Thickness = 1; hueCursorStroke.Parent = hueCursor
+	local hueCursorStroke = Instance.new("UIStroke")
+	hueCursorStroke.Color = Color3.new(0, 0, 0)
+	hueCursorStroke.Thickness = 1
+	hueCursorStroke.Parent = hueCursor
 
 	local hueBtn = Instance.new("TextButton")
 	hueBtn.Size = UDim2.new(1, 0, 1, 0)
 	hueBtn.BackgroundTransparency = 1
 	hueBtn.Text = ""
-	hueBtn.ZIndex = 407
+	hueBtn.ZIndex = 307
 	hueBtn.Parent = hueFrame
 
 	local hexInput = Instance.new("Frame")
@@ -1925,7 +1805,7 @@ local function CreateColorPicker(parent, name, default, flag, callback)
 	hexInput.Position = UDim2.new(0, 7, 0, 155)
 	hexInput.BackgroundColor3 = Colors.InnerBorder1
 	hexInput.BorderSizePixel = 0
-	hexInput.ZIndex = 403
+	hexInput.ZIndex = 303
 	hexInput.Parent = popupBg
 
 	local hexInner = Instance.new("Frame")
@@ -1933,7 +1813,7 @@ local function CreateColorPicker(parent, name, default, flag, callback)
 	hexInner.Position = UDim2.new(0, 1, 0, 1)
 	hexInner.BackgroundColor3 = Colors.Deep
 	hexInner.BorderSizePixel = 0
-	hexInner.ZIndex = 404
+	hexInner.ZIndex = 304
 	hexInner.ClipsDescendants = true
 	hexInner.Parent = hexInput
 
@@ -1948,7 +1828,7 @@ local function CreateColorPicker(parent, name, default, flag, callback)
 	hexBox.TextSize = 11
 	hexBox.FontFace = GothamMedium
 	hexBox.ClearTextOnFocus = false
-	hexBox.ZIndex = 405
+	hexBox.ZIndex = 305
 	hexBox.Parent = hexInner
 
 	local rgbLabel = Instance.new("TextLabel")
@@ -1960,7 +1840,7 @@ local function CreateColorPicker(parent, name, default, flag, callback)
 	rgbLabel.TextSize = 10
 	rgbLabel.FontFace = GothamRegular
 	rgbLabel.TextXAlignment = Enum.TextXAlignment.Center
-	rgbLabel.ZIndex = 403
+	rgbLabel.ZIndex = 303
 	rgbLabel.Parent = popupBg
 
 	local cpState = {currentColor = default, hue = h, sat = s2, val = v2}
@@ -1970,11 +1850,6 @@ local function CreateColorPicker(parent, name, default, flag, callback)
 	local isOpen = false
 	previewBtn.MouseButton1Click:Connect(function()
 		isOpen = not isOpen
-		if isOpen then
-			local absPos = previewOuter.AbsolutePosition
-			local absSize = previewOuter.AbsoluteSize
-			popupOuter.Position = UDim2.new(0, absPos.X + absSize.X - 180, 0, absPos.Y + absSize.Y + 4)
-		end
 		popupOuter.Visible = isOpen
 	end)
 
@@ -2231,4 +2106,8 @@ function Library:AutoShow()
 end
 
 getgenv().library = Library
+Layer1.Visible = false
+watermarkBorderAccent.Visible = false
+keybindBorderAccent.Visible = false
+indicatorBorderAccent.Visible = false
 return Library
